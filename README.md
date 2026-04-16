@@ -91,9 +91,9 @@ npm start
 
 # 👨‍💻 Equipo
 
-Ivo Bertoni — FullStack Dev / QA
-Diego Contreras — FullStack Dev
-Andrés Volpe — FullStack Dev / QA
+* Ivo Bertoni — FullStack Dev / QA
+* Diego Contreras — FullStack Dev
+* Andrés Volpe — FullStack Dev / QA
 
 # 📄 Licencia
 
