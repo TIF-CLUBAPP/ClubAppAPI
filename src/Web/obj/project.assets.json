@@ -37,6 +37,22 @@
           }
         }
       },
+      "Swashbuckle.AspNetCore.SwaggerUI/10.1.7": {
+        "type": "package",
+        "compile": {
+          "lib/net10.0/Swashbuckle.AspNetCore.SwaggerUI.dll": {
+            "related": ".pdb;.xml"
+          }
+        },
+        "runtime": {
+          "lib/net10.0/Swashbuckle.AspNetCore.SwaggerUI.dll": {
+            "related": ".pdb;.xml"
+          }
+        },
+        "frameworkReferences": [
+          "Microsoft.AspNetCore.App"
+        ]
+      },
       "Application/1.0.0": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v10.0",
@@ -112,6 +128,27 @@
         "microsoft.openapi.nuspec"
       ]
     },
+    "Swashbuckle.AspNetCore.SwaggerUI/10.1.7": {
+      "sha512": "iJo3ODyUb/M8Vm8AH1r9y9iAba0w95xsCn3zFVl96ISRHbTDWxi+l7oFVCZqUEdjd97B8VMDPnMliWAdomR8uw==",
+      "type": "package",
+      "path": "swashbuckle.aspnetcore.swaggerui/10.1.7",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "lib/net10.0/Swashbuckle.AspNetCore.SwaggerUI.dll",
+        "lib/net10.0/Swashbuckle.AspNetCore.SwaggerUI.pdb",
+        "lib/net10.0/Swashbuckle.AspNetCore.SwaggerUI.xml",
+        "lib/net8.0/Swashbuckle.AspNetCore.SwaggerUI.dll",
+        "lib/net8.0/Swashbuckle.AspNetCore.SwaggerUI.pdb",
+        "lib/net8.0/Swashbuckle.AspNetCore.SwaggerUI.xml",
+        "lib/net9.0/Swashbuckle.AspNetCore.SwaggerUI.dll",
+        "lib/net9.0/Swashbuckle.AspNetCore.SwaggerUI.pdb",
+        "lib/net9.0/Swashbuckle.AspNetCore.SwaggerUI.xml",
+        "package-readme.md",
+        "swashbuckle.aspnetcore.swaggerui.10.1.7.nupkg.sha512",
+        "swashbuckle.aspnetcore.swaggerui.nuspec"
+      ]
+    },
     "Application/1.0.0": {
       "type": "project",
       "path": "../Application/Application.csproj",
@@ -132,7 +169,8 @@
     "net10.0": [
       "Application >= 1.0.0",
       "Infrastructure >= 1.0.0",
-      "Microsoft.AspNetCore.OpenApi >= 10.0.5"
+      "Microsoft.AspNetCore.OpenApi >= 10.0.5",
+      "Swashbuckle.AspNetCore.SwaggerUI >= 10.1.7"
     ]
   },
   "packageFolders": {
@@ -142,11 +180,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Web\\Web.csproj",
+      "projectUniqueName": "c:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Web\\Web.csproj",
       "projectName": "Web",
-      "projectPath": "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Web\\Web.csproj",
+      "projectPath": "c:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Web\\Web.csproj",
       "packagesPath": "C:\\Users\\berto\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Web\\obj\\",
+      "outputPath": "c:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Web\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -167,8 +205,8 @@
         "net10.0": {
           "targetAlias": "net10.0",
           "projectReferences": {
-            "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Application\\Application.csproj": {
-              "projectPath": "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Application\\Application.csproj"
+            "c:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Application\\Application.csproj": {
+              "projectPath": "c:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Application\\Application.csproj"
             },
             "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Infrastructure\\Infrastructure.csproj": {
               "projectPath": "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Infrastructure\\Infrastructure.csproj"
@@ -195,6 +233,10 @@
           "Microsoft.AspNetCore.OpenApi": {
             "target": "Package",
             "version": "[10.0.5, )"
+          },
+          "Swashbuckle.AspNetCore.SwaggerUI": {
+            "target": "Package",
+            "version": "[10.1.7, )"
           }
         },
         "imports": [
