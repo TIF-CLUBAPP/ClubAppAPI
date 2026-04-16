@@ -72,7 +72,7 @@ Se implementa control de acceso basado en roles.
 Clonar repositorio
 git clone https://github.com/tu-usuario/clubapp.git
 
-# Entrar al proyecto
+# 👥 Entrar al proyecto
 cd clubapp
 
 Backend
@@ -90,6 +90,7 @@ npm start
 (A FUTURO OJO)
 
 # 👨‍💻 Equipo
+
 Ivo Bertoni — FullStack Dev / QA
 Diego Contreras — FullStack Dev
 Andrés Volpe — FullStack Dev / QA
@@ -98,6 +99,6 @@ Andrés Volpe — FullStack Dev / QA
 
 Este proyecto es de uso académico.
 
-#💡 Sobre el proyecto
+# 💡 Sobre el proyecto
 
 ClubApp nace como una solución para clubes pequeños que aún gestionan sus membresías de forma manual o con herramientas poco eficientes, ofreciendo una alternativa digital simple, clara y accesible.
