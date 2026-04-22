@@ -14,6 +14,22 @@ builder.Services.AddOpenApi();
 // Aquí le decimos al sistema: "Cuando un Controller pida IActivityService, dale ActivityService"
 builder.Services.AddScoped<IActivityService, ActivityService>();
 
+//Enrollment builder inscripcion
+builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
+
+//User builder 
+builder.Services.AddScoped<IUserService, UserService>();
+
+//Notification builder
+builder.Services.AddScoped<INotificationService, NotificationService>();
+
+//MemberShip builder membresia
+builder.Services.AddScoped<IMembershipService, MembershipService>();
+
+//Payment builder pago
+builder.Services.AddScoped<IPaymentService, PaymentService>();
+
+
 // ----------------------------------------------
 
 var app = builder.Build();
