@@ -2,7 +2,7 @@
   "version": 2,
   "dgSpecHash": "XIDStEujPV4=",
   "success": true,
-  "projectFilePath": "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Web\\Web.csproj",
+  "projectFilePath": "/home/diego/Proyectos/ClubAppAPI/src/Web/Web.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\berto\\.nuget\\packages\\microsoft.aspnetcore.openapi\\10.0.5\\microsoft.aspnetcore.openapi.10.0.5.nupkg.sha512",
     "C:\\Users\\berto\\.nuget\\packages\\microsoft.openapi\\2.0.0\\microsoft.openapi.2.0.0.nupkg.sha512",
