@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "YrLE3ro+WPA=",
+  "dgSpecHash": "aXAJ43tKlVM=",
   "success": true,
-  "projectFilePath": "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Application\\Application.csproj",
+  "projectFilePath": "/home/diego/Proyectos/ClubAppAPI/src/Application/Application.csproj",
   "expectedPackageFiles": [],
   "logs": []
 }
