@@ -18,7 +18,7 @@ public class MembershipsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll() => Ok(await _membershipService.GetAllMembershipsAsync());
 
-    [HttpGet("user/{userId}")]
+    [HttpGet("user/{userId:int}")]
     public async Task<IActionResult> GetByUser(int userId)
     {
         var membership = await _membershipService.GetByUserIdAsync(userId);
@@ -32,7 +32,7 @@ public class MembershipsController : ControllerBase
         return Ok(new { message = "Membresía asignada correctamente" });
     }
 
-    [HttpPatch("{id}/status")]
+    [HttpPatch("{id:int}/status")]
     public async Task<IActionResult> UpdateStatus(int id, [FromBody] string newStatus)
     {
         var result = await _membershipService.UpdateStatusAsync(id, newStatus);
