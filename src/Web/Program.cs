@@ -10,6 +10,19 @@ builder.Services.AddControllers();
 // Configuración de OpenAPI / Swagger
 builder.Services.AddOpenApi();
 
+// Configure the SQLite connection
+var connection = new SqliteConnection("Data Source=miWebAppDatabase.db");
+connection.Open();
+
+// Set journal mode to DELETE using PRAGMA statement
+using (var command = connection.CreateCommand())
+{
+    command.CommandText = "PRAGMA journal_mode = DELETE;";
+    command.ExecuteNonQuery();
+}
+
+builder.Services.AddDbContext<ApplicationContext>(options => options.UseSqlite(connection));
+
 // --- INYECCIÓN DE DEPENDENCIAS (EL "CABLEADO") ---
 // Aquí le decimos al sistema: "Cuando un Controller pida IActivityService, dale ActivityService"
 builder.Services.AddScoped<IActivityService, ActivityService>();
