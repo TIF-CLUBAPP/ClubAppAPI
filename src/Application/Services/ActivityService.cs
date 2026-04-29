@@ -5,6 +5,26 @@ namespace ClubApp.Application.Services;
 
 public class ActivityService : IActivityService
 {
+    public async Task<bool> UpdateActivityAsync(int activityId, ActivityDto dto)
+    {
+        var existing = _activities.FirstOrDefault(a => a.Id == activityId);
+        if (existing == null) return false;
+
+        existing.Name = dto.Name;
+        existing.Schedule = dto.Schedule;
+        existing.AvailableSlots = dto.AvailableSlots;
+        return true;
+    }
+
+    public async Task<bool> DeleteActivityAsync(int activityId)
+    {
+        var activity = _activities.FirstOrDefault(a => a.Id == activityId);
+        if (activity == null) return false;
+
+        _activities.Remove(activity);
+        return true;
+    }
+
     // Lista estática para simular la base de datos
     private static List<ActivityDto> _activities = new List<ActivityDto>
     {
@@ -35,4 +55,6 @@ public class ActivityService : IActivityService
         }
         return await Task.FromResult(false);
     }
+
+
 }

@@ -24,4 +24,12 @@ public class PaymentService : IPaymentService
         _payments.Add(dto);
         return await Task.FromResult(true);
     }
+    public async Task<bool> UpdatePaymentStatusAsync(int paymentId, string newStatus)
+    {
+        var payment = _payments.FirstOrDefault(p => p.Id == paymentId);
+        if (payment == null) return false;
+
+        payment.Status = newStatus;
+        return await Task.FromResult(true);
+    }
 }

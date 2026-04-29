@@ -18,7 +18,7 @@ public class UsersController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll() => Ok(await _userService.GetAllUsersAsync());
 
-    [HttpGet("{id}")]
+    [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
     {
         var user = await _userService.GetUserByIdAsync(id);
@@ -32,7 +32,16 @@ public class UsersController : ControllerBase
         return Ok(new { message = "Usuario creado correctamente" });
     }
 
-    [HttpDelete("{id}")]
+    [HttpPut("{id:int}")]
+    public async Task<IActionResult> Put(int id, [FromBody] UserDto dto)
+    {
+        var result = await _userService.UpdateUserAsync(id, dto);
+        if (!result) return NotFound($"No se pudo actualizar: ID {id} no encontrado");
+
+        return Ok("Usuario modificado");
+    }
+
+    [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
         var result = await _userService.DeleteUserAsync(id);

@@ -20,3 +20,7 @@ namespace ClubApp.Domain.Entities;
 
 
     }
+
+public class BaseEntity
+{
+}

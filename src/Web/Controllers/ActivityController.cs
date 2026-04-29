@@ -24,4 +24,27 @@ public class ActivitiesController : ControllerBase
         await _activityService.CreateActivityAsync(dto);
         return Ok("Actividad creada en memoria");
     }
+
+    // --- MODIFICACIÓN ---
+    [HttpPut("{activityId:int}")]
+    public async Task<IActionResult> Put(int activityId, [FromBody] ActivityDto dto)
+    {
+        // Usamos activityId (el de la URL) para buscar
+        var result = await _activityService.UpdateActivityAsync(activityId, dto);
+
+        if (!result) return NotFound($"No se encontró la actividad con ID {activityId}");
+
+        return Ok("Actividad modificada con éxito");
+    }
+
+    // --- BAJA ---
+    [HttpDelete("{activityId:int}")]
+    public async Task<IActionResult> Delete(int activityId)
+    {
+        var result = await _activityService.DeleteActivityAsync(activityId);
+
+        if (!result) return NotFound($"No se pudo eliminar: ID {activityId} no encontrado");
+
+        return Ok($"Actividad {activityId} eliminada");
+    }
 }

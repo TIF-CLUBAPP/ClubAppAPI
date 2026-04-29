@@ -34,4 +34,20 @@ public class EnrollmentsController : ControllerBase
         var result = await _enrollmentService.CancelEnrollmentAsync(id);
         return result ? Ok("Inscripción cancelada") : NotFound();
     }
+
+        [HttpPut("{id:int}")]
+    public async Task<IActionResult> Put(int id, [FromBody] EnrollmentDto dto)
+    {
+        var result = await _enrollmentService.UpdateEnrollmentAsync(id, dto);
+        if (!result) return NotFound($"No se encontró la inscripción con ID {id}");
+        return Ok("Inscripción actualizada con éxito");
+    }
+
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> Delete(int id)
+    {
+        var result = await _enrollmentService.DeleteEnrollmentAsync(id);
+        if (!result) return NotFound($"No se encontró la inscripción con ID {id}");
+        return Ok($"Inscripción {id} eliminada");
+    }
 }
