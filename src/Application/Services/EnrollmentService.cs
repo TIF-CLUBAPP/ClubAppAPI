@@ -21,6 +21,29 @@ public class EnrollmentService : IEnrollmentService
         return await Task.FromResult(true);
     }
 
+    public async Task<bool> UpdateEnrollmentAsync(int enrollmentId, EnrollmentDto enrollmentDto)
+    {
+        var existing = _enrollments.FirstOrDefault(e => e.Id == enrollmentId);
+        if (existing == null) return false;
+
+        existing.UserId = enrollmentDto.UserId;
+        existing.ActivityId = enrollmentDto.ActivityId;
+        existing.EnrollmentDate = enrollmentDto.EnrollmentDate;
+        existing.Status = enrollmentDto.Status;
+        existing.ActivityName = enrollmentDto.ActivityName;
+
+        return await Task.FromResult(true);
+    }
+
+    public async Task<bool> DeleteEnrollmentAsync(int enrollmentId)
+    {
+        var enrollment = _enrollments.FirstOrDefault(e => e.Id == enrollmentId);
+        if (enrollment == null) return false;
+
+        _enrollments.Remove(enrollment);
+        return await Task.FromResult(true);
+    }
+
     public async Task<bool> CancelEnrollmentAsync(int enrollmentId)
     {
         var enrollment = _enrollments.FirstOrDefault(e => e.Id == enrollmentId);
