@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "c:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Infrastructure\\Infrastructure.csproj": {}
+    "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Infrastructure\\Infrastructure.csproj": {}
   },
   "projects": {
-    "c:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Application\\Application.csproj": {
+    "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Application\\Application.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "c:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Application\\Application.csproj",
+        "projectUniqueName": "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Application\\Application.csproj",
         "projectName": "Application",
-        "projectPath": "c:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Application\\Application.csproj",
+        "projectPath": "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Application\\Application.csproj",
         "packagesPath": "C:\\Users\\berto\\.nuget\\packages\\",
-        "outputPath": "c:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Application\\obj\\",
+        "outputPath": "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Application\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -32,8 +32,8 @@
           "net10.0": {
             "targetAlias": "net10.0",
             "projectReferences": {
-              "c:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Domain\\Domain.csproj": {
-                "projectPath": "c:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Domain\\Domain.csproj"
+              "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Domain\\Domain.csproj": {
+                "projectPath": "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Domain\\Domain.csproj"
               }
             }
           }
@@ -347,14 +347,14 @@
         }
       }
     },
-    "c:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Domain\\Domain.csproj": {
+    "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Domain\\Domain.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "c:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Domain\\Domain.csproj",
+        "projectUniqueName": "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Domain\\Domain.csproj",
         "projectName": "Domain",
-        "projectPath": "c:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Domain\\Domain.csproj",
+        "projectPath": "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Domain\\Domain.csproj",
         "packagesPath": "C:\\Users\\berto\\.nuget\\packages\\",
-        "outputPath": "c:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Domain\\obj\\",
+        "outputPath": "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Domain\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -686,14 +686,14 @@
         }
       }
     },
-    "c:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Infrastructure\\Infrastructure.csproj": {
+    "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Infrastructure\\Infrastructure.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "c:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Infrastructure\\Infrastructure.csproj",
+        "projectUniqueName": "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Infrastructure\\Infrastructure.csproj",
         "projectName": "Infrastructure",
-        "projectPath": "c:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Infrastructure\\Infrastructure.csproj",
+        "projectPath": "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Infrastructure\\Infrastructure.csproj",
         "packagesPath": "C:\\Users\\berto\\.nuget\\packages\\",
-        "outputPath": "c:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Infrastructure\\obj\\",
+        "outputPath": "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Infrastructure\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -714,8 +714,8 @@
           "net10.0": {
             "targetAlias": "net10.0",
             "projectReferences": {
-              "c:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Application\\Application.csproj": {
-                "projectPath": "c:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Application\\Application.csproj"
+              "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Application\\Application.csproj": {
+                "projectPath": "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Application\\Application.csproj"
               }
             }
           }
@@ -735,6 +735,12 @@
       "frameworks": {
         "net10.0": {
           "targetAlias": "net10.0",
+          "dependencies": {
+            "Microsoft.EntityFrameworkCore.Sqlite": {
+              "target": "Package",
+              "version": "[10.0.7, )"
+            }
+          },
           "imports": [
             "net461",
             "net462",
