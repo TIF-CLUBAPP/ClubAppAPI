@@ -1,5 +1,8 @@
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Services;
+using Infrastructure.Data;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
