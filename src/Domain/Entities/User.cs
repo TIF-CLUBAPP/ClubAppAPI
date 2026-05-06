@@ -20,7 +20,7 @@ public class User : BaseEntity
     public string PasswordHash { get; set; } = string.Empty;
 
     // El Rol que define qué puede hacer este usuario
-    public UserRole Role { get; set; } = UserRole.MEMBER;
+    public UserRole Role { get; set; } = UserRole.MEMBER; 
 
     // Campo de la clase MemberUser (ahora integrado aquí)
     public DateTime? LastPaymentDate { get; set; }

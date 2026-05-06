@@ -1,12 +1,13 @@
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Dtos;
 using ClubApp.Domain.Entities;
+using ClubApp.Domain.Interfaces;
 
 namespace ClubApp.Application.Services;
 
 public class UserService : IUserService
 {
-    // Cambiamos la lista estática por el repositorio
+    // Cambiamos la lista estática por el repositorio 
     private readonly IUserRepository _userRepository;
 
     // Inyectamos el repositorio en el constructor
@@ -15,23 +16,21 @@ public class UserService : IUserService
         _userRepository = userRepository;
     }
 
-    public async Task<IEnumerable<UserDto>> GetAllUsersAsync()
+        public async Task<IEnumerable<UserDto>> GetAllUsersAsync()
     {
         var users = await _userRepository.GetAllAsync();
-        
-        // Mapeamos de Entidad (Domain) a DTO (Application)
-        return users.Select(u => new UserDto 
-        { 
-            Id = u.Id, 
-            FirstName = u.FirstName, 
-            LastName = u.LastName, 
-            Email = u.Email, 
-            Role = u.Role,
+
+        return users.Select(u => new UserDto
+        {
+            Id = u.Id,
+            FirstName = u.FirstName,
+            LastName = u.LastName,
+            Email = u.Email,
+            Role = u.Role,// tambien falta?
             BadgeNum = u.BadgeNum,
             CreatedAt = u.CreatedAt
         });
     }
-
     public async Task<UserDto?> GetUserByIdAsync(int id)
     {
         var user = await _userRepository.GetByIdAsync(id);

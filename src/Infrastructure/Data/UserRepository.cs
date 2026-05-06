@@ -6,9 +6,9 @@ using Infrastructure.Data;
 
 namespace ClubApp.Infrastructure.Data;
 
-public class ActivityRepository : RepositoryBase<Activity>, IActivityRepository 
+public class UserRepository : RepositoryBase<User>, IUserRepository 
 {
-    public ActivityRepository(ApplicationContext context) : base(context)
+    public UserRepository(ApplicationContext context) : base(context)
     {
         
     }

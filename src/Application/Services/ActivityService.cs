@@ -3,7 +3,7 @@ using ClubApp.Application.Dtos;
 using ClubApp.Domain.Entities;
 using ClubApp.Domain.Interfaces;
 
-namespace ClubApp.Application.Services;
+namespace ClubApp.Application.Services; 
 
 public class ActivityService : IActivityService
 {
