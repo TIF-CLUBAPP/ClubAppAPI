@@ -4,7 +4,7 @@ using Infrastructure.Data;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using ClubApp.Domain.Interfaces;
-using ClubApp.Infrastructure.Data; // este ese falta todavia estaba haciendo ese
+using ClubApp.Infrastructure.Data; 
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +15,7 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 
 builder.Services.AddScoped<IEnrollmentRepository, EnrollmentRepository>();
 
+builder.Services.AddScoped<IMembershipRepository, MembershipRepository>();
 
 // --- SERVICIOS DEL SISTEMA ---
 
