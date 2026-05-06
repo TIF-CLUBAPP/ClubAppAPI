@@ -3,8 +3,17 @@ using ClubApp.Application.Services;
 using Infrastructure.Data;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using ClubApp.Domain.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// REPOSITORIOS 
+builder.Services.AddScoped<IActivityRepository, ActivityRepository>(); // esto falta que ahora da error gratis 
+
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+
+
+
 
 // --- SERVICIOS DEL SISTEMA ---
 

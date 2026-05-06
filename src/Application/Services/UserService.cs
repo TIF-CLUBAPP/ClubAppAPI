@@ -6,49 +6,83 @@ namespace ClubApp.Application.Services;
 
 public class UserService : IUserService
 {
-    private static List<UserDto> _users = new List<UserDto>
+    // Cambiamos la lista estática por el repositorio
+    private readonly IUserRepository _userRepository;
+
+    // Inyectamos el repositorio en el constructor
+    public UserService(IUserRepository userRepository)
     {
-        new UserDto { Id = 1, FirstName = "Admin", LastName = "Principal", Email = "admin@club.com", Role = "ADMIN", BadgeNum = "A001" }
-    };
+        _userRepository = userRepository;
+    }
 
     public async Task<IEnumerable<UserDto>> GetAllUsersAsync()
     {
-        return await Task.FromResult(_users);
+        var users = await _userRepository.GetAllAsync();
+        
+        // Mapeamos de Entidad (Domain) a DTO (Application)
+        return users.Select(u => new UserDto 
+        { 
+            Id = u.Id, 
+            FirstName = u.FirstName, 
+            LastName = u.LastName, 
+            Email = u.Email, 
+            Role = u.Role,
+            BadgeNum = u.BadgeNum,
+            CreatedAt = u.CreatedAt
+        });
     }
 
     public async Task<UserDto?> GetUserByIdAsync(int id)
     {
-        var user = _users.FirstOrDefault(u => u.Id == id);
-        return await Task.FromResult(user);
+        var user = await _userRepository.GetByIdAsync(id);
+        if (user == null) return null;
+
+        return new UserDto 
+        { 
+            Id = user.Id, 
+            FirstName = user.FirstName, 
+            LastName = user.LastName, 
+            Email = user.Email, 
+            Role = user.Role 
+        };
     }
 
     public async Task<bool> CreateUserAsync(UserDto userDto)
     {
-        userDto.Id = _users.Any() ? _users.Max(u => u.Id) + 1 : 1;
-        userDto.CreatedAt = DateTime.Now;
-        _users.Add(userDto);
-        return await Task.FromResult(true);
+        var newUser = new User 
+        {
+            FirstName = userDto.FirstName,
+            LastName = userDto.LastName,
+            Email = userDto.Email,
+            Role = userDto.Role,
+            BadgeNum = userDto.BadgeNum
+            // El Id y CreatedAt se manejan automáticamente en la base de datos/BaseEntity
+        };
+
+        await _userRepository.AddAsync(newUser);
+        return true;
     }
 
     public async Task<bool> UpdateUserAsync(int id, UserDto userDto)
     {
-        var existingUser = _users.FirstOrDefault(u => u.Id == id);
+        var existingUser = await _userRepository.GetByIdAsync(id);
         if (existingUser == null) return false;
 
         existingUser.FirstName = userDto.FirstName;
         existingUser.LastName = userDto.LastName;
         existingUser.Email = userDto.Email;
         existingUser.Role = userDto.Role;
-        
-        return await Task.FromResult(true);
+
+        await _userRepository.UpdateAsync(existingUser);
+        return true;
     }
 
     public async Task<bool> DeleteUserAsync(int id)
     {
-        var user = _users.FirstOrDefault(u => u.Id == id);
+        var user = await _userRepository.GetByIdAsync(id);
         if (user == null) return false;
 
-        _users.Remove(user);
-        return await Task.FromResult(true);
+        await _userRepository.DeleteAsync(id);
+        return true;
     }
 }
