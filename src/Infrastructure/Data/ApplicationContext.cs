@@ -19,6 +19,7 @@ namespace Infrastructure.Data
         public DbSet<User> Users { get; set; }
         public DbSet<Enrollment> Enrollments { get; set; }
         public DbSet<Membership> Memberships { get; set; }
+        public DbSet<Notification> Notifications { get; set; }
 
     }
 }

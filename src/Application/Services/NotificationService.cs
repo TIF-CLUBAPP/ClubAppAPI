@@ -1,67 +1,110 @@
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Dtos;
+using ClubApp.Domain.Entities;
+using ClubApp.Domain.Interfaces;
 
-namespace ClubApp.Application.Services;
-
-public class NotificationService : INotificationService
+namespace ClubApp.Application.Services
 {
-    private static List<NotificationDto> _notifications = new List<NotificationDto>();
-
-    public async Task<IEnumerable<NotificationDto>> GetNotificationsByUserAsync(int userId)
+    public class NotificationService : INotificationService
     {
-        return await Task.FromResult(_notifications.Where(n => n.User_id == userId));
-    }
+        private readonly INotificationRepository _notificationRepository;
 
-    public async Task<IEnumerable<NotificationDto>> GetAllNotificationsAsync()
-    {
-        return await Task.FromResult(_notifications);
-    }
-
-    public async Task<NotificationDto?> GetNotificationByIdAsync(int notificationId)
-    {
-        return await Task.FromResult(_notifications.FirstOrDefault(n => n.Id == notificationId));
-    }
-
-    public async Task<bool> SendNotificationAsync(NotificationDto dto)
-    {
-        dto.Id = _notifications.Any() ? _notifications.Max(n => n.Id) + 1 : 1;
-        dto.CreatedAt = DateTime.Now;
-        dto.IsRead = false;
-        _notifications.Add(dto);
-        return await Task.FromResult(true);
-    }
-
-    public async Task<bool> UpdateNotificationAsync(int notificationId, NotificationDto dto)
-    {
-        var existing = _notifications.FirstOrDefault(n => n.Id == notificationId);
-        if (existing == null) return false;
-
-        existing.User_id = dto.User_id;
-        existing.Title = dto.Title;
-        existing.Message = dto.Message;
-        existing.IsRead = dto.IsRead;
-        // CreatedAt no se actualiza, queda la original
-
-        return await Task.FromResult(true);
-    }
-
-    public async Task<bool> DeleteNotificationAsync(int notificationId)
-    {
-        var notification = _notifications.FirstOrDefault(n => n.Id == notificationId);
-        if (notification == null)
+        public NotificationService(INotificationRepository notificationRepository)
         {
-            return false;  // No existe
+            _notificationRepository = notificationRepository;
         }
-        _notifications.Remove(notification);
-        return true;
-    }
 
-    public async Task<bool> MarkAsReadAsync(int id)
-    {
-        var notification = _notifications.FirstOrDefault(n => n.Id == id);
-        if (notification == null) return false;
+        public async Task<IEnumerable<NotificationDto>> GetAllNotificationsAsync()
+        {
+            var notifications = await _notificationRepository.GetAllAsync();
+            return notifications.Select(n => new NotificationDto
+            {
+                Id = n.Id,
+                User_id = n.User_id,
+                Title = n.Title,
+                Message = n.Message,
+                CreatedAt = n.CreatedAt,
+                IsRead = n.IsRead
+            });
+        }
 
-        notification.IsRead = true;
-        return await Task.FromResult(true);
+        public async Task<IEnumerable<NotificationDto>> GetNotificationsByUserAsync(int userId)
+        {
+            var notifications = (await _notificationRepository.GetAllAsync())
+                .Where(n => n.User_id == userId);
+
+            return notifications.Select(n => new NotificationDto
+            {
+                Id = n.Id,
+                User_id = n.User_id,
+                Title = n.Title,
+                Message = n.Message,
+                CreatedAt = n.CreatedAt,
+                IsRead = n.IsRead
+            });
+        }
+
+        public async Task<NotificationDto?> GetNotificationByIdAsync(int notificationId)
+        {
+            var notification = await _notificationRepository.GetByIdAsync(notificationId);
+            if (notification == null) return null;
+
+            return new NotificationDto
+            {
+                Id = notification.Id,
+                User_id = notification.User_id,
+                Title = notification.Title,
+                Message = notification.Message,
+                CreatedAt = notification.CreatedAt,
+                IsRead = notification.IsRead
+            };
+        }
+
+        public async Task<bool> SendNotificationAsync(NotificationDto dto)
+        {
+            var newNotification = new Notification
+            {
+                User_id = dto.User_id,
+                Title = dto.Title,
+                Message = dto.Message,
+                IsRead = false,
+                CreatedAt = DateTime.Now
+            };
+
+            await _notificationRepository.AddAsync(newNotification);
+            return true;
+        }
+
+        public async Task<bool> UpdateNotificationAsync(int notificationId, NotificationDto dto)
+        {
+            var existing = await _notificationRepository.GetByIdAsync(notificationId);
+            if (existing == null) return false;
+
+            existing.Title = dto.Title;
+            existing.Message = dto.Message;
+            existing.IsRead = dto.IsRead;
+
+            await _notificationRepository.UpdateAsync(existing);
+            return true;
+        }
+
+        public async Task<bool> DeleteNotificationAsync(int notificationId)
+        {
+            var notification = await _notificationRepository.GetByIdAsync(notificationId);
+            if (notification == null) return false;
+
+            await _notificationRepository.DeleteAsync(notificationId);
+            return true;
+        }
+
+        public async Task<bool> MarkAsReadAsync(int notificationId)
+        {
+            var notification = await _notificationRepository.GetByIdAsync(notificationId);
+            if (notification == null) return false;
+
+            notification.IsRead = true;
+            await _notificationRepository.UpdateAsync(notification);
+            return true;
+        }
     }
 }

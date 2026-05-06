@@ -17,6 +17,10 @@ builder.Services.AddScoped<IEnrollmentRepository, EnrollmentRepository>();
 
 builder.Services.AddScoped<IMembershipRepository, MembershipRepository>();
 
+builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
+
+
+
 // --- SERVICIOS DEL SISTEMA ---
 
 builder.Services.AddControllers();
