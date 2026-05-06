@@ -13,6 +13,7 @@ builder.Services.AddScoped<IActivityRepository, ActivityRepository>();
 
 builder.Services.AddScoped<IUserRepository, UserRepository>(); 
 
+builder.Services.AddScoped<IEnrollmentRepository, EnrollmentRepository>();
 
 
 // --- SERVICIOS DEL SISTEMA ---
