@@ -20,8 +20,8 @@ public class ActivityService : IActivityService
 
         return activities.Select(a => new ActivityDto
         {
-            Id = a.Id,
             Name = a.Name,
+            Description = a.Description,
             Schedule = a.Schedule,
             MaxCapacity = a.MaxCapacity,
             IsActive = a.IsActive
@@ -34,6 +34,7 @@ public class ActivityService : IActivityService
         {
             Name = dto.Name,
             Schedule = dto.Schedule,
+            Description = dto.Description,
             MaxCapacity = dto.MaxCapacity,
             IsActive = true
         };
