@@ -19,7 +19,7 @@ builder.Services.AddScoped<IMembershipRepository, MembershipRepository>();
 
 builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 
-
+builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 
 // --- SERVICIOS DEL SISTEMA ---
 

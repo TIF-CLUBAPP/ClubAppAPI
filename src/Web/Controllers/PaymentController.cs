@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Dtos;
+using ClubApp.Domain.Entities;
 
 namespace ClubApp.API.Controllers;
 
@@ -26,7 +27,7 @@ public class PaymentsController(IPaymentService paymentService) : ControllerBase
     }
 
     [HttpPatch("{paymentId:int}/status")]
-    public async Task<IActionResult> UpdateStatus(int paymentId, [FromBody] string newStatus)
+    public async Task<IActionResult> UpdateStatus(int paymentId, [FromBody] PaymentStatus newStatus)
     {
         var result = await paymentService.UpdatePaymentStatusAsync(paymentId, newStatus);
         
@@ -34,4 +35,6 @@ public class PaymentsController(IPaymentService paymentService) : ControllerBase
 
         return Ok($"Estado del pago {paymentId} actualizado a {newStatus}");
     }
+
+    
 }
