@@ -9,7 +9,6 @@ public enum UserRole
     ADMIN,
     SUPERADMIN
 }
-
 public class User : BaseEntity
 {
     // Campos extraídos exactamente de la "Base Class" de tu imagen
@@ -20,7 +19,7 @@ public class User : BaseEntity
     public string PasswordHash { get; set; } = string.Empty;
 
     // El Rol que define qué puede hacer este usuario
-    public UserRole Role { get; set; } = UserRole.MEMBER;
+    public UserRole Role { get; set; } = UserRole.MEMBER; 
 
     // Campo de la clase MemberUser (ahora integrado aquí)
     public DateTime? LastPaymentDate { get; set; }
@@ -29,5 +28,5 @@ public class User : BaseEntity
     public virtual ICollection<Enrollment> Enrollments { get; set; } = new List<Enrollment>();
 
     // Métodos lógicos que aparecían en tu diagrama (opcionales para el Entity)
-    public bool IsAdmin() => Role == UserRole.ADMIN || Role == UserRole.SUPERADMIN;
+    public bool IsAdmin() => Role == UserRole.ADMIN || Role == UserRole.SUPERADMIN; //OJO MIRA ESTO EN EL FUTURO
 }

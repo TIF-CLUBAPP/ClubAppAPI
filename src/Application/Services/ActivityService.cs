@@ -1,60 +1,80 @@
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Dtos;
+using ClubApp.Domain.Entities;
+using ClubApp.Domain.Interfaces;
 
-namespace ClubApp.Application.Services;
+namespace ClubApp.Application.Services; 
 
 public class ActivityService : IActivityService
 {
+    private readonly IActivityRepository _activityRepository;
+
+    public ActivityService(IActivityRepository activityRepository)
+    {
+        _activityRepository = activityRepository;
+    }
+
+    public async Task<IEnumerable<ActivityDto>> GetAllAvailableActivitiesAsync()
+    {
+        var activities = await _activityRepository.GetAllAsync();
+
+        return activities.Select(a => new ActivityDto
+        {
+            Name = a.Name,
+            Description = a.Description,
+            Schedule = a.Schedule,
+            MaxCapacity = a.MaxCapacity,
+            IsActive = a.IsActive
+        });
+    }
+
+    public async Task<bool> CreateActivityAsync(ActivityDto dto)
+    {
+        var newActivity = new Activity
+        {
+            Name = dto.Name,
+            Schedule = dto.Schedule,
+            Description = dto.Description,
+            MaxCapacity = dto.MaxCapacity,
+            IsActive = true
+        };
+
+        await _activityRepository.AddAsync(newActivity);
+        return true;
+    }
+
     public async Task<bool> UpdateActivityAsync(int activityId, ActivityDto dto)
     {
-        var existing = _activities.FirstOrDefault(a => a.Id == activityId);
+        var existing = await _activityRepository.GetByIdAsync(activityId);
         if (existing == null) return false;
 
         existing.Name = dto.Name;
         existing.Schedule = dto.Schedule;
-        existing.AvailableSlots = dto.AvailableSlots;
+        existing.MaxCapacity = dto.MaxCapacity;
+
+        await _activityRepository.UpdateAsync(existing);
         return true;
     }
 
     public async Task<bool> DeleteActivityAsync(int activityId)
     {
-        var activity = _activities.FirstOrDefault(a => a.Id == activityId);
-        if (activity == null) return false;
+        var existing = await _activityRepository.GetByIdAsync(activityId);
+        if (existing == null) return false;
 
-        _activities.Remove(activity);
+        await _activityRepository.DeleteAsync(activityId);
         return true;
-    }
-
-    // Lista estática para simular la base de datos
-    private static List<ActivityDto> _activities = new List<ActivityDto>
-    {
-        new ActivityDto { Id = 1, Name = "Fútbol", Schedule = "Lunes 18:00", AvailableSlots = 20 },
-        new ActivityDto { Id = 2, Name = "Gimnasio", Schedule = "Martes 10:00", AvailableSlots = 15 }
-    };
-
-    public async Task<IEnumerable<ActivityDto>> GetAllAvailableActivitiesAsync()
-    {
-        return await Task.FromResult(_activities);
-    }
-
-    public async Task<bool> CreateActivityAsync(ActivityDto activityDto)
-    {
-        // Simulamos la generación de un ID
-        activityDto.Id = _activities.Any() ? _activities.Max(a => a.Id) + 1 : 1;
-        _activities.Add(activityDto);
-        return await Task.FromResult(true);
     }
 
     public async Task<bool> EnrollMemberAsync(int userId, int activityId)
     {
-        var activity = _activities.FirstOrDefault(a => a.Id == activityId);
-        if (activity != null && activity.AvailableSlots > 0)
+        var activity = await _activityRepository.GetByIdAsync(activityId);
+        
+        // Aquí podrías validar si hay cupo usando una lógica de Enrollments
+        if (activity != null && activity.IsActive)
         {
-            activity.AvailableSlots--; // Simulamos la inscripción restando un cupo
-            return await Task.FromResult(true);
+            // Lógica de inscripción (normalmente crearías un registro en la tabla Enrollments)
+            return true;
         }
-        return await Task.FromResult(false);
+        return false;
     }
-
-
 }

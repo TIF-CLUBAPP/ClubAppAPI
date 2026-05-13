@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Dtos;
-
+using ClubApp.Domain.Entities;
 namespace ClubApp.API.Controllers;
 
 [ApiController]
@@ -33,9 +33,9 @@ public class MembershipsController : ControllerBase
     }
 
     [HttpPatch("{id:int}/status")]
-    public async Task<IActionResult> UpdateStatus(int id, [FromBody] string newStatus)
+    public async Task<IActionResult> UpdateStatus(int id, [FromBody] MembershipStatus newStatus) // from body queda?? 
     {
         var result = await _membershipService.UpdateStatusAsync(id, newStatus);
         return result ? Ok(new { message = "Estado actualizado" }) : NotFound();
     }
-}
+} 

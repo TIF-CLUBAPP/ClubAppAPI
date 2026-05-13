@@ -1,7 +1,25 @@
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Services;
+using Infrastructure.Data;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using ClubApp.Domain.Interfaces;
+using ClubApp.Infrastructure.Data; 
 
 var builder = WebApplication.CreateBuilder(args);
+
+// REPOSITORIOS 
+builder.Services.AddScoped<IActivityRepository, ActivityRepository>(); 
+
+builder.Services.AddScoped<IUserRepository, UserRepository>(); 
+
+builder.Services.AddScoped<IEnrollmentRepository, EnrollmentRepository>();
+
+builder.Services.AddScoped<IMembershipRepository, MembershipRepository>();
+
+builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
+
+builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 
 // --- SERVICIOS DEL SISTEMA ---
 
@@ -9,6 +27,19 @@ builder.Services.AddControllers();
 
 // Configuración de OpenAPI / Swagger
 builder.Services.AddOpenApi();
+
+// Configure the SQLite connection
+var connection = new SqliteConnection("Data Source=miWebAppDatabase.db");
+connection.Open();
+
+// Set journal mode to DELETE using PRAGMA statement
+using (var command = connection.CreateCommand())
+{
+    command.CommandText = "PRAGMA journal_mode = DELETE;";
+    command.ExecuteNonQuery();
+}
+
+builder.Services.AddDbContext<ApplicationContext>(options => options.UseSqlite(connection));
 
 // --- INYECCIÓN DE DEPENDENCIAS (EL "CABLEADO") ---
 // Aquí le decimos al sistema: "Cuando un Controller pida IActivityService, dale ActivityService"

@@ -1,55 +1,78 @@
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Dtos;
+using ClubApp.Domain.Entities;
+using ClubApp.Domain.Interfaces;
 
 namespace ClubApp.Application.Services;
 
 public class EnrollmentService : IEnrollmentService
 {
-    // Lista estática para simular la base de datos de inscripciones
-    private static List<EnrollmentDto> _enrollments = new List<EnrollmentDto>();
+    private readonly IEnrollmentRepository _enrollmentRepository;
+
+    public EnrollmentService(IEnrollmentRepository enrollmentRepository)
+    {
+        _enrollmentRepository = enrollmentRepository;
+    }
 
     public async Task<IEnumerable<EnrollmentDto>> GetAllEnrollmentsAsync()
     {
-        return await Task.FromResult(_enrollments);
+        var enrollments = await _enrollmentRepository.GetAllAsync();
+        return enrollments.Select(e => new EnrollmentDto
+        {
+            Id = e.Id,
+            UserId = e.UserId,
+            ActivityId = e.ActivityId,
+            EnrollmentDate = e.EnrollmentDate,
+            Status = e.Status.ToString()
+        });
     }
 
     public async Task<bool> CreateEnrollmentAsync(EnrollmentDto enrollmentDto)
     {
-        enrollmentDto.Id = _enrollments.Any() ? _enrollments.Max(e => e.Id) + 1 : 1;
-        enrollmentDto.Status = "Active";
-        _enrollments.Add(enrollmentDto);
-        return await Task.FromResult(true);
+        var newEnrollment = new Enrollment
+        {
+            UserId = enrollmentDto.UserId,
+            ActivityId = enrollmentDto.ActivityId,
+            EnrollmentDate = enrollmentDto.EnrollmentDate,
+            Status = EnrollmentStatus.Active
+        };
+
+        await _enrollmentRepository.AddAsync(newEnrollment);
+        return true;
     }
 
     public async Task<bool> UpdateEnrollmentAsync(int enrollmentId, EnrollmentDto enrollmentDto)
     {
-        var existing = _enrollments.FirstOrDefault(e => e.Id == enrollmentId);
+        var existing = await _enrollmentRepository.GetByIdAsync(enrollmentId);
         if (existing == null) return false;
 
         existing.UserId = enrollmentDto.UserId;
         existing.ActivityId = enrollmentDto.ActivityId;
         existing.EnrollmentDate = enrollmentDto.EnrollmentDate;
-        existing.Status = enrollmentDto.Status;
-        existing.ActivityName = enrollmentDto.ActivityName;
+        existing.Status = Enum.TryParse<EnrollmentStatus>(enrollmentDto.Status, out var status)
+            ? status
+            : EnrollmentStatus.Active;
 
-        return await Task.FromResult(true);
+        await _enrollmentRepository.UpdateAsync(existing);
+        return true;
     }
 
     public async Task<bool> DeleteEnrollmentAsync(int enrollmentId)
     {
-        var enrollment = _enrollments.FirstOrDefault(e => e.Id == enrollmentId);
+        var enrollment = await _enrollmentRepository.GetByIdAsync(enrollmentId);
         if (enrollment == null) return false;
 
-        _enrollments.Remove(enrollment);
-        return await Task.FromResult(true);
+        await _enrollmentRepository.DeleteAsync(enrollmentId);
+        return true;
     }
 
     public async Task<bool> CancelEnrollmentAsync(int enrollmentId)
     {
-        var enrollment = _enrollments.FirstOrDefault(e => e.Id == enrollmentId);
+        var enrollment = await _enrollmentRepository.GetByIdAsync(enrollmentId);
         if (enrollment == null) return false;
 
-        enrollment.Status = "Cancelled";
-        return await Task.FromResult(true);
+        enrollment.Status = EnrollmentStatus.Cancelled;
+        await _enrollmentRepository.UpdateAsync(enrollment);
+        return true;
     }
 }
