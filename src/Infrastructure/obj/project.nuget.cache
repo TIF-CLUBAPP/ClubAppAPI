@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "A7u+MkLHhdQ=",
+  "dgSpecHash": "Y5EBPosZUbw=",
   "success": true,
-  "projectFilePath": "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Infrastructure\\Infrastructure.csproj",
+  "projectFilePath": "c:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Infrastructure\\Infrastructure.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\berto\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",
     "C:\\Users\\berto\\.nuget\\packages\\microsoft.build.framework\\18.0.2\\microsoft.build.framework.18.0.2.nupkg.sha512",
