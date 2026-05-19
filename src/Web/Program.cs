@@ -21,6 +21,8 @@ builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 
 builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 
+builder.Services.AddScoped<IActivityService, ActivityService>();
+
 // --- SERVICIOS DEL SISTEMA ---
 
 builder.Services.AddControllers();

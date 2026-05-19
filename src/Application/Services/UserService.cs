@@ -2,21 +2,20 @@ using ClubApp.Application.Interfaces;
 using ClubApp.Application.Dtos;
 using ClubApp.Domain.Entities;
 using ClubApp.Domain.Interfaces;
+using ClubApp.Domain.Exceptions;
 
 namespace ClubApp.Application.Services;
 
 public class UserService : IUserService
 {
-    // Cambiamos la lista estática por el repositorio 
     private readonly IUserRepository _userRepository;
 
-    // Inyectamos el repositorio en el constructor
     public UserService(IUserRepository userRepository)
     {
         _userRepository = userRepository;
     }
 
-        public async Task<IEnumerable<UserDto>> GetAllUsersAsync()
+    public async Task<IEnumerable<UserDto>> GetAllUsersAsync()
     {
         var users = await _userRepository.GetAllAsync();
 
@@ -26,15 +25,19 @@ public class UserService : IUserService
             FirstName = u.FirstName,
             LastName = u.LastName,
             Email = u.Email,
-            Role = u.Role,// tambien falta?
+            Role = u.Role, 
             BadgeNum = u.BadgeNum,
             CreatedAt = u.CreatedAt
-        });
+        }).ToList();
     }
-    public async Task<UserDto?> GetUserByIdAsync(int id)
+
+    public async Task<UserDto> GetUserByIdAsync(int id)
     {
         var user = await _userRepository.GetByIdAsync(id);
-        if (user == null) return null;
+        if (user == null)
+        {
+            throw new NotFoundException("User", id);
+        }
 
         return new UserDto 
         { 
@@ -42,20 +45,24 @@ public class UserService : IUserService
             FirstName = user.FirstName, 
             LastName = user.LastName, 
             Email = user.Email, 
-            Role = user.Role 
+            Role = user.Role
         };
     }
 
     public async Task<bool> CreateUserAsync(UserDto userDto)
     {
+        if (string.IsNullOrWhiteSpace(userDto.Email))
+        {
+            throw new AppValidationException("El correo electrónico es un campo obligatorio.");
+        }
+
         var newUser = new User 
         {
             FirstName = userDto.FirstName,
             LastName = userDto.LastName,
             Email = userDto.Email,
-            Role = userDto.Role,
+            Role = userDto.Role, 
             BadgeNum = userDto.BadgeNum
-            // El Id y CreatedAt se manejan automáticamente en la base de datos/BaseEntity
         };
 
         await _userRepository.AddAsync(newUser);
@@ -65,12 +72,15 @@ public class UserService : IUserService
     public async Task<bool> UpdateUserAsync(int id, UserDto userDto)
     {
         var existingUser = await _userRepository.GetByIdAsync(id);
-        if (existingUser == null) return false;
+        if (existingUser == null)
+        {
+            throw new NotFoundException("User", id);
+        }
 
         existingUser.FirstName = userDto.FirstName;
         existingUser.LastName = userDto.LastName;
         existingUser.Email = userDto.Email;
-        existingUser.Role = userDto.Role;
+        existingUser.Role = userDto.Role; 
 
         await _userRepository.UpdateAsync(existingUser);
         return true;
@@ -79,7 +89,10 @@ public class UserService : IUserService
     public async Task<bool> DeleteUserAsync(int id)
     {
         var user = await _userRepository.GetByIdAsync(id);
-        if (user == null) return false;
+        if (user == null)
+        {
+            throw new NotFoundException("User", id);
+        }
 
         await _userRepository.DeleteAsync(id);
         return true;
