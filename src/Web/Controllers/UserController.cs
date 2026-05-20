@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Dtos;
+using ClubApp.Application.Requests; // Asegurate de que esta ruta sea la de tu AuthenticationRequest
+using Microsoft.AspNetCore.Authorization; // ¡CRÍTICO para el AllowAnonymous!
 
 namespace ClubApp.API.Controllers;
 
@@ -9,10 +11,13 @@ namespace ClubApp.API.Controllers;
 public class UsersController : ControllerBase
 {
     private readonly IUserService _userService;
+    private readonly ICustomAuthenticationService _authService; // <-- 1. Agregamos el campo privado
 
-    public UsersController(IUserService userService)
+    // 2. Inyectamos AMBOS servicios en el constructor para que .NET no chille
+    public UsersController(IUserService userService, ICustomAuthenticationService authService)
     {
         _userService = userService;
+        _authService = authService;
     }
 
     [HttpGet]
@@ -25,9 +30,15 @@ public class UsersController : ControllerBase
         return user != null ? Ok(user) : NotFound();
     }
 
+    // =======================================================================
+    // REGISTRO DE USUARIOS: LIBRE DE CANDADOS
+    // =======================================================================
     [HttpPost]
+    [AllowAnonymous] // <-- ¡MAGIA! Esto quita el candado de Swagger solo para este método
     public async Task<IActionResult> Create([FromBody] UserDto userDto)
     {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+        
         await _userService.CreateUserAsync(userDto);
         return Ok(new { message = "Usuario creado correctamente" });
     }
@@ -46,5 +57,26 @@ public class UsersController : ControllerBase
     {
         var result = await _userService.DeleteUserAsync(id);
         return result ? Ok(new { message = "Usuario eliminado" }) : NotFound();
+    }
+
+    // =======================================================================
+    // LOGIN: ASÍNCRONO Y CONFIGURADO CORRECTAMENTE
+    // =======================================================================
+    [HttpPost("login")] // POST /api/Users/login
+    [AllowAnonymous]    // El login también tiene que ser público para poder entrar
+    public async Task<IActionResult> Login([FromBody] AuthenticationRequest request)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
+        // Usamos el método asincrónico que respeta tu arquitectura limpia con await
+        var token = await _authService.AuthenticationAsync(request);
+
+        if (token == null)
+        {
+            return Unauthorized(new { message = "Usuario o contraseña incorrectos." });
+        }
+
+        // Devolvemos el bendito token JWT listo para usar
+        return Ok(new { token = token });
     }
 }

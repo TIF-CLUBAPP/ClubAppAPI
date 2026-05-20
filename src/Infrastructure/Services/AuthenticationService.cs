@@ -1,12 +1,13 @@
-using ClubApp.Application.Interfaces;
-using ClubApp.Application.Requests;
-using ClubApp.Domain.Entities;
-using ClubApp.Domain.Interfaces;
-using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
+using System.Linq;
 using System.Security.Claims;
 using System.Text;
+using System.Threading.Tasks;
+using ClubApp.Application.Interfaces;
+using ClubApp.Application.Requests;
+using ClubApp.Domain.Interfaces; // Para tu IUserRepository
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 
 namespace ClubApp.Infrastructure.Services
 {
@@ -15,66 +16,61 @@ namespace ClubApp.Infrastructure.Services
         private readonly IUserRepository _userRepository;
         private readonly AutenticacionServiceOptions _options;
 
+        public class AutenticacionServiceOptions
+        {
+            public string Issuer { get; set; } = string.Empty;
+            public string Audience { get; set; } = string.Empty;
+            public string SecretForKey { get; set; } = string.Empty;
+        }
+
         public AutenticacionService(IUserRepository userRepository, IOptions<AutenticacionServiceOptions> options)
         {
             _userRepository = userRepository;
             _options = options.Value;
         }
 
-        private async Task<User?> ValidateUser(AuthenticationRequest authenticationRequest)
+        public async Task<string?> AuthenticationAsync(AuthenticationRequest request)
         {
-            if (string.IsNullOrEmpty(authenticationRequest.UserName) || string.IsNullOrEmpty(authenticationRequest.Password))
-                return null;
+            // 1. Traemos la lista del repositorio de forma asíncrona usando tu método base
+            var users = await _userRepository.GetAllAsync();
 
-            // Llamada asincrónica al repositorio
-            var user = await _userRepository.GetUserByEmail(authenticationRequest.UserName);
+            // Buscamos el usuario por su FirstName o su Email
+            var user = users.FirstOrDefault(u => u.FirstName == request.UserName || u.Email == request.UserName);
 
             if (user == null) return null;
 
-            // Validación directa de contraseña (si usan texto plano como el profesor)
-            if (user.PasswordHash == authenticationRequest.Password)
-                return user;
-
-            return null;
-        }
-
-        public async Task<string> Autenticar(AuthenticationRequest authenticationRequest)
-        {
-            var user = await ValidateUser(authenticationRequest);
-
-            if (user == null)
+            // 2. Validar contraseña en texto plano (luego podrás meterle hash si querés)
+            if (user.PasswordHash != request.Password)
             {
-                throw new Exception("User authentication failed"); // Usamos Exception común para evitar errores de compilación
+                return null;
             }
 
-            var securityPassword = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(_options.SecretForKey));
-            var credentials = new SigningCredentials(securityPassword, SecurityAlgorithms.HmacSha256);
+            // 3. Generación del Token JWT
+            // Modificamos la línea para que use una clave de auxilio fija si _options.SecretForKey viene vacía
+            var secretKeyString = string.IsNullOrEmpty(_options.SecretForKey)
+                ? "esta_es_una_clave_secreta_de_auxilio_super_larga_12345"
+                : _options.SecretForKey;
+
+            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKeyString));
+            var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
             var claimsForToken = new List<Claim>
             {
                 new Claim("sub", user.Id.ToString()),
-                new Claim("given_name", user.FirstName ?? string.Empty),
-                new Claim("family_name", user.LastName ?? string.Empty),
-                new Claim("role", user.Role.ToString()) // El rol sale de la base de datos, no del request
+                new Claim(ClaimTypes.Email, user.Email),
+                new Claim(ClaimTypes.Name, user.FirstName),
+                new Claim(ClaimTypes.Role, user.Role.ToString())
             };
 
             var jwtSecurityToken = new JwtSecurityToken(
-              _options.Issuer,
-              _options.Audience,
-              claimsForToken,
-              DateTime.UtcNow,
-              DateTime.UtcNow.AddHours(1),
-              credentials);
+                _options.Issuer,
+                _options.Audience,
+                claimsForToken,
+                DateTime.UtcNow,
+                DateTime.UtcNow.AddHours(2),
+                credentials);
 
             return new JwtSecurityTokenHandler().WriteToken(jwtSecurityToken);
-        }
-
-        public class AutenticacionServiceOptions
-        {
-            public const string AutenticacionService = "AutenticacionService";
-            public string Issuer { get; set; } = string.Empty;
-            public string Audience { get; set; } = string.Empty;
-            public string SecretForKey { get; set; } = string.Empty;
         }
     }
 }

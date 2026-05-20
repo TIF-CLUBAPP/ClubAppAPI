@@ -1,8 +1,10 @@
+using System.Threading.Tasks;
 using ClubApp.Application.Requests;
 
-namespace ClubApp.Application.Interfaces;
-
-public interface ICustomAuthenticationService
+namespace ClubApp.Application.Interfaces
 {
-    Task<string> Autenticar(AuthenticationRequest authenticationRequest);
+    public interface ICustomAuthenticationService
+    {
+        Task<string?> AuthenticationAsync(AuthenticationRequest request);
+    }
 }

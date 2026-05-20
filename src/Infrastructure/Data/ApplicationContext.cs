@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using ClubApp.Domain.Entities;
 
-namespace Infrastructure.Data
+namespace ClubApp.Infrastructure.Data
 {
     public class ApplicationContext : DbContext
     {
@@ -22,5 +22,23 @@ namespace Infrastructure.Data
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<Payment> Payments { get; set; }
 
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+
+            // Esto inyecta un usuario a la fuerza en la base de datos al iniciar
+            modelBuilder.Entity<ClubApp.Domain.Entities.User>().HasData(new ClubApp.Domain.Entities.User
+            {
+                Id = 1,
+                BadgeNum = "123",
+                FirstName = "nico",
+                LastName = "dev",
+                Email = "nico@clubapp.com",
+                PasswordHash = "1234", // Esta va a ser tu contraseña de prueba
+                Role = ClubApp.Domain.Entities.UserRole.ADMIN
+            });
+        }
+
     }
+
 }

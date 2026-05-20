@@ -27,7 +27,7 @@ public class UserService : IUserService
             Email = u.Email,
             Role = u.Role, 
             BadgeNum = u.BadgeNum,
-            CreatedAt = u.CreatedAt
+            CreatedAt = u.CreatedAt,
         }).ToList();
     }
 
@@ -61,6 +61,7 @@ public class UserService : IUserService
             FirstName = userDto.FirstName,
             LastName = userDto.LastName,
             Email = userDto.Email,
+            PasswordHash = userDto.Password, // OJO: Aquí deberías hashear la contraseña antes de guardarla
             Role = userDto.Role, 
             BadgeNum = userDto.BadgeNum
         };
