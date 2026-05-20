@@ -4,14 +4,14 @@ using Infrastructure.Data;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using ClubApp.Domain.Interfaces;
-using ClubApp.Infrastructure.Data; 
+using ClubApp.Infrastructure.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // REPOSITORIOS 
-builder.Services.AddScoped<IActivityRepository, ActivityRepository>(); 
+builder.Services.AddScoped<IActivityRepository, ActivityRepository>();
 
-builder.Services.AddScoped<IUserRepository, UserRepository>(); 
+builder.Services.AddScoped<IUserRepository, UserRepository>();
 
 builder.Services.AddScoped<IEnrollmentRepository, EnrollmentRepository>();
 
@@ -25,10 +25,16 @@ builder.Services.AddScoped<IActivityService, ActivityService>();
 
 // --- SERVICIOS DEL SISTEMA ---
 
+builder.Services.Configure<ClubApp.Infrastructure.Services.AutenticacionService.AutenticacionServiceOptions>(
+    builder.Configuration.GetSection("AuthenticationService"));
+
+builder.Services.AddScoped<ICustomAuthenticationService, ClubApp.Infrastructure.Services.AutenticacionService>();
+
 builder.Services.AddControllers();
 
 // Configuración de OpenAPI / Swagger
 builder.Services.AddOpenApi();
+builder.Services.AddSwaggerGen();
 
 // Configure the SQLite connection
 var connection = new SqliteConnection("Data Source=miWebAppDatabase.db");
@@ -73,9 +79,9 @@ if (app.Environment.IsDevelopment())
 
     app.UseSwaggerUI(options =>
     {
-       // Esto permite que veas la interfaz gráfica de Swagger para probar tus métodos
-       options.SwaggerEndpoint("/openapi/v1.json", "ClubApp API V1"); 
-       options.RoutePrefix = "swagger"; // Podrás entrar en http://localhost:PORT/swagger
+        // Esto permite que veas la interfaz gráfica de Swagger para probar tus métodos
+        options.SwaggerEndpoint("/openapi/v1.json", "ClubApp API V1");
+        options.RoutePrefix = "swagger"; // Podrás entrar en http://localhost:PORT/swagger
     });
 }
 

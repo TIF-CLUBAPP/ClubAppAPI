@@ -1,8 +1,8 @@
-using ClubApp.Application.Models.Requests;
+using ClubApp.Application.Requests;
 
 namespace ClubApp.Application.Interfaces;
 
 public interface ICustomAuthenticationService
 {
-    string Autenticar(AuthenticationRequest authenticationRequest);
+    Task<string> Autenticar(AuthenticationRequest authenticationRequest);
 }

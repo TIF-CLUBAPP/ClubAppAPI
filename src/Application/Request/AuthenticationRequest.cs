@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace ClubApp.Application.Models.Requests
+namespace ClubApp.Application.Requests
 {
     public class AuthenticationRequest
     {
