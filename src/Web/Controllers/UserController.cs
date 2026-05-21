@@ -8,6 +8,7 @@ namespace ClubApp.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class UsersController : ControllerBase
 {
     private readonly IUserService _userService;
@@ -34,7 +35,6 @@ public class UsersController : ControllerBase
     // REGISTRO DE USUARIOS: LIBRE DE CANDADOS
     // =======================================================================
     [HttpPost]
-    [AllowAnonymous] // <-- ¡MAGIA! Esto quita el candado de Swagger solo para este método
     public async Task<IActionResult> Create([FromBody] UserDto userDto)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);

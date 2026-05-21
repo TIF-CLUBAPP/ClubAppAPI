@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Dtos;
+using Microsoft.AspNetCore.Authorization;
 
 namespace ClubApp.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize] 
 public class NotificationsController : ControllerBase
 {
     private readonly INotificationService _notificationService;
@@ -35,7 +37,12 @@ public class NotificationsController : ControllerBase
         return Ok(await _notificationService.GetNotificationsByUserAsync(userId));
     }
 
+    // =======================================================================
+    // ACCIONES EXCLUSIVAS PARA ADMINISTRADORES
+    // =======================================================================
+
     [HttpPost]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
     public async Task<IActionResult> Send([FromBody] NotificationDto dto)
     {
         var result = await _notificationService.SendNotificationAsync(dto);
@@ -43,6 +50,7 @@ public class NotificationsController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")] 
     public async Task<IActionResult> Put(int id, [FromBody] NotificationDto dto)
     {
         var result = await _notificationService.UpdateNotificationAsync(id, dto);
@@ -51,12 +59,17 @@ public class NotificationsController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
     public async Task<IActionResult> Delete(int id)
     {
         var result = await _notificationService.DeleteNotificationAsync(id);
         if (!result) return NotFound($"No se encontró la notificación con ID {id}");
         return Ok($"Notificación {id} eliminada");
     }
+
+    // =======================================================================
+    // ACCIÓN DISPONIBLE PARA CUALQUIER USUARIO LOGUEADO
+    // =======================================================================
 
     [HttpPatch("{id:int}/read")]
     public async Task<IActionResult> MarkAsRead(int id)

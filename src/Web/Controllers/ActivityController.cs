@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
 using ClubApp.Application.Interfaces;
-using ClubApp.Application.Dtos; // Importante para que reconozca ActivityDto
+using ClubApp.Application.Dtos;
+using Microsoft.AspNetCore.Authorization; 
 
 namespace ClubApp.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize] 
 public class ActivitiesController : ControllerBase
 {
     private readonly IActivityService _activityService;
@@ -15,21 +17,29 @@ public class ActivitiesController : ControllerBase
         _activityService = activityService;
     }
 
+    // =======================================================================
+    // ACCIÓN DISPONIBLE PARA CUALQUIER SOCIO LOGUEADO
+    // =======================================================================
+    
     [HttpGet]
     public async Task<IActionResult> Get() => Ok(await _activityService.GetAllAvailableActivitiesAsync());
 
+    // =======================================================================
+    // ACCIONES EXCLUSIVAS PARA ADMINISTRADORES
+    // =======================================================================
+
     [HttpPost]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")] 
     public async Task<IActionResult> Post([FromBody] ActivityDto dto)
     {
         await _activityService.CreateActivityAsync(dto);
-        return Ok("Actividad creada en memoria");
+        return Ok("Actividad creada con éxito"); 
     }
 
-    // --- MODIFICACIÓN ---
     [HttpPut("{activityId:int}")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
     public async Task<IActionResult> Put(int activityId, [FromBody] ActivityDto dto)
     {
-        // Usamos activityId (el de la URL) para buscar
         var result = await _activityService.UpdateActivityAsync(activityId, dto);
 
         if (!result) return NotFound($"No se encontró la actividad con ID {activityId}");
@@ -37,8 +47,8 @@ public class ActivitiesController : ControllerBase
         return Ok("Actividad modificada con éxito");
     }
 
-    // --- BAJA ---
     [HttpDelete("{activityId:int}")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")] 
     public async Task<IActionResult> Delete(int activityId)
     {
         var result = await _activityService.DeleteActivityAsync(activityId);

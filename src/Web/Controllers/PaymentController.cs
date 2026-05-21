@@ -2,11 +2,13 @@ using Microsoft.AspNetCore.Mvc;
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Dtos;
 using ClubApp.Domain.Entities;
+using Microsoft.AspNetCore.Authorization;
 
 namespace ClubApp.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class PaymentsController(IPaymentService paymentService) : ControllerBase
 {
     [HttpGet]
@@ -26,7 +28,9 @@ public class PaymentsController(IPaymentService paymentService) : ControllerBase
         return Ok("Pago registrado correctamente");
     }
 
+    // 👈 3. Protegemos este endpoint para que SOLO los Admins puedan cambiar estados de pagos
     [HttpPatch("{paymentId:int}/status")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")] // 👈 Filtro estricto por Rol
     public async Task<IActionResult> UpdateStatus(int paymentId, [FromBody] PaymentStatus newStatus)
     {
         var result = await paymentService.UpdatePaymentStatusAsync(paymentId, newStatus);
@@ -35,6 +39,4 @@ public class PaymentsController(IPaymentService paymentService) : ControllerBase
 
         return Ok($"Estado del pago {paymentId} actualizado a {newStatus}");
     }
-
-    
 }
