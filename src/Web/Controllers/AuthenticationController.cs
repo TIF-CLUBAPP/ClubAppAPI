@@ -23,7 +23,7 @@ public class AuthenticationController : ControllerBase
     {
         try
         {
-            string? token = await _customAuthenticationService.AuthenticateAsync(authenticationRequest);
+            string? token = await _customAuthenticationService.AuthenticationAsync(authenticationRequest);
 
             if (token == null)
             {

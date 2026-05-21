@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Dtos;
-using ClubApp.Application.Requests; // Asegurate de que esta ruta sea la de tu AuthenticationRequest
-using Microsoft.AspNetCore.Authorization; // ¡CRÍTICO para el AllowAnonymous!
+using ClubApp.Application.Requests; 
+using Microsoft.AspNetCore.Authorization; 
 
 namespace ClubApp.API.Controllers;
 
@@ -12,9 +12,8 @@ namespace ClubApp.API.Controllers;
 public class UsersController : ControllerBase
 {
     private readonly IUserService _userService;
-    private readonly ICustomAuthenticationService _authService; // <-- 1. Agregamos el campo privado
+    private readonly ICustomAuthenticationService _authService; 
 
-    // 2. Inyectamos AMBOS servicios en el constructor para que .NET no chille
     public UsersController(IUserService userService, ICustomAuthenticationService authService)
     {
         _userService = userService;
@@ -35,6 +34,7 @@ public class UsersController : ControllerBase
     // REGISTRO DE USUARIOS: LIBRE DE CANDADOS
     // =======================================================================
     [HttpPost]
+    [AllowAnonymous]
     public async Task<IActionResult> Create([FromBody] UserDto userDto)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
@@ -62,8 +62,8 @@ public class UsersController : ControllerBase
     // =======================================================================
     // LOGIN: ASÍNCRONO Y CONFIGURADO CORRECTAMENTE
     // =======================================================================
-    [HttpPost("login")] // POST /api/Users/login
-    [AllowAnonymous]    // El login también tiene que ser público para poder entrar
+    [HttpPost("login")] 
+    [AllowAnonymous]    
     public async Task<IActionResult> Login([FromBody] AuthenticationRequest request)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
@@ -76,7 +76,6 @@ public class UsersController : ControllerBase
             return Unauthorized(new { message = "Usuario o contraseña incorrectos." });
         }
 
-        // Devolvemos el bendito token JWT listo para usar
         return Ok(new { token = token });
     }
 }

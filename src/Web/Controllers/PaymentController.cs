@@ -28,9 +28,8 @@ public class PaymentsController(IPaymentService paymentService) : ControllerBase
         return Ok("Pago registrado correctamente");
     }
 
-    // 👈 3. Protegemos este endpoint para que SOLO los Admins puedan cambiar estados de pagos
     [HttpPatch("{paymentId:int}/status")]
-    [Authorize(Roles = "ADMIN,SUPERADMIN")] // 👈 Filtro estricto por Rol
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
     public async Task<IActionResult> UpdateStatus(int paymentId, [FromBody] PaymentStatus newStatus)
     {
         var result = await paymentService.UpdatePaymentStatusAsync(paymentId, newStatus);

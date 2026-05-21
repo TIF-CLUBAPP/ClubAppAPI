@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text; 
 using Microsoft.OpenApi;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using ClubApp.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,19 +25,15 @@ builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 // ==========================================
 // 2. SERVICIOS DEL SISTEMA Y AUTENTICACIÓN
 // ==========================================
-builder.Services.Configure<ClubApp.Infrastructure.Services.AutenticacionService.AutenticacionServiceOptions>(
-    builder.Configuration.GetSection("AuthenticationService"));
 
-builder.Services.AddScoped<ICustomAuthenticationService, ClubApp.Infrastructure.Services.AutenticacionService>();
+builder.Services.AddScoped<ICustomAuthenticationService, AutenticacionService>();
 
 builder.Services.AddControllers();
 
-// Extraemos los valores validando que si no existen en el appsettings, usen un texto por defecto para no romper el arranque
-string issuer = builder.Configuration["AutenticacionService:Issuer"] ?? "ClubAppServer";
-string audience = builder.Configuration["AutenticacionService:Audience"] ?? "ClubAppUsers";
-string secretKey = builder.Configuration["AutenticacionService:SecretForKey"] 
-                   ?? builder.Configuration["AuthenticationService:SecretForKey"] 
-                   ?? "EstaEsUnaClaveSecretaSuperSeguraDeRespaldo123!"; // Clave de respaldo si todo viene nulo
+string issuer = builder.Configuration["Authentication:Issuer"] ?? "ClubAppAPI";
+string audience = builder.Configuration["Authentication:Audience"] ?? "ClubAppUsers";
+string secretKey = builder.Configuration["Authentication:SecretForKey"] 
+                   ?? "esta_es_una_clave_secreta_de_auxilio_super_larga_12345"; 
 
 // Autenticación JWT Bearer Backend 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme) 
@@ -50,7 +47,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             ValidIssuer = issuer,
             ValidAudience = audience,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)) // Evita el crash por nulo
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)) // 👈 Ahora las llaves coinciden perfectamente
         };
     });
 
@@ -61,31 +58,27 @@ builder.Services.AddOpenApi(options =>
 {
     options.AddDocumentTransformer((document, context, cancellationToken) =>
     {
-        // 1. Definición del esquema
         var schemeName = "ClubAppBearerAuth";
 
         var securityScheme = new OpenApiSecurityScheme
         {
             Type = SecuritySchemeType.Http,
-            Scheme = "bearer", // En minúsculas para cumplir estándares de OpenAPI 3.1
+            Scheme = "bearer", 
             BearerFormat = "JWT",
             Description = "Acá pegar el token generado al loguearse sin la palabra 'Bearer'."
         };
 
-        // Instanciar componentes si vienen nulos de raíz
         document.Components ??= new OpenApiComponents();
         document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
         document.Components.SecuritySchemes[schemeName] = securityScheme;
 
-        // 2. Requerimiento global usando la nueva referencia de .NET 10
         var schemeReference = new OpenApiSecuritySchemeReference(schemeName, document);
 
         var requirement = new OpenApiSecurityRequirement
         {
-            [schemeReference] = [] // Sintaxis limpia para los alcances (scopes) nulos
+            [schemeReference] = [] 
         };
 
-        // Asignar de forma global al documento
         document.Security = new List<OpenApiSecurityRequirement> { requirement };
 
         return Task.CompletedTask;
@@ -123,19 +116,19 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi(); // Mapea el JSON nativo en /openapi/v1.json
+    app.MapOpenApi(); 
     
     app.UseSwaggerUI(options =>
     {
         options.SwaggerEndpoint("/openapi/v1.json", "ClubApp API V1 (.NET 10)");
-        options.RoutePrefix = "swagger"; // Mantiene tu ruta para entrar desde /swagger
+        options.RoutePrefix = "swagger"; 
     });
 }
 
 app.UseHttpsRedirection();
 
-app.UseAuthentication(); // 1. Identifica al usuario
-app.UseAuthorization();  // 2. Valida sus permisos de Rol
+app.UseAuthentication();
+app.UseAuthorization();  
 
 app.MapControllers();
 
