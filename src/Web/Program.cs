@@ -1,38 +1,96 @@
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Services;
-using Infrastructure.Data;
+using ClubApp.Infrastructure.Data;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using ClubApp.Domain.Interfaces;
-using ClubApp.Infrastructure.Data; 
+using Microsoft.IdentityModel.Tokens; 
+using System.Text; 
+using Microsoft.OpenApi;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using ClubApp.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// REPOSITORIOS 
-builder.Services.AddScoped<IActivityRepository, ActivityRepository>(); 
-
-builder.Services.AddScoped<IUserRepository, UserRepository>(); 
-
+// ==========================================
+// 1. REGISTRO DE REPOSITORIOS (Capa Datos)
+// ==========================================
+builder.Services.AddScoped<IActivityRepository, ActivityRepository>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IEnrollmentRepository, EnrollmentRepository>();
-
 builder.Services.AddScoped<IMembershipRepository, MembershipRepository>();
-
 builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
-
 builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 
-// --- SERVICIOS DEL SISTEMA ---
+// ==========================================
+// 2. SERVICIOS DEL SISTEMA Y AUTENTICACIÓN
+// ==========================================
+
+builder.Services.AddScoped<ICustomAuthenticationService, AutenticacionService>();
 
 builder.Services.AddControllers();
 
-// Configuración de OpenAPI / Swagger
-builder.Services.AddOpenApi();
+string issuer = builder.Configuration["Authentication:Issuer"] ?? "ClubAppAPI";
+string audience = builder.Configuration["Authentication:Audience"] ?? "ClubAppUsers";
+string secretKey = builder.Configuration["Authentication:SecretForKey"] 
+                   ?? "esta_es_una_clave_secreta_de_auxilio_super_larga_12345"; 
 
-// Configure the SQLite connection
+// Autenticación JWT Bearer Backend 
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme) 
+    .AddJwtBearer(options => 
+    {
+        options.TokenValidationParameters = new TokenValidationParameters()
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = issuer,
+            ValidAudience = audience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)) // 👈 Ahora las llaves coinciden perfectamente
+        };
+    });
+
+// ==========================================
+// 3. CONFIGURACIÓN DE OPENAPI (El método de tu amigo)
+// ==========================================
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer((document, context, cancellationToken) =>
+    {
+        var schemeName = "ClubAppBearerAuth";
+
+        var securityScheme = new OpenApiSecurityScheme
+        {
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer", 
+            BearerFormat = "JWT",
+            Description = "Acá pegar el token generado al loguearse sin la palabra 'Bearer'."
+        };
+
+        document.Components ??= new OpenApiComponents();
+        document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
+        document.Components.SecuritySchemes[schemeName] = securityScheme;
+
+        var schemeReference = new OpenApiSecuritySchemeReference(schemeName, document);
+
+        var requirement = new OpenApiSecurityRequirement
+        {
+            [schemeReference] = [] 
+        };
+
+        document.Security = new List<OpenApiSecurityRequirement> { requirement };
+
+        return Task.CompletedTask;
+    });
+});
+ 
+// ==========================================
+// 4. CONFIGURACIÓN DE BASE DE DATOS (SQLite)
+// ==========================================
 var connection = new SqliteConnection("Data Source=miWebAppDatabase.db");
 connection.Open();
 
-// Set journal mode to DELETE using PRAGMA statement
 using (var command = connection.CreateCommand())
 {
     command.CommandText = "PRAGMA journal_mode = DELETE;";
@@ -41,44 +99,37 @@ using (var command = connection.CreateCommand())
 
 builder.Services.AddDbContext<ApplicationContext>(options => options.UseSqlite(connection));
 
-// --- INYECCIÓN DE DEPENDENCIAS (EL "CABLEADO") ---
-// Aquí le decimos al sistema: "Cuando un Controller pida IActivityService, dale ActivityService"
+// ==========================================
+// 5. INYECCIÓN DE SERVICIOS DE APLICACIÓN
+// ==========================================
 builder.Services.AddScoped<IActivityService, ActivityService>();
-
-//Enrollment builder inscripcion
 builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
-
-//User builder 
 builder.Services.AddScoped<IUserService, UserService>();
-
-//Notification builder
 builder.Services.AddScoped<INotificationService, NotificationService>();
-
-//MemberShip builder membresia
 builder.Services.AddScoped<IMembershipService, MembershipService>();
-
-//Payment builder pago
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 
-
-// ----------------------------------------------
-
+// ==========================================
+// 6. PIPELINE DE EJECUCIÓN (MIDDLEWARES)
+// ==========================================
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
-
+    app.MapOpenApi(); 
+    
     app.UseSwaggerUI(options =>
     {
-       // Esto permite que veas la interfaz gráfica de Swagger para probar tus métodos
-       options.SwaggerEndpoint("/openapi/v1.json", "ClubApp API V1"); 
-       options.RoutePrefix = "swagger"; // Podrás entrar en http://localhost:PORT/swagger
+        options.SwaggerEndpoint("/openapi/v1.json", "ClubApp API V1 (.NET 10)");
+        options.RoutePrefix = "swagger"; 
     });
 }
 
 app.UseHttpsRedirection();
-app.UseAuthorization();
+
+app.UseAuthentication();
+app.UseAuthorization();  
+
 app.MapControllers();
 
 app.Run();

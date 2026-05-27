@@ -1,18 +1,23 @@
 using Microsoft.AspNetCore.Mvc;
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Dtos;
+using ClubApp.Application.Requests; 
+using Microsoft.AspNetCore.Authorization; 
 
 namespace ClubApp.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class UsersController : ControllerBase
 {
     private readonly IUserService _userService;
+    private readonly ICustomAuthenticationService _authService; 
 
-    public UsersController(IUserService userService)
+    public UsersController(IUserService userService, ICustomAuthenticationService authService)
     {
         _userService = userService;
+        _authService = authService;
     }
 
     [HttpGet]
@@ -25,9 +30,15 @@ public class UsersController : ControllerBase
         return user != null ? Ok(user) : NotFound();
     }
 
+    // =======================================================================
+    // REGISTRO DE USUARIOS: LIBRE DE CANDADOS
+    // =======================================================================
     [HttpPost]
+    [AllowAnonymous]
     public async Task<IActionResult> Create([FromBody] UserDto userDto)
     {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+        
         await _userService.CreateUserAsync(userDto);
         return Ok(new { message = "Usuario creado correctamente" });
     }
@@ -46,5 +57,25 @@ public class UsersController : ControllerBase
     {
         var result = await _userService.DeleteUserAsync(id);
         return result ? Ok(new { message = "Usuario eliminado" }) : NotFound();
+    }
+
+    // =======================================================================
+    // LOGIN: ASÍNCRONO Y CONFIGURADO CORRECTAMENTE
+    // =======================================================================
+    [HttpPost("login")] 
+    [AllowAnonymous]    
+    public async Task<IActionResult> Login([FromBody] AuthenticationRequest request)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
+        // Usamos el método asincrónico que respeta tu arquitectura limpia con await
+        var token = await _authService.AuthenticationAsync(request);
+
+        if (token == null)
+        {
+            return Unauthorized(new { message = "Usuario o contraseña incorrectos." });
+        }
+
+        return Ok(new { token = token });
     }
 }
