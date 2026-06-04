@@ -4,8 +4,8 @@ using ClubApp.Infrastructure.Data;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using ClubApp.Domain.Interfaces;
-using Microsoft.IdentityModel.Tokens; 
-using System.Text; 
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 using Microsoft.OpenApi;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using ClubApp.Infrastructure.Services;
@@ -32,12 +32,12 @@ builder.Services.AddControllers();
 
 string issuer = builder.Configuration["Authentication:Issuer"] ?? "ClubAppAPI";
 string audience = builder.Configuration["Authentication:Audience"] ?? "ClubAppUsers";
-string secretKey = builder.Configuration["Authentication:SecretForKey"] 
-                   ?? "esta_es_una_clave_secreta_de_auxilio_super_larga_12345"; 
+string secretKey = builder.Configuration["Authentication:SecretForKey"]
+                   ?? "esta_es_una_clave_secreta_de_auxilio_super_larga_12345";
 
 // Autenticación JWT Bearer Backend 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme) 
-    .AddJwtBearer(options => 
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
     {
         options.TokenValidationParameters = new TokenValidationParameters()
         {
@@ -63,7 +63,7 @@ builder.Services.AddOpenApi(options =>
         var securityScheme = new OpenApiSecurityScheme
         {
             Type = SecuritySchemeType.Http,
-            Scheme = "bearer", 
+            Scheme = "bearer",
             BearerFormat = "JWT",
             Description = "Acá pegar el token generado al loguearse sin la palabra 'Bearer'."
         };
@@ -76,7 +76,7 @@ builder.Services.AddOpenApi(options =>
 
         var requirement = new OpenApiSecurityRequirement
         {
-            [schemeReference] = [] 
+            [schemeReference] = []
         };
 
         document.Security = new List<OpenApiSecurityRequirement> { requirement };
@@ -84,7 +84,7 @@ builder.Services.AddOpenApi(options =>
         return Task.CompletedTask;
     });
 });
- 
+
 // ==========================================
 // 4. CONFIGURACIÓN DE BASE DE DATOS (SQLite)
 // ==========================================
@@ -117,21 +117,19 @@ builder.Services.AddHttpClient<IWeatherService, WeatherService>();
 // ==========================================
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+app.MapOpenApi();
+
+app.UseSwaggerUI(options =>
 {
-    app.MapOpenApi(); 
-    
-    app.UseSwaggerUI(options =>
-    {
-        options.SwaggerEndpoint("/openapi/v1.json", "ClubApp API V1 (.NET 10)");
-        options.RoutePrefix = "swagger"; 
-    });
-}
+    options.SwaggerEndpoint("/openapi/v1.json", "ClubApp API V1 (.NET 10)");
+    options.RoutePrefix = "swagger";
+});
+
 
 app.UseHttpsRedirection();
 
 app.UseAuthentication();
-app.UseAuthorization();  
+app.UseAuthorization();
 
 app.MapControllers();
 
