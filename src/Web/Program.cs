@@ -109,6 +109,9 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IMembershipService, MembershipService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 
+// Registro del servicio del clima configurando su cliente HTTP interno
+builder.Services.AddHttpClient<IWeatherService, WeatherService>();
+
 // ==========================================
 // 6. PIPELINE DE EJECUCIÓN (MIDDLEWARES)
 // ==========================================
