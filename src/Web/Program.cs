@@ -88,7 +88,12 @@ builder.Services.AddOpenApi(options =>
 // ==========================================
 // 4. CONFIGURACIÓN DE BASE DE DATOS (SQLite)
 // ==========================================
-var connection = new SqliteConnection("Data Source=miWebAppDatabase.db");
+// 1. Conseguimos la ruta de la carpeta raíz de la app (funciona tanto en tu PC como en Azure)
+var baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
+var databasePath = Path.Combine(baseDirectory, "miWebAppDatabase.db");
+
+// 2. Pasamos la ruta absoluta a la conexión
+var connection = new SqliteConnection($"Data Source={databasePath}");
 connection.Open();
 
 using (var command = connection.CreateCommand())
