@@ -25,7 +25,6 @@ builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 // ==========================================
 // 2. SERVICIOS DEL SISTEMA Y AUTENTICACIÓN
 // ==========================================
-
 builder.Services.AddScoped<ICustomAuthenticationService, AutenticacionService>();
 
 builder.Services.AddControllers();
@@ -33,7 +32,7 @@ builder.Services.AddControllers();
 string issuer = builder.Configuration["Authentication:Issuer"] ?? "ClubAppAPI";
 string audience = builder.Configuration["Authentication:Audience"] ?? "ClubAppUsers";
 string secretKey = builder.Configuration["Authentication:SecretForKey"]
-                   ?? "esta_es_una_clave_secreta_de_auxilio_super_larga_12345";
+                    ?? "esta_es_una_clave_secreta_de_auxilio_super_larga_12345";
 
 // Autenticación JWT Bearer Backend 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -47,12 +46,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             ValidIssuer = issuer,
             ValidAudience = audience,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)) // 👈 Ahora las llaves coinciden perfectamente
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey))
         };
     });
 
 // ==========================================
-// 3. CONFIGURACIÓN DE OPENAPI (El método de tu amigo)
+// 3. CONFIGURACIÓN DE OPENAPI
 // ==========================================
 builder.Services.AddOpenApi(options =>
 {
@@ -88,11 +87,9 @@ builder.Services.AddOpenApi(options =>
 // ==========================================
 // 4. CONFIGURACIÓN DE BASE DE DATOS (SQLite)
 // ==========================================
-// 1. Conseguimos la ruta de la carpeta raíz de la app (funciona tanto en tu PC como en Azure)
 var baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
 var databasePath = Path.Combine(baseDirectory, "miWebAppDatabase.db");
 
-// 2. Pasamos la ruta absoluta a la conexión
 var connection = new SqliteConnection($"Data Source={databasePath}");
 connection.Open();
 
@@ -114,13 +111,32 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IMembershipService, MembershipService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 
-// Registro del servicio del clima configurando su cliente HTTP interno
 builder.Services.AddHttpClient<IWeatherService, WeatherService>();
 
 // ==========================================
 // 6. PIPELINE DE EJECUCIÓN (MIDDLEWARES)
 // ==========================================
 var app = builder.Build();
+
+// 👇 ACÁ ESTÁ LO DE LA IMAGEN APLICADO PERFECTAMENTE PARA TU PROYECTO
+#region Apply EF migrations
+using (var serviceScope = app.Services.CreateScope())
+{
+    try
+    {
+        // Usamos tu contexto real: ApplicationContext
+        var dbContext = serviceScope.ServiceProvider.GetRequiredService<ApplicationContext>();
+        
+        // EnsureCreated asegura que si el archivo .db no existe en Azure, lo crea con todas sus tablas al instante
+        dbContext.Database.EnsureCreated();
+    }
+    catch (Exception ex)
+    {
+        var logger = serviceScope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Error crítico al inicializar la base de datos en el servidor.");
+    }
+}
+#endregion
 
 app.MapOpenApi();
 
@@ -129,7 +145,6 @@ app.UseSwaggerUI(options =>
     options.SwaggerEndpoint("/openapi/v1.json", "ClubApp API V1 (.NET 10)");
     options.RoutePrefix = "swagger";
 });
-
 
 app.UseHttpsRedirection();
 
