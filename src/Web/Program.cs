@@ -118,7 +118,6 @@ builder.Services.AddHttpClient<IWeatherService, WeatherService>();
 // ==========================================
 var app = builder.Build();
 
-// 👇 ACÁ ESTÁ LO DE LA IMAGEN APLICADO PERFECTAMENTE PARA TU PROYECTO
 #region Apply EF migrations
 using (var serviceScope = app.Services.CreateScope())
 {
