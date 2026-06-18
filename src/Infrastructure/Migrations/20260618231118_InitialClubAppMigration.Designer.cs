@@ -3,16 +3,19 @@ using System;
 using ClubApp.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace Infrastructure.Data.Migrations
+namespace Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationContext))]
-    partial class ApplicationContextModelSnapshot : ModelSnapshot
+    [Migration("20260618231118_InitialClubAppMigration")]
+    partial class InitialClubAppMigration
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.7");
@@ -225,6 +228,19 @@ namespace Infrastructure.Data.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Users");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            BadgeNum = "123",
+                            CreatedAt = new DateTime(2026, 6, 18, 23, 11, 17, 885, DateTimeKind.Utc).AddTicks(9343),
+                            Email = "nico@clubapp.com",
+                            FirstName = "nico",
+                            LastName = "dev",
+                            PasswordHash = "1234",
+                            Role = 1
+                        });
                 });
 
             modelBuilder.Entity("ClubApp.Domain.Entities.Enrollment", b =>

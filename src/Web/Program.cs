@@ -87,8 +87,18 @@ builder.Services.AddOpenApi(options =>
 // ==========================================
 // 4. CONFIGURACIÓN DE BASE DE DATOS (SQLite)
 // ==========================================
-var baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
-var databasePath = Path.Combine(baseDirectory, "miWebAppDatabase.db");
+string databasePath;
+var azureHome = Environment.GetEnvironmentVariable("HOME");
+
+if (!string.IsNullOrEmpty(azureHome))
+{
+    databasePath = Path.Combine(azureHome, "site", "wwwroot", "miWebAppDatabase.db");
+}
+else
+{
+    var baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
+    databasePath = Path.Combine(baseDirectory, "miWebAppDatabase.db");
+}
 
 var connection = new SqliteConnection($"Data Source={databasePath}");
 connection.Open();
@@ -119,10 +129,19 @@ builder.Services.AddHttpClient<IWeatherService, WeatherService>();
 var app = builder.Build();
 
 #region Apply EF migrations
-using (var serviceScopescope = app.Services.CreateScope())
+using (var serviceScope = app.Services.CreateScope())
 {
-    var dbContext = serviceScopescope.ServiceProvider.GetRequiredService<ApplicationContext>();
-    dbContext.Database.Migrate();
+    try
+    {
+        var dbContext = serviceScope.ServiceProvider.GetRequiredService<ApplicationContext>();
+        
+        dbContext.Database.Migrate(); 
+    }
+    catch (Exception ex)
+    {
+        var logger = serviceScope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Error aplicando las migraciones en Azure. Revisar logs.");
+    }
 }
 #endregion
 
