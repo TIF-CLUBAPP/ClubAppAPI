@@ -119,21 +119,10 @@ builder.Services.AddHttpClient<IWeatherService, WeatherService>();
 var app = builder.Build();
 
 #region Apply EF migrations
-using (var serviceScope = app.Services.CreateScope())
+using (var serviceScopescope = app.Services.CreateScope())
 {
-    try
-    {
-        // Usamos tu contexto real: ApplicationContext
-        var dbContext = serviceScope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        
-        // EnsureCreated asegura que si el archivo .db no existe en Azure, lo crea con todas sus tablas al instante
-        dbContext.Database.EnsureCreated();
-    }
-    catch (Exception ex)
-    {
-        var logger = serviceScope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "Error crítico al inicializar la base de datos en el servidor.");
-    }
+    var dbContext = serviceScopescope.ServiceProvider.GetRequiredService<ApplicationContext>();
+    dbContext.Database.Migrate();
 }
 #endregion
 
