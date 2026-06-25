@@ -117,6 +117,7 @@ builder.Services.AddHttpClient<IWeatherService, WeatherService>();
 // ==========================================
 // 6. PIPELINE DE EJECUCIÓN (MIDDLEWARES)
 // ==========================================
+
 var app = builder.Build();
 
 #region Apply EF migrations
