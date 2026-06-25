@@ -8,6 +8,7 @@ using System.Text;
 using Microsoft.OpenApi;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using ClubApp.Infrastructure.Services;
+using Microsoft.Data.Sqlite;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -86,12 +87,20 @@ builder.Services.AddOpenApi(options =>
 // ==========================================
 // 4. CONFIGURACIÓN DE BASE DE DATOS (SQLite)
 // ==========================================
-// Levantamos la conexión limpia según el entorno activo (Development o Production)
-string connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
-    ?? throw new InvalidOperationException("La cadena de conexión 'DefaultConnection' no fue encontrada.");
+// Configure the SQLite connection
+string connectionString = builder.Configuration["ConnectionStrings:SQLiteConnectionString"]!;
+Console.WriteLine(connectionString);
+var connection = new SqliteConnection(connectionString);
+connection.Open();
 
-builder.Services.AddDbContext<ApplicationContext>(options => 
-    options.UseSqlite(connectionString, b => b.MigrationsAssembly("Infrastructure")));
+// Set journal mode to DELETE using PRAGMA statement
+using (var command = connection.CreateCommand())
+{
+    command.CommandText = "PRAGMA journal_mode = DELETE;";
+    command.ExecuteNonQuery();
+}
+
+builder.Services.AddDbContext<ApplicationContext>(dbContextOptions => dbContextOptions.UseSqlite(connection));
 
 // ==========================================
 // 5. INYECCIÓN DE SERVICIOS DE APLICACIÓN
