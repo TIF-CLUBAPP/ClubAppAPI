@@ -26,17 +26,31 @@ namespace ClubApp.Infrastructure.Data
         {
             base.OnModelCreating(modelBuilder);
 
-            // Esto inyecta un usuario a la fuerza en la base de datos al iniciar
-            modelBuilder.Entity<ClubApp.Domain.Entities.User>().HasData(new ClubApp.Domain.Entities.User
-            {
-                Id = 1,
-                BadgeNum = "123",
-                FirstName = "nico",
-                LastName = "dev",
-                Email = "nico@clubapp.com",
-                PasswordHash = "1234", // Esta va a ser tu contraseña de prueba
-                Role = ClubApp.Domain.Entities.UserRole.ADMIN
-            });
+            // Esto inyecta usuarios a la fuerza en la base de datos al iniciar
+            modelBuilder.Entity<ClubApp.Domain.Entities.User>().HasData(
+                new ClubApp.Domain.Entities.User
+                {
+                    Id = 1,
+                    BadgeNum = "123",
+                    FirstName = "nico",
+                    LastName = "dev",
+                    Email = "nico@clubapp.com",
+                    PasswordHash = "1234",
+                    Role = ClubApp.Domain.Entities.UserRole.ADMIN,
+                    CreatedAt = DateTime.UtcNow
+                },
+                new ClubApp.Domain.Entities.User
+                {
+                    Id = 2,
+                    BadgeNum = "001",
+                    FirstName = "Super",
+                    LastName = "Admin",
+                    Email = "superadmin@clubapp.com",
+                    PasswordHash = "SuperAdmin@123",
+                    Role = ClubApp.Domain.Entities.UserRole.SUPERADMIN,
+                    CreatedAt = DateTime.UtcNow
+                }
+            );
         }
 
     }

@@ -1,7 +1,6 @@
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Services;
 using ClubApp.Infrastructure.Data;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using ClubApp.Domain.Interfaces;
 using Microsoft.IdentityModel.Tokens;
@@ -87,29 +86,12 @@ builder.Services.AddOpenApi(options =>
 // ==========================================
 // 4. CONFIGURACIÓN DE BASE DE DATOS (SQLite)
 // ==========================================
-string databasePath;
-var azureHome = Environment.GetEnvironmentVariable("HOME");
+// Levantamos la conexión limpia según el entorno activo (Development o Production)
+string connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
+    ?? throw new InvalidOperationException("La cadena de conexión 'DefaultConnection' no fue encontrada.");
 
-if (!string.IsNullOrEmpty(azureHome))
-{
-    databasePath = Path.Combine(azureHome, "site", "wwwroot", "miWebAppDatabase.db");
-}
-else
-{
-    var baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
-    databasePath = Path.Combine(baseDirectory, "miWebAppDatabase.db");
-}
-
-var connection = new SqliteConnection($"Data Source={databasePath}");
-connection.Open();
-
-using (var command = connection.CreateCommand())
-{
-    command.CommandText = "PRAGMA journal_mode = DELETE;";
-    command.ExecuteNonQuery();
-}
-
-builder.Services.AddDbContext<ApplicationContext>(options => options.UseSqlite(connection));
+builder.Services.AddDbContext<ApplicationContext>(options => 
+    options.UseSqlite(connectionString, b => b.MigrationsAssembly("Infrastructure")));
 
 // ==========================================
 // 5. INYECCIÓN DE SERVICIOS DE APLICACIÓN
@@ -134,13 +116,12 @@ using (var serviceScope = app.Services.CreateScope())
     try
     {
         var dbContext = serviceScope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        
         dbContext.Database.Migrate(); 
     }
     catch (Exception ex)
     {
         var logger = serviceScope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "Error aplicando las migraciones en Azure. Revisar logs.");
+        logger.LogError(ex, "Error aplicando las migraciones de Entity Framework.");
     }
 }
 #endregion
