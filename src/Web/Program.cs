@@ -87,8 +87,8 @@ builder.Services.AddOpenApi(options =>
 // 4. CONFIGURACIÓN DE BASE DE DATOS (SQLite)
 // ==========================================
 // Levantamos la conexión limpia según el entorno activo (Development o Production)
-string connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
-    ?? throw new InvalidOperationException("La cadena de conexión 'DefaultConnection' no fue encontrada.");
+string connectionString = builder.Configuration.GetConnectionString("SQLiteConnection") 
+    ?? throw new InvalidOperationException("La cadena de conexión 'SQLiteConnection' no fue encontrada.");
 
 builder.Services.AddDbContext<ApplicationContext>(options => 
     options.UseSqlite(connectionString, b => b.MigrationsAssembly("Infrastructure")));
