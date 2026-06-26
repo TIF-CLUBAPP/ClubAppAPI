@@ -234,7 +234,7 @@ namespace Infrastructure.Migrations
                         {
                             Id = 1,
                             BadgeNum = "123",
-                            CreatedAt = new DateTime(2026, 6, 18, 23, 11, 17, 885, DateTimeKind.Utc).AddTicks(9343),
+                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, DateTimeKind.Utc),
                             Email = "nico@clubapp.com",
                             FirstName = "nico",
                             LastName = "dev",
