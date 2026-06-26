@@ -87,13 +87,20 @@ builder.Services.AddOpenApi(options =>
 // ==========================================
 // 4. CONFIGURACIÓN DE BASE DE DATOS (SQLite)
 // ==========================================
-// Configure the SQLite connection
 string connectionString = builder.Configuration["ConnectionStrings:SQLiteConnectionString"]!;
-Console.WriteLine(connectionString);
+
+// Truco profesional: Si la cadena es relativa, le forzamos la ruta absoluta del servidor
+if (connectionString.Contains("Data Source=") && !connectionString.Contains(":\\") && !connectionString.Contains("/"))
+{
+    var dbName = connectionString.Replace("Data Source=", "");
+    var dbPath = Path.Combine(AppContext.BaseDirectory, dbName);
+    connectionString = $"Data Source={dbPath}";
+}
+
+Console.WriteLine($"Usando la base de datos en: {connectionString}");
 var connection = new SqliteConnection(connectionString);
 connection.Open();
 
-// Set journal mode to DELETE using PRAGMA statement
 using (var command = connection.CreateCommand())
 {
     command.CommandText = "PRAGMA journal_mode = DELETE;";
@@ -141,7 +148,7 @@ app.MapOpenApi();
 app.UseSwaggerUI(options =>
 {
     options.SwaggerEndpoint("/openapi/v1.json", "ClubApp API V1 (.NET 10)");
-    options.RoutePrefix = "swagger";
+    options.RoutePrefix = string.Empty; // 🚀 Al dejarlo vacío, la url principal levanta el Swagger directo!
 });
 
 app.UseHttpsRedirection();
