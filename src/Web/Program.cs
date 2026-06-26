@@ -34,7 +34,6 @@ string audience = builder.Configuration["Authentication:Audience"] ?? "ClubAppUs
 string secretKey = builder.Configuration["Authentication:SecretForKey"]
                     ?? "esta_es_una_clave_secreta_de_auxilio_super_larga_12345";
 
-// Autenticación JWT Bearer Backend 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -85,11 +84,11 @@ builder.Services.AddOpenApi(options =>
 });
 
 // ==========================================
-// 4. CONFIGURACIÓN DE BASE DE DATOS (SQLite)
+// 4. CONFIGURACIÓN DE BASE DE DATOS (Inyección Limpia)
 // ==========================================
 string connectionString = builder.Configuration["ConnectionStrings:SQLiteConnectionString"]!;
 
-// Truco profesional: Si la cadena es relativa, le forzamos la ruta absoluta del servidor
+// Si la ruta del SQLite es relativa, aseguramos que use el directorio base del servidor
 if (connectionString.Contains("Data Source=") && !connectionString.Contains(":\\") && !connectionString.Contains("/"))
 {
     var dbName = connectionString.Replace("Data Source=", "");
@@ -97,17 +96,8 @@ if (connectionString.Contains("Data Source=") && !connectionString.Contains(":\\
     connectionString = $"Data Source={dbPath}";
 }
 
-Console.WriteLine($"Usando la base de datos en: {connectionString}");
-var connection = new SqliteConnection(connectionString);
-connection.Open();
-
-using (var command = connection.CreateCommand())
-{
-    command.CommandText = "PRAGMA journal_mode = DELETE;";
-    command.ExecuteNonQuery();
-}
-
-builder.Services.AddDbContext<ApplicationContext>(dbContextOptions => dbContextOptions.UseSqlite(connection));
+// Inyectamos el DbContext delegándole la ConnectionString de forma nativa
+builder.Services.AddDbContext<ApplicationContext>(options => options.UseSqlite(connectionString));
 
 // ==========================================
 // 5. INYECCIÓN DE SERVICIOS DE APLICACIÓN
@@ -124,15 +114,28 @@ builder.Services.AddHttpClient<IWeatherService, WeatherService>();
 // ==========================================
 // 6. PIPELINE DE EJECUCIÓN (MIDDLEWARES)
 // ==========================================
-
 var app = builder.Build();
 
-#region Apply EF migrations
+#region Inicialización Segura de BD y Migraciones
 using (var serviceScope = app.Services.CreateScope())
 {
     try
     {
         var dbContext = serviceScope.ServiceProvider.GetRequiredService<ApplicationContext>();
+        
+        // Abrimos la conexión e imponemos el PRAGMA acá adentro de forma controlada
+        var conn = dbContext.Database.GetDbConnection();
+        if (conn.State != System.Data.ConnectionState.Open)
+        {
+            conn.Open();
+        }
+        using (var command = conn.CreateCommand())
+        {
+            command.CommandText = "PRAGMA journal_mode = DELETE;";
+            command.ExecuteNonQuery();
+        }
+
+        // Aplicamos migraciones voluntarias
         dbContext.Database.Migrate(); 
     }
     catch (Exception ex)
@@ -148,7 +151,7 @@ app.MapOpenApi();
 app.UseSwaggerUI(options =>
 {
     options.SwaggerEndpoint("/openapi/v1.json", "ClubApp API V1 (.NET 10)");
-    options.RoutePrefix = string.Empty; // 🚀 Al dejarlo vacío, la url principal levanta el Swagger directo!
+    options.RoutePrefix = string.Empty; // 🚀 Al dejarlo vacío, la raíz abre el Swagger directo
 });
 
 app.UseHttpsRedirection();
