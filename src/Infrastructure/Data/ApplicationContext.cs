@@ -37,7 +37,7 @@ namespace ClubApp.Infrastructure.Data
                     Email = "nico@clubapp.com",
                     PasswordHash = "1234",
                     Role = ClubApp.Domain.Entities.UserRole.ADMIN,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, DateTimeKind.Utc)
                 },
                 new ClubApp.Domain.Entities.User
                 {
@@ -48,7 +48,7 @@ namespace ClubApp.Infrastructure.Data
                     Email = "superadmin@clubapp.com",
                     PasswordHash = "SuperAdmin@123",
                     Role = ClubApp.Domain.Entities.UserRole.SUPERADMIN,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, DateTimeKind.Utc)
                 }
             );
         }
