@@ -84,19 +84,25 @@ builder.Services.AddOpenApi(options =>
 });
 
 // ==========================================
-// 4. CONFIGURACIÓN DE BASE DE DATOS (Inyección Limpia)
+// 4. CONFIGURACIÓN DE BASE DE DATOS (Fijada para Azure)
 // ==========================================
-string connectionString = builder.Configuration["ConnectionStrings:SQLiteConnectionString"]!;
+// Intentamos obtener la conexión, si no existe, usamos una ruta absoluta por defecto
+string dbFileName = "clubapp.db";
+string dbPath;
 
-// Si la ruta del SQLite es relativa, aseguramos que use el directorio base del servidor
-if (connectionString.Contains("Data Source=") && !connectionString.Contains(":\\") && !connectionString.Contains("/"))
+// Detectar si estamos en Azure
+if (Environment.GetEnvironmentVariable("HOME") != null) 
 {
-    var dbName = connectionString.Replace("Data Source=", "");
-    var dbPath = Path.Combine(AppContext.BaseDirectory, dbName);
-    connectionString = $"Data Source={dbPath}";
+    // Estamos en Azure Linux (App Service)
+    dbPath = Path.Combine(Environment.GetEnvironmentVariable("HOME")!, "site", "wwwroot", dbFileName);
+}
+else 
+{
+    // Estamos en desarrollo local
+    dbPath = Path.Combine(AppContext.BaseDirectory, dbFileName);
 }
 
-// Inyectamos el DbContext delegándole la ConnectionString de forma nativa
+string connectionString = $"Data Source={dbPath}";
 builder.Services.AddDbContext<ApplicationContext>(options => options.UseSqlite(connectionString));
 
 // ==========================================
@@ -116,33 +122,12 @@ builder.Services.AddHttpClient<IWeatherService, WeatherService>();
 // ==========================================
 var app = builder.Build();
 
-#region Inicialización Segura de BD y Migraciones
-using (var serviceScope = app.Services.CreateScope())
+#region Inicialización Automática de Base de Datos
+using (var scope = app.Services.CreateScope())
 {
-    try
-    {
-        var dbContext = serviceScope.ServiceProvider.GetRequiredService<ApplicationContext>();
-        
-        // Abrimos la conexión e imponemos el PRAGMA acá adentro de forma controlada
-        var conn = dbContext.Database.GetDbConnection();
-        if (conn.State != System.Data.ConnectionState.Open)
-        {
-            conn.Open();
-        }
-        using (var command = conn.CreateCommand())
-        {
-            command.CommandText = "PRAGMA journal_mode = DELETE;";
-            command.ExecuteNonQuery();
-        }
-
-        // Aplicamos migraciones voluntarias
-        dbContext.Database.Migrate(); 
-    }
-    catch (Exception ex)
-    {
-        var logger = serviceScope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "Error aplicando las migraciones de Entity Framework.");
-    }
+    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
+    // Esto crea la base de datos y aplica todas las tablas si no existen
+    dbContext.Database.EnsureCreated(); 
 }
 #endregion
 
