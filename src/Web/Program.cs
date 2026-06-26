@@ -116,12 +116,33 @@ builder.Services.AddHttpClient<IWeatherService, WeatherService>();
 // ==========================================
 var app = builder.Build();
 
-#region Inicialización Automática de Base de Datos
-using (var scope = app.Services.CreateScope())
+#region Inicialización Segura de BD y Migraciones
+using (var serviceScope = app.Services.CreateScope())
 {
-    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
+    try
+    {
+        var dbContext = serviceScope.ServiceProvider.GetRequiredService<ApplicationContext>();
+        
+        // Abrimos la conexión e imponemos el PRAGMA acá adentro de forma controlada
+        var conn = dbContext.Database.GetDbConnection();
+        if (conn.State != System.Data.ConnectionState.Open)
+        {
+            conn.Open();
+        }
+        using (var command = conn.CreateCommand())
+        {
+            command.CommandText = "PRAGMA journal_mode = DELETE;";
+            command.ExecuteNonQuery();
+        }
 
-    dbContext.Database.Migrate(); 
+        // Aplicamos migraciones voluntarias
+        dbContext.Database.Migrate(); 
+    }
+    catch (Exception ex)
+    {
+        var logger = serviceScope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Error aplicando las migraciones de Entity Framework.");
+    }
 }
 #endregion
 
