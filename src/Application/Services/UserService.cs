@@ -4,6 +4,7 @@ using ClubApp.Domain.Entities;
 using ClubApp.Domain.Interfaces;
 using ClubApp.Domain.Exceptions;
 
+
 namespace ClubApp.Application.Services;
 
 public class UserService : IUserService
@@ -25,7 +26,7 @@ public class UserService : IUserService
             FirstName = u.FirstName,
             LastName = u.LastName,
             Email = u.Email,
-            Role = u.Role, 
+            Role = u.Role,
             BadgeNum = u.BadgeNum,
             CreatedAt = u.CreatedAt,
         }).ToList();
@@ -39,31 +40,43 @@ public class UserService : IUserService
             throw new NotFoundException("User", id);
         }
 
-        return new UserDto 
-        { 
-            Id = user.Id, 
-            FirstName = user.FirstName, 
-            LastName = user.LastName, 
-            Email = user.Email, 
+        return new UserDto
+        {
+            Id = user.Id,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            Email = user.Email,
             Role = user.Role
         };
     }
 
-    public async Task<bool> CreateUserAsync(UserDto userDto)
+    public async Task<bool> CreateUserAsync(UserRegisterDto userDto) 
     {
         if (string.IsNullOrWhiteSpace(userDto.Email))
         {
             throw new AppValidationException("El correo electrónico es un campo obligatorio.");
         }
 
-        var newUser = new User 
+        // 1. Generacion de BadgeNum
+        var allUsers = await _userRepository.GetAllAsync();
+
+        int nextNumber = allUsers.Any() ? allUsers.Max(u => int.Parse(u.BadgeNum)) + 1 : 1;
+        string generatedBadgeNum = nextNumber.ToString("D3");
+
+        // 2. Creacion del usuario
+        var newUser = new User
         {
             FirstName = userDto.FirstName,
             LastName = userDto.LastName,
             Email = userDto.Email,
-            PasswordHash = userDto.Password, // OJO: Aquí deberías hashear la contraseña antes de guardarla
-            Role = userDto.Role, 
-            BadgeNum = userDto.BadgeNum
+
+            // 3. Hasheo real de contraseña
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(userDto.Password),
+
+            // 4. Valores automáticos
+            Role = 0, // Member
+            BadgeNum = generatedBadgeNum,
+            CreatedAt = DateTime.UtcNow
         };
 
         await _userRepository.AddAsync(newUser);
@@ -81,7 +94,7 @@ public class UserService : IUserService
         existingUser.FirstName = userDto.FirstName;
         existingUser.LastName = userDto.LastName;
         existingUser.Email = userDto.Email;
-        existingUser.Role = userDto.Role; 
+        existingUser.Role = userDto.Role;
 
         await _userRepository.UpdateAsync(existingUser);
         return true;

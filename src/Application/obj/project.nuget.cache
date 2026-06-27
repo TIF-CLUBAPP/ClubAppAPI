@@ -1,8 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "YrLE3ro+WPA=",
+  "dgSpecHash": "rZj3ZFgeGus=",
   "success": true,
   "projectFilePath": "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Application\\Application.csproj",
-  "expectedPackageFiles": [],
+  "expectedPackageFiles": [
+    "C:\\Users\\berto\\.nuget\\packages\\bcrypt.net-next\\4.2.0\\bcrypt.net-next.4.2.0.nupkg.sha512"
+  ],
   "logs": []
 }
