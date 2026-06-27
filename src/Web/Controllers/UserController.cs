@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Dtos;
-using ClubApp.Application.Requests; 
-using Microsoft.AspNetCore.Authorization; 
+using ClubApp.Application.Requests;
+using Microsoft.AspNetCore.Authorization;
 
 namespace ClubApp.API.Controllers;
 
@@ -12,7 +12,7 @@ namespace ClubApp.API.Controllers;
 public class UsersController : ControllerBase
 {
     private readonly IUserService _userService;
-    private readonly ICustomAuthenticationService _authService; 
+    private readonly ICustomAuthenticationService _authService;
 
     public UsersController(IUserService userService, ICustomAuthenticationService authService)
     {
@@ -35,11 +35,12 @@ public class UsersController : ControllerBase
     // =======================================================================
     [HttpPost]
     [AllowAnonymous]
-    public async Task<IActionResult> Create([FromBody] UserDto userDto)
+    public async Task<IActionResult> Create([FromBody] UserRegisterDto registerDto)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
-        
-        await _userService.CreateUserAsync(userDto);
+
+        await _userService.CreateUserAsync(registerDto);
+
         return Ok(new { message = "Usuario creado correctamente" });
     }
 
@@ -62,8 +63,8 @@ public class UsersController : ControllerBase
     // =======================================================================
     // LOGIN: ASÍNCRONO Y CONFIGURADO CORRECTAMENTE
     // =======================================================================
-    [HttpPost("login")] 
-    [AllowAnonymous]    
+    [HttpPost("login")]
+    [AllowAnonymous]
     public async Task<IActionResult> Login([FromBody] AuthenticationRequest request)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);

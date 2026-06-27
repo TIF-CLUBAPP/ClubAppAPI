@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "b0obwWsTYog=",
+  "dgSpecHash": "xl11HwQ+RKk=",
   "success": true,
-  "projectFilePath": "c:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Web\\Web.csproj",
+  "projectFilePath": "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Web\\Web.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\berto\\.nuget\\packages\\bcrypt.net-next\\4.2.0\\bcrypt.net-next.4.2.0.nupkg.sha512",
     "C:\\Users\\berto\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",
@@ -37,7 +37,7 @@
     "C:\\Users\\berto\\.nuget\\packages\\newtonsoft.json\\13.0.3\\newtonsoft.json.13.0.3.nupkg.sha512",
     "C:\\Users\\berto\\.nuget\\packages\\sqlitepclraw.bundle_e_sqlite3\\2.1.11\\sqlitepclraw.bundle_e_sqlite3.2.1.11.nupkg.sha512",
     "C:\\Users\\berto\\.nuget\\packages\\sqlitepclraw.core\\2.1.11\\sqlitepclraw.core.2.1.11.nupkg.sha512",
-    "C:\\Users\\berto\\.nuget\\packages\\sqlitepclraw.lib.e_sqlite3\\2.1.11\\sqlitepclraw.lib.e_sqlite3.2.1.11.nupkg.sha512",
+    "C:\\Users\\berto\\.nuget\\packages\\sqlitepclraw.lib.e_sqlite3\\3.50.3\\sqlitepclraw.lib.e_sqlite3.3.50.3.nupkg.sha512",
     "C:\\Users\\berto\\.nuget\\packages\\sqlitepclraw.provider.e_sqlite3\\2.1.11\\sqlitepclraw.provider.e_sqlite3.2.1.11.nupkg.sha512",
     "C:\\Users\\berto\\.nuget\\packages\\swashbuckle.aspnetcore\\10.1.7\\swashbuckle.aspnetcore.10.1.7.nupkg.sha512",
     "C:\\Users\\berto\\.nuget\\packages\\swashbuckle.aspnetcore.swagger\\10.1.7\\swashbuckle.aspnetcore.swagger.10.1.7.nupkg.sha512",
@@ -54,12 +54,12 @@
   ],
   "logs": [
     {
-      "code": "NU1903",
+      "code": "NU1603",
       "level": "Warning",
-      "message": "Package 'SQLitePCLRaw.lib.e_sqlite3' 2.1.11 has a known high severity vulnerability, https://github.com/advisories/GHSA-2m69-gcr7-jv3q",
-      "projectPath": "c:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Web\\Web.csproj",
+      "message": "Web depende de SQLitePCLRaw.lib.e_sqlite3 (>= 2.1.12), pero no se encontró SQLitePCLRaw.lib.e_sqlite3 2.1.12. SQLitePCLRaw.lib.e_sqlite3 3.50.3 se resolvió en su lugar.",
+      "projectPath": "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Web\\Web.csproj",
       "warningLevel": 1,
-      "filePath": "c:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Web\\Web.csproj",
+      "filePath": "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Web\\Web.csproj",
       "libraryId": "SQLitePCLRaw.lib.e_sqlite3",
       "targetGraphs": [
         "net10.0"
