@@ -2,7 +2,6 @@ using System.Collections.Generic;
 
 namespace ClubApp.Domain.Entities;
 
-// Definimos el Enum aquí arriba para que esté disponible en todo el namespace
 public enum UserRole
 {
     MEMBER,
@@ -18,15 +17,10 @@ public class User : BaseEntity
     public string Email { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
 
-    // El Rol que define qué puede hacer este usuario
     public UserRole Role { get; set; } = UserRole.MEMBER; 
-
-    // Campo de la clase MemberUser (ahora integrado aquí)
     public DateTime? LastPaymentDate { get; set; }
 
-    // Relación con Enrollment (Un usuario tiene muchas inscripciones)
     public virtual ICollection<Enrollment> Enrollments { get; set; } = new List<Enrollment>();
 
-    // Métodos lógicos que aparecían en tu diagrama (opcionales para el Entity)
     public bool IsAdmin() => Role == UserRole.ADMIN || Role == UserRole.SUPERADMIN; //OJO MIRA ESTO EN EL FUTURO
 }

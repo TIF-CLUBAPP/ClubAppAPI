@@ -4,6 +4,8 @@ using ClubApp.Domain.Entities;
 using ClubApp.Domain.Interfaces;
 using ClubApp.Domain.Exceptions;
 using ClubApp.Application.Requests;
+using ClubApp.Models.DTOs;
+using ClubApp.Application.DTOs;
 
 
 namespace ClubApp.Application.Services;
@@ -125,6 +127,35 @@ public class UserService : IUserService
         user.LastName = request.LastName ?? user.LastName;
 
         // 3. Guardamos los cambios
+        await _userRepository.UpdateAsync(user);
+        return true;
+    }
+
+    public async Task<bool> ChangePasswordAsync(int id, ChangePasswordDto dto)
+    {
+        var user = await _userRepository.GetByIdAsync(id);
+        if (user == null) return false;
+
+        // 1. BCrypt agarra el texto plano, lo procesa con la sal del hash guardado y compara
+        bool contrasenaActualValida = BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.PasswordHash);
+
+        if (!contrasenaActualValida) return false;
+
+        // 2. Hasheamos la nueva antes de pisar la vieja
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+
+        await _userRepository.UpdateAsync(user);
+        return true;
+    }
+
+
+    public async Task<bool> UpdateUserRoleAsync(int id, UpdateRoleDto dto)
+    {
+        var user = await _userRepository.GetByIdAsync(id);
+        if (user == null) return false;
+
+        user.Role = (UserRole)dto.NewRole;
+
         await _userRepository.UpdateAsync(user);
         return true;
     }

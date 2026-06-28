@@ -4,6 +4,8 @@ using ClubApp.Application.Dtos;
 using ClubApp.Application.Requests;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
+using ClubApp.Models.DTOs;
+using ClubApp.Application.DTOs;
 
 namespace ClubApp.API.Controllers;
 
@@ -45,18 +47,46 @@ public class UsersController : ControllerBase
         return Ok(new { message = "Usuario creado correctamente" });
     }
 
-    [HttpPut("{id:int}")]
-    public async Task<IActionResult> Put(int id, [FromBody] UserDto dto)
+    [HttpPost("{id}/change-password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword(int id, [FromBody] ChangePasswordDto passwordDto)
     {
-        var result = await _userService.UpdateUserAsync(id, dto);
-        if (!result) return NotFound($"No se pudo actualizar: ID {id} no encontrado");
+        // Extraer ID del token
+        var userIdFromToken = User.FindFirst("sub")?.Value
+                              ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
 
-        return Ok("Usuario modificado");
+        // Seguridad: Solo el dueño puede
+        if (userIdFromToken != id.ToString())
+        {
+            return Forbid();
+        }
+
+        // Llamar al servicio
+        var result = await _userService.ChangePasswordAsync(id, passwordDto);
+
+        if (!result)
+        {
+            return BadRequest(new { message = "Error: Verifica tu contraseña actual o el formato de la nueva." });
+        }
+
+        return Ok(new { message = "Contraseña actualizada correctamente" });
     }
 
     [HttpDelete("{id:int}")]
+    [Authorize] 
     public async Task<IActionResult> Delete(int id)
     {
+        // 1. Extraer el rol del token de quien está intentando borrar
+        var currentUserRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value
+                              ?? User.FindFirst("role")?.Value;
+
+        // 2. Control de acceso:
+        if (!string.Equals(currentUserRole, "SUPERADMIN", StringComparison.OrdinalIgnoreCase))
+        {
+            return Forbid();
+        }
+
+        // 3. Si el token es de un admin groso, procedemos con el borrado
         var result = await _userService.DeleteUserAsync(id);
         return result ? Ok(new { message = "Usuario eliminado" }) : NotFound();
     }
@@ -94,6 +124,25 @@ public class UsersController : ControllerBase
         }
 
         return Ok(new { message = "Actualizado" });
+    }
+
+    [HttpPatch("{id}/role")]
+    [Authorize]
+    public async Task<IActionResult> UpdateRole([FromRoute] int id, [FromBody] UpdateRoleDto dto)
+    {
+        var currentUserRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value
+                              ?? User.FindFirst("role")?.Value;
+
+        // Validación estricta con el texto de tu Token ("SUPERADMIN")
+        if (!string.Equals(currentUserRole, "SUPERADMIN", StringComparison.OrdinalIgnoreCase))
+        {
+            return Forbid();
+        }
+
+        var result = await _userService.UpdateUserRoleAsync(id, dto);
+        if (!result) return NotFound(new { message = "Usuario no encontrado" });
+
+        return Ok(new { message = "Rol actualizado correctamente" });
     }
 
     // =======================================================================
