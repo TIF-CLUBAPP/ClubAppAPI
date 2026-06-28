@@ -23,9 +23,12 @@ namespace ClubApp.Infrastructure.Data
         {
             base.OnModelCreating(modelBuilder);
 
+            // ==========================================
+            // 1. DATA SEEDING DE USUARIOS 
+            // ==========================================
             var users = new List<User>();
 
-            // 1. Dos Super Admins
+            // Dos Super Admins
             for (int i = 1; i <= 2; i++)
             {
                 users.Add(new User
@@ -41,7 +44,7 @@ namespace ClubApp.Infrastructure.Data
                 });
             }
 
-            // 2. Cuatro Profesores/Admins
+            // Cuatro Profesores/Admins
             for (int i = 1; i <= 4; i++)
             {
                 users.Add(new User
@@ -57,7 +60,7 @@ namespace ClubApp.Infrastructure.Data
                 });
             }
 
-            // 3. Ocho Usuarios/Members
+            // Ocho Usuarios/Members
             for (int i = 1; i <= 8; i++)
             {
                 users.Add(new User
@@ -74,6 +77,42 @@ namespace ClubApp.Infrastructure.Data
             }
 
             modelBuilder.Entity<User>().HasData(users);
+
+            // ==========================================
+            // 2. DATA SEEDING DE ACTIVIDADES 
+            // ==========================================
+            modelBuilder.Entity<Activity>().HasData(
+                new Activity
+                {
+                    Id = 1,
+                    Name = "Fútbol 5",
+                    Description = "Turnos nocturnos de fútbol amateur.",
+                    MaxCapacity = 10,
+                    Schedule = "Lunes y Miércoles 20:00 hs",
+                    IsActive = true,
+                    CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, DateTimeKind.Utc)
+                },
+                new Activity
+                {
+                    Id = 2,
+                    Name = "Crossfit",
+                    Description = "Clases de alta intensidad y WODs.",
+                    MaxCapacity = 15,
+                    Schedule = "Martes y Jueves 19:00 hs",
+                    IsActive = true,
+                    CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, DateTimeKind.Utc)
+                },
+                new Activity
+                {
+                    Id = 3,
+                    Name = "Spinning (TEST LLENO)",
+                    Description = "Ciclismo de interior sin cupos disponibles.",
+                    MaxCapacity = 0, // <--para forzar el error de clase llena en Enrollment
+                    Schedule = "Viernes 18:00 hs",
+                    IsActive = true,
+                    CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, DateTimeKind.Utc)
+                }
+            );
         }
     }
 }
