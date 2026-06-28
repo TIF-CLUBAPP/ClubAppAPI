@@ -1,13 +1,14 @@
-using ClubApp.Application.Dtos;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using ClubApp.Domain.Entities;
+using ClubApp.Application.Dtos;
 
-namespace ClubApp.Application.Interfaces
+namespace ClubApp.Application.Interfaces;
+
+public interface IMembershipService
 {
-    public interface IMembershipService
-    {
-        Task<IEnumerable<MembershipDto>> GetAllMembershipsAsync();
-        Task<MembershipDto> GetByUserIdAsync(int userId);
-        Task<bool> CreateMembershipAsync(MembershipDto dto);
-        Task<bool> UpdateStatusAsync(int id, MembershipStatus newStatus);
-    }
+    Task<IEnumerable<Membership>> GetAllMembershipsAsync();
+    Task<Membership?> GetMembershipByUserIdAsync(int userId);
+    Task<string> CreateMembershipAsync(CreateMembershipDto dto);
+    Task<string> UpdateStatusAsync(int id, MembershipStatus newStatus);
 }
