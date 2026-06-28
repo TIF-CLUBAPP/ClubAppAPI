@@ -3,6 +3,7 @@ using ClubApp.Application.Dtos;
 using ClubApp.Domain.Entities;
 using ClubApp.Domain.Interfaces;
 using ClubApp.Domain.Exceptions;
+using ClubApp.Application.Requests;
 
 
 namespace ClubApp.Application.Services;
@@ -50,7 +51,7 @@ public class UserService : IUserService
         };
     }
 
-    public async Task<bool> CreateUserAsync(UserRegisterDto userDto) 
+    public async Task<bool> CreateUserAsync(UserRegisterDto userDto)
     {
         if (string.IsNullOrWhiteSpace(userDto.Email))
         {
@@ -109,6 +110,22 @@ public class UserService : IUserService
         }
 
         await _userRepository.DeleteAsync(id);
+        return true;
+    }
+
+    public async Task<bool> UpdateBasicInfoAsync(int id, UpdateUserBasicRequest request)
+    {
+        // 1. Buscamos al usuario en la base de datos
+        var user = await _userRepository.GetByIdAsync(id); // O el método que uses para buscar
+
+        if (user == null) return false;
+
+        // 2. Actualizamos los campos básicos
+        user.FirstName = request.FirstName ?? user.FirstName;
+        user.LastName = request.LastName ?? user.LastName;
+
+        // 3. Guardamos los cambios
+        await _userRepository.UpdateAsync(user);
         return true;
     }
 }

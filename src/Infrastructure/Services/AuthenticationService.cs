@@ -7,8 +7,8 @@ using System.Text;
 using System.Threading.Tasks;
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Requests;
-using ClubApp.Domain.Interfaces; 
-using Microsoft.Extensions.Configuration; 
+using ClubApp.Domain.Interfaces;
+using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using BCrypt.Net; // Asegúrate de tener instalado el paquete BCrypt.Net-Next
 
@@ -17,7 +17,7 @@ namespace ClubApp.Infrastructure.Services
     public class AutenticacionService : ICustomAuthenticationService
     {
         private readonly IUserRepository _userRepository;
-        private readonly IConfiguration _configuration; 
+        private readonly IConfiguration _configuration;
 
         public AutenticacionService(IUserRepository userRepository, IConfiguration configuration)
         {
@@ -29,12 +29,12 @@ namespace ClubApp.Infrastructure.Services
         {
             var users = await _userRepository.GetAllAsync();
 
-            // Buscamos al usuario por nombre o email
-            var user = users.FirstOrDefault(u => u.FirstName == request.UserName || u.Email == request.UserName);
+            var user = users.FirstOrDefault(u => u.FirstName == request.Email || u.Email == request.Email);
 
-            if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+            if (user != null)
             {
-                return null;
+                bool isPasswordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
+                System.Diagnostics.Debug.WriteLine($"Usuario encontrado: {user.Email}. ¿Password válido?: {isPasswordValid}");
             }
 
             var secretKeyString = _configuration["Authentication:SecretForKey"];

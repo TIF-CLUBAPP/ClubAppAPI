@@ -3,6 +3,7 @@ using ClubApp.Application.Interfaces;
 using ClubApp.Application.Dtos;
 using ClubApp.Application.Requests;
 using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace ClubApp.API.Controllers;
 
@@ -58,6 +59,41 @@ public class UsersController : ControllerBase
     {
         var result = await _userService.DeleteUserAsync(id);
         return result ? Ok(new { message = "Usuario eliminado" }) : NotFound();
+    }
+
+    [HttpPatch("{id}/basic-info")]
+    [Authorize]
+    public async Task<IActionResult> UpdateBasicInfo(
+        [FromRoute] int id,
+        [FromBody] UpdateUserBasicRequest request)
+    {
+        // 1. Extraer el ID y el ROL del token
+        var userIdFromToken = User.FindFirst("sub")?.Value
+                              ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        // Asumiendo que el rol se guarda en el claim 'role'
+        var userRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value
+                       ?? User.FindFirst("role")?.Value;
+
+        // 2. Validación de seguridad: 
+        // Permitir si es el dueño (ID coincide) O si es 'SuperAdmin'
+        bool isOwner = userIdFromToken == id.ToString();
+        bool isSuperAdmin = userRole == "SuperAdmin";
+
+        if (!isOwner && !isSuperAdmin)
+        {
+            return Forbid(); // Retorna 403 Forbidden si no tiene permisos
+        }
+
+        // 3. Ejecutar la lógica de negocio
+        var result = await _userService.UpdateBasicInfoAsync(id, request);
+
+        if (!result)
+        {
+            return NotFound(new { message = "Usuario no encontrado" });
+        }
+
+        return Ok(new { message = "Actualizado" });
     }
 
     // =======================================================================

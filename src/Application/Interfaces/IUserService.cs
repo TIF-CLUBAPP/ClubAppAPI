@@ -1,4 +1,5 @@
 using ClubApp.Application.Dtos;
+using ClubApp.Application.Requests;
 
 namespace ClubApp.Application.Interfaces;
 
@@ -9,4 +10,6 @@ public interface IUserService
     Task<bool> CreateUserAsync(UserRegisterDto userDto);
     Task<bool> UpdateUserAsync(int id, UserDto userDto);
     Task<bool> DeleteUserAsync(int id);
+    Task<bool> UpdateBasicInfoAsync(int id, UpdateUserBasicRequest request);
+
 }

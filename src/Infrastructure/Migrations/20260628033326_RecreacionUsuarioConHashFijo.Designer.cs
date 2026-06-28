@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationContext))]
-    [Migration("20260628031853_SeedInicialFijo")]
-    partial class SeedInicialFijo
+    [Migration("20260628033326_RecreacionUsuarioConHashFijo")]
+    partial class RecreacionUsuarioConHashFijo
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

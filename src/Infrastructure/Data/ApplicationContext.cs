@@ -23,9 +23,6 @@ namespace ClubApp.Infrastructure.Data
         {
             base.OnModelCreating(modelBuilder);
 
-            // Hash estatico para "1234"
-            string hash1234 = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S";
-
             var users = new List<User>();
 
             // 1. Dos Super Admins
@@ -38,7 +35,7 @@ namespace ClubApp.Infrastructure.Data
                     FirstName = $"SuperAdmin{i}",
                     LastName = "Admin",
                     Email = $"superadmin{i}@clubapp.com",
-                    PasswordHash = hash1234, // Valor estático
+                    PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
                     Role = UserRole.SUPERADMIN,
                     CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, DateTimeKind.Utc)
                 });
@@ -54,7 +51,7 @@ namespace ClubApp.Infrastructure.Data
                     FirstName = $"Profesor{i}",
                     LastName = "Profe",
                     Email = $"profesor{i}@clubapp.com",
-                    PasswordHash = hash1234, // Valor estático
+                    PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
                     Role = UserRole.ADMIN,
                     CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, DateTimeKind.Utc)
                 });
@@ -70,7 +67,7 @@ namespace ClubApp.Infrastructure.Data
                     FirstName = $"Usuario{i}",
                     LastName = "Member",
                     Email = $"usuario{i}@clubapp.com",
-                    PasswordHash = hash1234, // Valor estático
+                    PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
                     Role = UserRole.MEMBER,
                     CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, DateTimeKind.Utc)
                 });
