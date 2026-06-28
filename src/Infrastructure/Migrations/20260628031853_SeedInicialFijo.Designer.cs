@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationContext))]
-    [Migration("20260627222744_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260628031853_SeedInicialFijo")]
+    partial class SeedInicialFijo
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -233,24 +233,156 @@ namespace Infrastructure.Migrations
                         new
                         {
                             Id = 1,
-                            BadgeNum = "123",
+                            BadgeNum = "000",
                             CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Email = "nico@clubapp.com",
-                            FirstName = "nico",
-                            LastName = "dev",
-                            PasswordHash = "1234",
-                            Role = 1
+                            Email = "superadmin1@clubapp.com",
+                            FirstName = "SuperAdmin1",
+                            LastName = "Admin",
+                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
+                            Role = 2
                         },
                         new
                         {
                             Id = 2,
-                            BadgeNum = "001",
+                            BadgeNum = "000",
                             CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Email = "superadmin@clubapp.com",
-                            FirstName = "Super",
+                            Email = "superadmin2@clubapp.com",
+                            FirstName = "SuperAdmin2",
                             LastName = "Admin",
-                            PasswordHash = "SuperAdmin@123",
+                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
                             Role = 2
+                        },
+                        new
+                        {
+                            Id = 3,
+                            BadgeNum = "000",
+                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Email = "profesor1@clubapp.com",
+                            FirstName = "Profesor1",
+                            LastName = "Profe",
+                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
+                            Role = 1
+                        },
+                        new
+                        {
+                            Id = 4,
+                            BadgeNum = "000",
+                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Email = "profesor2@clubapp.com",
+                            FirstName = "Profesor2",
+                            LastName = "Profe",
+                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
+                            Role = 1
+                        },
+                        new
+                        {
+                            Id = 5,
+                            BadgeNum = "000",
+                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Email = "profesor3@clubapp.com",
+                            FirstName = "Profesor3",
+                            LastName = "Profe",
+                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
+                            Role = 1
+                        },
+                        new
+                        {
+                            Id = 6,
+                            BadgeNum = "000",
+                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Email = "profesor4@clubapp.com",
+                            FirstName = "Profesor4",
+                            LastName = "Profe",
+                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
+                            Role = 1
+                        },
+                        new
+                        {
+                            Id = 7,
+                            BadgeNum = "000",
+                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Email = "usuario1@clubapp.com",
+                            FirstName = "Usuario1",
+                            LastName = "Member",
+                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
+                            Role = 0
+                        },
+                        new
+                        {
+                            Id = 8,
+                            BadgeNum = "000",
+                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Email = "usuario2@clubapp.com",
+                            FirstName = "Usuario2",
+                            LastName = "Member",
+                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
+                            Role = 0
+                        },
+                        new
+                        {
+                            Id = 9,
+                            BadgeNum = "000",
+                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Email = "usuario3@clubapp.com",
+                            FirstName = "Usuario3",
+                            LastName = "Member",
+                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
+                            Role = 0
+                        },
+                        new
+                        {
+                            Id = 10,
+                            BadgeNum = "000",
+                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Email = "usuario4@clubapp.com",
+                            FirstName = "Usuario4",
+                            LastName = "Member",
+                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
+                            Role = 0
+                        },
+                        new
+                        {
+                            Id = 11,
+                            BadgeNum = "000",
+                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Email = "usuario5@clubapp.com",
+                            FirstName = "Usuario5",
+                            LastName = "Member",
+                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
+                            Role = 0
+                        },
+                        new
+                        {
+                            Id = 12,
+                            BadgeNum = "000",
+                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Email = "usuario6@clubapp.com",
+                            FirstName = "Usuario6",
+                            LastName = "Member",
+                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
+                            Role = 0
+                        },
+                        new
+                        {
+                            Id = 13,
+                            BadgeNum = "000",
+                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Email = "usuario7@clubapp.com",
+                            FirstName = "Usuario7",
+                            LastName = "Member",
+                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
+                            Role = 0
+                        },
+                        new
+                        {
+                            Id = 14,
+                            BadgeNum = "000",
+                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Email = "usuario8@clubapp.com",
+                            FirstName = "Usuario8",
+                            LastName = "Member",
+                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
+                            Role = 0
                         });
                 });
 

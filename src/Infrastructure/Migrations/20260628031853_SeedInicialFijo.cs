@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class SeedInicialFijo : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -161,8 +161,20 @@ namespace Infrastructure.Migrations
                 columns: new[] { "Id", "BadgeNum", "CreatedAt", "Email", "FirstName", "LastName", "LastPaymentDate", "PasswordHash", "Role" },
                 values: new object[,]
                 {
-                    { 1, "123", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "nico@clubapp.com", "nico", "dev", null, "1234", 1 },
-                    { 2, "001", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "superadmin@clubapp.com", "Super", "Admin", null, "SuperAdmin@123", 2 }
+                    { 1, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "superadmin1@clubapp.com", "SuperAdmin1", "Admin", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 2 },
+                    { 2, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "superadmin2@clubapp.com", "SuperAdmin2", "Admin", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 2 },
+                    { 3, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "profesor1@clubapp.com", "Profesor1", "Profe", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 1 },
+                    { 4, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "profesor2@clubapp.com", "Profesor2", "Profe", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 1 },
+                    { 5, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "profesor3@clubapp.com", "Profesor3", "Profe", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 1 },
+                    { 6, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "profesor4@clubapp.com", "Profesor4", "Profe", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 1 },
+                    { 7, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "usuario1@clubapp.com", "Usuario1", "Member", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 0 },
+                    { 8, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "usuario2@clubapp.com", "Usuario2", "Member", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 0 },
+                    { 9, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "usuario3@clubapp.com", "Usuario3", "Member", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 0 },
+                    { 10, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "usuario4@clubapp.com", "Usuario4", "Member", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 0 },
+                    { 11, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "usuario5@clubapp.com", "Usuario5", "Member", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 0 },
+                    { 12, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "usuario6@clubapp.com", "Usuario6", "Member", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 0 },
+                    { 13, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "usuario7@clubapp.com", "Usuario7", "Member", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 0 },
+                    { 14, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "usuario8@clubapp.com", "Usuario8", "Member", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 0 }
                 });
 
             migrationBuilder.CreateIndex(
