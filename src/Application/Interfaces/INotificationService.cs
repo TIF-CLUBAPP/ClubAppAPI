@@ -1,14 +1,15 @@
+using ClubApp.Domain.Entities;
 using ClubApp.Application.Dtos;
 
 namespace ClubApp.Application.Interfaces;
 
 public interface INotificationService
 {
-    Task<IEnumerable<NotificationDto>> GetAllNotificationsAsync();
-    Task<IEnumerable<NotificationDto>> GetNotificationsByUserAsync(int userId);
-    Task<NotificationDto> GetNotificationByIdAsync(int notificationId);  
-    Task<bool> SendNotificationAsync(NotificationDto notificationDto);
-    Task<bool> UpdateNotificationAsync(int notificationId, NotificationDto notificationDto);  
-    Task<bool> DeleteNotificationAsync(int notificationId);  
-    Task<bool> MarkAsReadAsync(int notificationId);
+    Task<IEnumerable<Notification>> GetMyNotificationsAsync(int userId);
+    Task<IEnumerable<Notification>> GetNotificationsByUserIdAsync(int userId);
+    Task<Notification?> GetByIdAsync(int id);
+    Task<string> CreateNotificationAsync(CreateNotificationDto dto);
+    Task<string> UpdateNotificationAsync(int id, UpdateNotificationDto dto);
+    Task<bool> DeleteNotificationAsync(int id);
+    Task<string> MarkAsReadAsync(int notificationId, int loggedInUserId);
 }

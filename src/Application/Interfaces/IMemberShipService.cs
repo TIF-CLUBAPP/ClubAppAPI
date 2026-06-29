@@ -11,4 +11,5 @@ public interface IMembershipService
     Task<Membership?> GetMembershipByUserIdAsync(int userId);
     Task<string> CreateMembershipAsync(CreateMembershipDto dto);
     Task<string> UpdateStatusAsync(int id, MembershipStatus newStatus);
+    Task CheckAndProcessExpirationsAsync();
 }

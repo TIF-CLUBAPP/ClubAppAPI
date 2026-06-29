@@ -10,7 +10,7 @@ using ClubApp.Application.Requests;
 using ClubApp.Domain.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
-using BCrypt.Net; // Asegúrate de tener instalado el paquete BCrypt.Net-Next
+using BCrypt.Net;
 
 namespace ClubApp.Infrastructure.Services
 {
@@ -31,11 +31,13 @@ namespace ClubApp.Infrastructure.Services
 
             var user = users.FirstOrDefault(u => u.FirstName == request.Email || u.Email == request.Email);
 
-            if (user != null)
+            if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             {
-                bool isPasswordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
-                System.Diagnostics.Debug.WriteLine($"Usuario encontrado: {user.Email}. ¿Password válido?: {isPasswordValid}");
+                System.Diagnostics.Debug.WriteLine("Intento de inicio de sesión fallido: Credenciales inválidas.");
+                return null;
             }
+
+            System.Diagnostics.Debug.WriteLine($"Usuario autenticado correctamente: {user.Email}");
 
             var secretKeyString = _configuration["Authentication:SecretForKey"];
             if (string.IsNullOrEmpty(secretKeyString))
