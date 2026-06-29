@@ -2,6 +2,10 @@
 
 Aplicación web fullstack para la gestión de membresías, pagos y actividades en clubes deportivos pequeños. Diseñada para simplificar la administración y mejorar la experiencia tanto de usuarios como del staff del club.
 
+# LINK 🌐
+
+https://clubapp-emc7bfgrfsgca7dy.chilecentral-01.azurewebsites.net
+
 # 🚀 Características
 🔐 Autenticación de usuarios
 👤 Gestión de roles (Usuario, Admin, SuperAdmin)
@@ -31,6 +35,7 @@ Herramientas
 * Git & GitHub
 * Notion
 * Google Drive
+* Azure
 
 # 🧩 Arquitectura
 
@@ -87,13 +92,12 @@ npm start
 
 # 📷 Screenshots
 
-(A FUTURO OJO)
+(A FUTURO)
 
 # 👨‍💻 Equipo
 
 * Ivo Bertoni — FullStack Dev / QA
 * Diego Contreras — FullStack Dev
-* Andrés Volpe — FullStack Dev / QA
 
 # 📄 Licencia
 

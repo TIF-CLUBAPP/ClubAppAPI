@@ -1,13 +1,14 @@
-using ClubApp.Application.Dtos;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using ClubApp.Domain.Entities;
+using ClubApp.Application.Dtos;
 
-namespace ClubApp.Application.Interfaces
+namespace ClubApp.Application.Interfaces;
+
+public interface IPaymentService
 {
-    public interface IPaymentService
-    {
-        Task<IEnumerable<PaymentDto>> GetAllPaymentsAsync();
-        Task<IEnumerable<PaymentDto>> GetPaymentsByUserAsync(int userId);
-        Task<bool> RegisterPaymentAsync(PaymentDto paymentDto);
-        Task<bool> UpdatePaymentStatusAsync(int paymentId, PaymentStatus newStatus); 
-    }
+    Task<IEnumerable<Payment>> GetAllPaymentsAsync();
+    Task<IEnumerable<Payment>> GetPaymentsByUserIdAsync(int userId);
+    Task<string> CreatePaymentAsync(int loggedInUserId, string loggedInUserRole, CreatePaymentDto dto);
+    Task<string> UpdateStatusAsync(int paymentId, PaymentStatus newStatus);
 }

@@ -3,6 +3,10 @@ using ClubApp.Application.Dtos;
 using ClubApp.Domain.Entities;
 using ClubApp.Domain.Interfaces;
 using ClubApp.Domain.Exceptions;
+using ClubApp.Application.Requests;
+using ClubApp.Models.DTOs;
+using ClubApp.Application.DTOs;
+
 
 namespace ClubApp.Application.Services;
 
@@ -25,7 +29,7 @@ public class UserService : IUserService
             FirstName = u.FirstName,
             LastName = u.LastName,
             Email = u.Email,
-            Role = u.Role, 
+            Role = u.Role,
             BadgeNum = u.BadgeNum,
             CreatedAt = u.CreatedAt,
         }).ToList();
@@ -39,31 +43,43 @@ public class UserService : IUserService
             throw new NotFoundException("User", id);
         }
 
-        return new UserDto 
-        { 
-            Id = user.Id, 
-            FirstName = user.FirstName, 
-            LastName = user.LastName, 
-            Email = user.Email, 
+        return new UserDto
+        {
+            Id = user.Id,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            Email = user.Email,
             Role = user.Role
         };
     }
 
-    public async Task<bool> CreateUserAsync(UserDto userDto)
+    public async Task<bool> CreateUserAsync(UserRegisterDto userDto)
     {
         if (string.IsNullOrWhiteSpace(userDto.Email))
         {
             throw new AppValidationException("El correo electrónico es un campo obligatorio.");
         }
 
-        var newUser = new User 
+        // 1. Generacion de BadgeNum
+        var allUsers = await _userRepository.GetAllAsync();
+
+        int nextNumber = allUsers.Any() ? allUsers.Max(u => int.Parse(u.BadgeNum)) + 1 : 1;
+        string generatedBadgeNum = nextNumber.ToString("D3");
+
+        // 2. Creacion del usuario
+        var newUser = new User
         {
             FirstName = userDto.FirstName,
             LastName = userDto.LastName,
             Email = userDto.Email,
-            PasswordHash = userDto.Password, // OJO: Aquí deberías hashear la contraseña antes de guardarla
-            Role = userDto.Role, 
-            BadgeNum = userDto.BadgeNum
+
+            // 3. Hasheo real de contraseña
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(userDto.Password),
+
+            // 4. Valores automáticos
+            Role = 0, // Member
+            BadgeNum = generatedBadgeNum,
+            CreatedAt = DateTime.UtcNow
         };
 
         await _userRepository.AddAsync(newUser);
@@ -81,7 +97,7 @@ public class UserService : IUserService
         existingUser.FirstName = userDto.FirstName;
         existingUser.LastName = userDto.LastName;
         existingUser.Email = userDto.Email;
-        existingUser.Role = userDto.Role; 
+        existingUser.Role = userDto.Role;
 
         await _userRepository.UpdateAsync(existingUser);
         return true;
@@ -96,6 +112,51 @@ public class UserService : IUserService
         }
 
         await _userRepository.DeleteAsync(id);
+        return true;
+    }
+
+    public async Task<bool> UpdateBasicInfoAsync(int id, UpdateUserBasicRequest request)
+    {
+        // 1. Buscamos al usuario en la base de datos
+        var user = await _userRepository.GetByIdAsync(id); // O el método que uses para buscar
+
+        if (user == null) return false;
+
+        // 2. Actualizamos los campos básicos
+        user.FirstName = request.FirstName ?? user.FirstName;
+        user.LastName = request.LastName ?? user.LastName;
+
+        // 3. Guardamos los cambios
+        await _userRepository.UpdateAsync(user);
+        return true;
+    }
+
+    public async Task<bool> ChangePasswordAsync(int id, ChangePasswordDto dto)
+    {
+        var user = await _userRepository.GetByIdAsync(id);
+        if (user == null) return false;
+
+        // 1. BCrypt agarra el texto plano, lo procesa con la sal del hash guardado y compara
+        bool contrasenaActualValida = BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.PasswordHash);
+
+        if (!contrasenaActualValida) return false;
+
+        // 2. Hasheamos la nueva antes de pisar la vieja
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+
+        await _userRepository.UpdateAsync(user);
+        return true;
+    }
+
+
+    public async Task<bool> UpdateUserRoleAsync(int id, UpdateRoleDto dto)
+    {
+        var user = await _userRepository.GetByIdAsync(id);
+        if (user == null) return false;
+
+        user.Role = (UserRole)dto.NewRole;
+
+        await _userRepository.UpdateAsync(user);
         return true;
     }
 }

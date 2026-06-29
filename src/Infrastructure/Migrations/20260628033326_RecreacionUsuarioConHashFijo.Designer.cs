@@ -3,6 +3,7 @@ using System;
 using ClubApp.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationContext))]
-    partial class ApplicationContextModelSnapshot : ModelSnapshot
+    [Migration("20260628033326_RecreacionUsuarioConHashFijo")]
+    partial class RecreacionUsuarioConHashFijo
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.7");
@@ -47,38 +50,6 @@ namespace Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Activities");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Turnos nocturnos de fútbol amateur.",
-                            IsActive = true,
-                            MaxCapacity = 10,
-                            Name = "Fútbol 5",
-                            Schedule = "Lunes y Miércoles 20:00 hs"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Clases de alta intensidad y WODs.",
-                            IsActive = true,
-                            MaxCapacity = 15,
-                            Name = "Crossfit",
-                            Schedule = "Martes y Jueves 19:00 hs"
-                        },
-                        new
-                        {
-                            Id = 3,
-                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Ciclismo de interior sin cupos disponibles.",
-                            IsActive = true,
-                            MaxCapacity = 0,
-                            Name = "Spinning (TEST LLENO)",
-                            Schedule = "Viernes 18:00 hs"
-                        });
                 });
 
             modelBuilder.Entity("ClubApp.Domain.Entities.Enrollment", b =>

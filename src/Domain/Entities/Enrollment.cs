@@ -1,16 +1,20 @@
-namespace ClubApp.Domain.Entities
+using System;
+
+namespace ClubApp.Domain.Entities;
+
+public class Enrollment
 {
-    public class Enrollment : BaseEntity
-    {
-        public int UserId { get; set; }
-        public int ActivityId { get; set; }
-        public DateTime EnrollmentDate { get; set; }
-        public EnrollmentStatus Status { get; set; } = EnrollmentStatus.Active;
+    public int Id { get; set; }
+    
+    // Relación con Usuario
+    public int UserId { get; set; }
+    public User User { get; set; } = null!; 
 
-        // Relaciones
-        public virtual User User { get; set; } = null!;
-        public virtual Activity Activity { get; set; } = null!;
-    }
+    // Relacion con Actividad
+    public int ActivityId { get; set; }
+    public Activity Activity { get; set; } = null!;
 
-    public enum EnrollmentStatus { Active, Cancelled }
+    public DateTime EnrollmentDate { get; set; }
+    public EnrollmentStatus Status { get; set; }
+    public DateTime CreatedAt { get; set; }
 }

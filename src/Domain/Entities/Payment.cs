@@ -5,9 +5,9 @@ public enum PaymentStatus { COMPLETED, PENDING, FAILED }
 
 public class Payment : BaseEntity
 {
-    // Id viene de BaseEntity (sería el Payment_id del diagrama)
-    public int User_id { get; set; }    // FK hacia Usuario
-    public int Member_id { get; set; }  // FK hacia Membership
+    public int User_id { get; set; }    
+    public int Member_id { get; set; }  
+    public int Member_Id { get; set; }
     public decimal Amount { get; set; }
     public PaymentMethod Method { get; set; }
     public PaymentStatus Status { get; set; } = PaymentStatus.PENDING;

@@ -7,16 +7,17 @@ using System.Text;
 using System.Threading.Tasks;
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Requests;
-using ClubApp.Domain.Interfaces; 
-using Microsoft.Extensions.Configuration; 
+using ClubApp.Domain.Interfaces;
+using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
+using BCrypt.Net;
 
 namespace ClubApp.Infrastructure.Services
 {
     public class AutenticacionService : ICustomAuthenticationService
     {
         private readonly IUserRepository _userRepository;
-        private readonly IConfiguration _configuration; 
+        private readonly IConfiguration _configuration;
 
         public AutenticacionService(IUserRepository userRepository, IConfiguration configuration)
         {
@@ -28,14 +29,15 @@ namespace ClubApp.Infrastructure.Services
         {
             var users = await _userRepository.GetAllAsync();
 
-            var user = users.FirstOrDefault(u => u.FirstName == request.UserName || u.Email == request.UserName);
+            var user = users.FirstOrDefault(u => u.FirstName == request.Email || u.Email == request.Email);
 
-            if (user == null) return null;
-
-            if (user.PasswordHash != request.Password)
+            if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             {
+                System.Diagnostics.Debug.WriteLine("Intento de inicio de sesión fallido: Credenciales inválidas.");
                 return null;
             }
+
+            System.Diagnostics.Debug.WriteLine($"Usuario autenticado correctamente: {user.Email}");
 
             var secretKeyString = _configuration["Authentication:SecretForKey"];
             if (string.IsNullOrEmpty(secretKeyString))

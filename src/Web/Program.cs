@@ -9,6 +9,8 @@ using Microsoft.OpenApi;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using ClubApp.Infrastructure.Services;
 using Microsoft.Data.Sqlite;
+using ClubApp.Domain.Entities;
+using Microsoft.AspNetCore.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -103,7 +105,8 @@ else
 }
 
 string connectionString = $"Data Source={dbPath}";
-builder.Services.AddDbContext<ApplicationContext>(options => options.UseSqlite(connectionString));
+builder.Services.AddDbContext<ApplicationContext>(options =>
+    options.UseSqlite(builder.Configuration.GetConnectionString("SQLiteConnectionString")));;
 
 // ==========================================
 // 5. INYECCIÓN DE SERVICIOS DE APLICACIÓN
@@ -114,6 +117,8 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IMembershipService, MembershipService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
+
+builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 
 builder.Services.AddHttpClient<IWeatherService, WeatherService>();
 
@@ -126,7 +131,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-    // Esto crea la base de datos y aplica todas las tablas si no existen
+
     dbContext.Database.EnsureCreated(); 
 }
 #endregion
@@ -136,7 +141,7 @@ app.MapOpenApi();
 app.UseSwaggerUI(options =>
 {
     options.SwaggerEndpoint("/openapi/v1.json", "ClubApp API V1 (.NET 10)");
-    options.RoutePrefix = string.Empty; // 🚀 Al dejarlo vacío, la raíz abre el Swagger directo
+    options.RoutePrefix = string.Empty; 
 });
 
 app.UseHttpsRedirection();

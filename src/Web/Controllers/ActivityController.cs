@@ -1,13 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Dtos;
-using Microsoft.AspNetCore.Authorization; 
+using Microsoft.AspNetCore.Authorization;
 
 namespace ClubApp.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize] 
+[Authorize]
 public class ActivitiesController : ControllerBase
 {
     private readonly IActivityService _activityService;
@@ -20,7 +20,7 @@ public class ActivitiesController : ControllerBase
     // =======================================================================
     // ACCIÓN DISPONIBLE PARA CUALQUIER SOCIO LOGUEADO
     // =======================================================================
-    
+
     [HttpGet]
     public async Task<IActionResult> Get() => Ok(await _activityService.GetAllAvailableActivitiesAsync());
 
@@ -29,11 +29,11 @@ public class ActivitiesController : ControllerBase
     // =======================================================================
 
     [HttpPost]
-    [Authorize(Roles = "ADMIN,SUPERADMIN")] 
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
     public async Task<IActionResult> Post([FromBody] ActivityDto dto)
     {
         await _activityService.CreateActivityAsync(dto);
-        return Ok("Actividad creada con éxito"); 
+        return Ok("Actividad creada con éxito");
     }
 
     [HttpPut("{activityId:int}")]
@@ -48,7 +48,7 @@ public class ActivitiesController : ControllerBase
     }
 
     [HttpDelete("{activityId:int}")]
-    [Authorize(Roles = "ADMIN,SUPERADMIN")] 
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
     public async Task<IActionResult> Delete(int activityId)
     {
         var result = await _activityService.DeleteActivityAsync(activityId);
@@ -57,4 +57,21 @@ public class ActivitiesController : ControllerBase
 
         return Ok($"Actividad {activityId} eliminada");
     }
+
+    [HttpGet("{activityId:int}")]
+    public async Task<IActionResult> GetById([FromRoute] int activityId)
+    {
+        var activity = await _activityService.GetActivityByIdAsync(activityId);
+
+        if (activity == null)
+        {
+            return NotFound(new { message = "Actividad no encontrada" });
+        }
+
+        return Ok(activity);
+    }
+}
+
+internal class authorizeAttribute : Attribute
+{
 }
