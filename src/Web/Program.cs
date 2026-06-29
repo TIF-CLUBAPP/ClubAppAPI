@@ -93,12 +93,12 @@ string dbFileName = "clubapp.db";
 string dbPath;
 
 // Detectar si estamos en Azure
-if (Environment.GetEnvironmentVariable("HOME") != null) 
+if (Environment.GetEnvironmentVariable("HOME") != null)
 {
     // Estamos en Azure Linux (App Service)
     dbPath = Path.Combine(Environment.GetEnvironmentVariable("HOME")!, "site", "wwwroot", dbFileName);
 }
-else 
+else
 {
     // Estamos en desarrollo local
     dbPath = Path.Combine(AppContext.BaseDirectory, dbFileName);
@@ -106,7 +106,7 @@ else
 
 string connectionString = $"Data Source={dbPath}";
 builder.Services.AddDbContext<ApplicationContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("SQLiteConnectionString")));;
+    options.UseSqlite(connectionString));
 
 // ==========================================
 // 5. INYECCIÓN DE SERVICIOS DE APLICACIÓN
@@ -132,7 +132,7 @@ using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
 
-    dbContext.Database.EnsureCreated(); 
+    dbContext.Database.EnsureCreated();
 }
 #endregion
 
@@ -141,7 +141,7 @@ app.MapOpenApi();
 app.UseSwaggerUI(options =>
 {
     options.SwaggerEndpoint("/openapi/v1.json", "ClubApp API V1 (.NET 10)");
-    options.RoutePrefix = string.Empty; 
+    options.RoutePrefix = string.Empty;
 });
 
 app.UseHttpsRedirection();
