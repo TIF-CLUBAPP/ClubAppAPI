@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-and-deploy:
-    runs-on: windows-latest
+    runs-on: windows-latest 
 
     steps:
       - uses: actions/checkout@v4
@@ -19,22 +19,17 @@ jobs:
           dotnet-version: '10.x'
 
       - name: Restore dependencies
-        run: dotnet restore ClubApp.slnx  # Usa tu archivo de solución global
+        run: dotnet restore ClubApp.slnx
 
       - name: Build with dotnet
         run: dotnet build --configuration Release --no-restore
 
       - name: dotnet publish
-        # 🚀 ESTA ES TU RUTA REAL COMPROBADA DE TU CAPTURA:
         run: dotnet publish src/Web/Web.csproj -c Release -o ./publish
 
-      - name: Login to Azure
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-      
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'ClubAPP'
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: ./publish
