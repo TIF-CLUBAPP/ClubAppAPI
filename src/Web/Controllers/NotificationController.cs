@@ -1,13 +1,15 @@
 using Microsoft.AspNetCore.Mvc;
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Dtos;
+using ClubApp.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace ClubApp.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize] 
+[Authorize]
 public class NotificationsController : ControllerBase
 {
     private readonly INotificationService _notificationService;
@@ -20,62 +22,72 @@ public class NotificationsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
-        return Ok(await _notificationService.GetAllNotificationsAsync());
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdClaim, out int loggedInUserId)) return Unauthorized();
+
+        return Ok(await _notificationService.GetMyNotificationsAsync(loggedInUserId));
+    }
+
+    [HttpPost]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    public async Task<IActionResult> Post([FromBody] CreateNotificationDto dto)
+    {
+        await _notificationService.CreateNotificationAsync(dto);
+        return Ok(new { message = "Notificación emitida con éxito." });
     }
 
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
     {
-        var notification = await _notificationService.GetNotificationByIdAsync(id);
-        if (notification == null) return NotFound($"No se encontró la notificación con ID {id}");
+        var notification = await _notificationService.GetByIdAsync(id);
+        if (notification == null) return NotFound();
+
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
+
+        if (userRole != "ADMIN" && userRole != "SUPERADMIN" && notification.User_id.ToString() != userIdClaim)
+        {
+            return StatusCode(403, "Acceso denegado.");
+        }
+
         return Ok(notification);
     }
 
-    [HttpGet("user/{userId:int}")]
-    public async Task<IActionResult> GetByUser(int userId)
-    {
-        return Ok(await _notificationService.GetNotificationsByUserAsync(userId));
-    }
-
-    // =======================================================================
-    // ACCIONES EXCLUSIVAS PARA ADMINISTRADORES
-    // =======================================================================
-
-    [HttpPost]
-    [Authorize(Roles = "ADMIN,SUPERADMIN")]
-    public async Task<IActionResult> Send([FromBody] NotificationDto dto)
-    {
-        var result = await _notificationService.SendNotificationAsync(dto);
-        return result ? Ok(new { message = "Notificación enviada" }) : BadRequest("Error al enviar");
-    }
-
     [HttpPut("{id:int}")]
-    [Authorize(Roles = "ADMIN,SUPERADMIN")] 
-    public async Task<IActionResult> Put(int id, [FromBody] NotificationDto dto)
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    public async Task<IActionResult> Put(int id, [FromBody] UpdateNotificationDto dto)
     {
         var result = await _notificationService.UpdateNotificationAsync(id, dto);
-        if (!result) return NotFound($"No se encontró la notificación con ID {id}");
-        return Ok("Notificación actualizada con éxito");
+        if (result == "NOT_FOUND") return NotFound("La notificación no existe.");
+        return Ok(new { message = "Notificación corregida." });
     }
 
     [HttpDelete("{id:int}")]
     [Authorize(Roles = "ADMIN,SUPERADMIN")]
     public async Task<IActionResult> Delete(int id)
     {
-        var result = await _notificationService.DeleteNotificationAsync(id);
-        if (!result) return NotFound($"No se encontró la notificación con ID {id}");
-        return Ok($"Notificación {id} eliminada");
+        var deleted = await _notificationService.DeleteNotificationAsync(id);
+        if (!deleted) return NotFound("No se encontró el registro para eliminar.");
+        return Ok(new { message = "Notificación eliminada del sistema." });
     }
 
-    // =======================================================================
-    // ACCIÓN DISPONIBLE PARA CUALQUIER USUARIO LOGUEADO
-    // =======================================================================
+    [HttpGet("user/{userId:int}")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    public async Task<IActionResult> GetByUserId(int userId)
+    {
+        return Ok(await _notificationService.GetNotificationsByUserIdAsync(userId));
+    }
 
     [HttpPatch("{id:int}/read")]
     public async Task<IActionResult> MarkAsRead(int id)
     {
-        var result = await _notificationService.MarkAsReadAsync(id);
-        if (!result) return NotFound($"No se encontró la notificación con ID {id}");
-        return Ok("Notificación marcada como leída");
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdClaim, out int loggedInUserId)) return Unauthorized();
+
+        var result = await _notificationService.MarkAsReadAsync(id, loggedInUserId);
+        if (result == "NOT_FOUND") return NotFound();
+        if (result == "NOT_AUTHORIZED") return StatusCode(403, "No te pertenece esta alerta.");
+
+        return Ok(new { message = "Marcada como leída." });
     }
 }

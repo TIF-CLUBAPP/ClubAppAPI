@@ -25,7 +25,7 @@ public class ActivityService : IActivityService
 
         return activities.Select(a => new ActivityDto
         {
-            Name = a.Name, 
+            Name = a.Name,
             Description = a.Description,
             Schedule = a.Schedule,
             MaxCapacity = a.MaxCapacity,
@@ -108,10 +108,14 @@ public class ActivityService : IActivityService
             UserId = userId,
             ActivityId = activityId,
             EnrollmentDate = DateTime.Now,
-            Status = EnrollmentStatus.Active
+            Status = EnrollmentStatus.ACTIVE
         };
 
         await _enrollmentRepository.AddAsync(enrollment);
         return true;
+    }
+    public async Task<Activity?> GetActivityByIdAsync(int activityId)
+    {
+        return await _activityRepository.GetByIdAsync(activityId);
     }
 }
