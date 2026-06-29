@@ -7,7 +7,6 @@ public class Payment : BaseEntity
 {
     public int User_id { get; set; }    
     public int Member_id { get; set; }  
-    public int Member_Id { get; set; }
     public decimal Amount { get; set; }
     public PaymentMethod Method { get; set; }
     public PaymentStatus Status { get; set; } = PaymentStatus.PENDING;
