@@ -88,7 +88,7 @@ builder.Services.AddOpenApi(options =>
 // ==========================================
 // 4. CONFIGURACIÓN DE BASE DE DATOS (Fijada para Azure)
 // ==========================================
-string dbFileName = "clubapp.db";
+string dbFileName = "clubapp_v2.db";
 string dbPath;
 
 if (Environment.GetEnvironmentVariable("HOME") != null)
@@ -127,8 +127,8 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
-
-    dbContext.Database.EnsureCreated();
+    
+    ClubApp.Infrastructure.Data.DbInitializer.Seed(dbContext);
 }
 #endregion
 
