@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using ClubApp.Domain.Entities;
-using Microsoft.AspNetCore.Identity;
 
 namespace ClubApp.Infrastructure.Data
 {
@@ -13,11 +12,12 @@ namespace ClubApp.Infrastructure.Data
             context.Database.EnsureCreated();
 
             // ==========================================
-            // 2. SEEDING DE USUARIOS
+            // 2. SEEDING DE USUARIOS (Con BCrypt)
             // ==========================================
             if (!context.Users.Any())
             {
-                var passwordHasher = new PasswordHasher<User>();
+                // Hasheamos la clave "1234" usando BCrypt directamente
+                string hashedPassword = BCrypt.Net.BCrypt.HashPassword("1234");
                 var users = new List<User>();
 
                 // Dos Super Admins
@@ -30,7 +30,7 @@ namespace ClubApp.Infrastructure.Data
                         FirstName = $"SuperAdmin{i}",
                         LastName = "Admin",
                         Email = $"superadmin{i}@clubapp.com",
-                        PasswordHash = passwordHasher.HashPassword(null!, "1234"),
+                        PasswordHash = hashedPassword,
                         Role = UserRole.SUPERADMIN,
                         CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, DateTimeKind.Utc)
                     });
@@ -46,7 +46,7 @@ namespace ClubApp.Infrastructure.Data
                         FirstName = $"Profesor{i}",
                         LastName = "Profe",
                         Email = $"profesor{i}@clubapp.com",
-                        PasswordHash = passwordHasher.HashPassword(null!, "1234"),
+                        PasswordHash = hashedPassword,
                         Role = UserRole.ADMIN,
                         CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, DateTimeKind.Utc)
                     });
@@ -62,7 +62,7 @@ namespace ClubApp.Infrastructure.Data
                         FirstName = $"Usuario{i}",
                         LastName = "Member",
                         Email = $"usuario{i}@clubapp.com",
-                        PasswordHash = passwordHasher.HashPassword(null!, "1234"),
+                        PasswordHash = hashedPassword,
                         Role = UserRole.MEMBER,
                         CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, DateTimeKind.Utc)
                     });
