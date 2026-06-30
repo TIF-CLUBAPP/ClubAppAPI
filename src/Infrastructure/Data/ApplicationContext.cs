@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using ClubApp.Domain.Entities;
-using BCrypt.Net;
 
 namespace ClubApp.Infrastructure.Data
 {
@@ -26,6 +25,7 @@ namespace ClubApp.Infrastructure.Data
             // ==========================================
             // 1. DATA SEEDING DE USUARIOS 
             // ==========================================
+            var passwordHasher = new Microsoft.AspNetCore.Identity.PasswordHasher<User>();
             var users = new List<User>();
 
             // Dos Super Admins
@@ -38,7 +38,7 @@ namespace ClubApp.Infrastructure.Data
                     FirstName = $"SuperAdmin{i}",
                     LastName = "Admin",
                     Email = $"superadmin{i}@clubapp.com",
-                    PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
+                    PasswordHash = passwordHasher.HashPassword(null!, "1234"), // Clave: 1234
                     Role = UserRole.SUPERADMIN,
                     CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, DateTimeKind.Utc)
                 });
@@ -54,7 +54,7 @@ namespace ClubApp.Infrastructure.Data
                     FirstName = $"Profesor{i}",
                     LastName = "Profe",
                     Email = $"profesor{i}@clubapp.com",
-                    PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
+                    PasswordHash = passwordHasher.HashPassword(null!, "1234"), // Clave: 1234
                     Role = UserRole.ADMIN,
                     CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, DateTimeKind.Utc)
                 });
@@ -70,13 +70,14 @@ namespace ClubApp.Infrastructure.Data
                     FirstName = $"Usuario{i}",
                     LastName = "Member",
                     Email = $"usuario{i}@clubapp.com",
-                    PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
+                    PasswordHash = passwordHasher.HashPassword(null!, "1234"), // Clave: 1234
                     Role = UserRole.MEMBER,
                     CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, DateTimeKind.Utc)
                 });
             }
 
             modelBuilder.Entity<User>().HasData(users);
+
 
             // ==========================================
             // 2. DATA SEEDING DE ACTIVIDADES 
@@ -107,7 +108,7 @@ namespace ClubApp.Infrastructure.Data
                     Id = 3,
                     Name = "Spinning (TEST LLENO)",
                     Description = "Ciclismo de interior sin cupos disponibles.",
-                    MaxCapacity = 0, // <--para forzar el error de clase llena en Enrollment
+                    MaxCapacity = 0, 
                     Schedule = "Viernes 18:00 hs",
                     IsActive = true,
                     CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, DateTimeKind.Utc)

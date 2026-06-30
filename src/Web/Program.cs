@@ -88,20 +88,16 @@ builder.Services.AddOpenApi(options =>
 // ==========================================
 // 4. CONFIGURACIÓN DE BASE DE DATOS (Fijada para Azure)
 // ==========================================
-// Intentamos obtener la conexión, si no existe, usamos una ruta absoluta por defecto
 string dbFileName = "clubapp.db";
 string dbPath;
 
-// Detectar si estamos en Azure
 if (Environment.GetEnvironmentVariable("HOME") != null)
 {
-    // Estamos en Azure Linux (App Service)
     dbPath = Path.Combine(Environment.GetEnvironmentVariable("HOME")!, "site", "wwwroot", dbFileName);
 }
 else
 {
-    // Estamos en desarrollo local
-    dbPath = Path.Combine(AppContext.BaseDirectory, dbFileName);
+    dbPath = Path.Combine(Directory.GetCurrentDirectory(), dbFileName); 
 }
 
 string connectionString = $"Data Source={dbPath}";
