@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "Gzv5ydkAsw0=",
+  "dgSpecHash": "WwuYuVcjvxg=",
   "success": true,
   "projectFilePath": "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Infrastructure\\Infrastructure.csproj",
   "expectedPackageFiles": [
@@ -58,7 +58,7 @@
     {
       "code": "NU1603",
       "level": "Warning",
-      "message": "Infrastructure depends on SQLitePCLRaw.lib.e_sqlite3 (>= 2.1.12) but SQLitePCLRaw.lib.e_sqlite3 2.1.12 was not found. SQLitePCLRaw.lib.e_sqlite3 3.50.3 was resolved instead.",
+      "message": "Infrastructure depende de SQLitePCLRaw.lib.e_sqlite3 (>= 2.1.12), pero no se encontró SQLitePCLRaw.lib.e_sqlite3 2.1.12. SQLitePCLRaw.lib.e_sqlite3 3.50.3 se resolvió en su lugar.",
       "projectPath": "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Infrastructure\\Infrastructure.csproj",
       "warningLevel": 1,
       "filePath": "C:\\Users\\berto\\AppData\\Local\\GitHubDesktop\\ClubApp\\ClubAppAPI\\src\\Infrastructure\\Infrastructure.csproj",
