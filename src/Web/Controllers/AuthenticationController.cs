@@ -1,5 +1,5 @@
 using ClubApp.Application.Interfaces;
-using ClubApp.Application.Requests;
+using ClubApp.Application.Models.Request;
 using ClubApp.Domain.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization; 

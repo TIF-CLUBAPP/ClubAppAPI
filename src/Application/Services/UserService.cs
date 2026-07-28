@@ -3,7 +3,7 @@ using ClubApp.Application.Dtos;
 using ClubApp.Domain.Entities;
 using ClubApp.Domain.Interfaces;
 using ClubApp.Domain.Exceptions;
-using ClubApp.Application.Requests;
+using ClubApp.Application.Models.Request;
 using ClubApp.Models.DTOs;
 using ClubApp.Application.DTOs;
 

@@ -1,6 +1,6 @@
 using ClubApp.Application.Dtos;
 using ClubApp.Application.DTOs;
-using ClubApp.Application.Requests;
+using ClubApp.Application.Models.Request;
 using ClubApp.Models.DTOs;
 
 namespace ClubApp.Application.Interfaces;

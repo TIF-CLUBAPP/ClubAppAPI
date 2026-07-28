@@ -1,4 +1,4 @@
-namespace ClubApp.Application.Requests
+namespace ClubApp.Application.Models.Request
 {
     public class UpdateUserBasicRequest
     {

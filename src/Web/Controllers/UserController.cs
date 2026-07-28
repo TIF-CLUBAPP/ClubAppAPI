@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Dtos;
-using ClubApp.Application.Requests;
+using ClubApp.Application.Models.Request;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
 using ClubApp.Models.DTOs;
