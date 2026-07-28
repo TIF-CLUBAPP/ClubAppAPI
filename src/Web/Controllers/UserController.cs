@@ -33,35 +33,36 @@ public class UsersController : ControllerBase
         return user != null ? Ok(user) : NotFound();
     }
 
-    // =======================================================================
-    // REGISTRO DE USUARIOS: LIBRE DE CANDADOS
-    // =======================================================================
     [HttpPost]
     [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create([FromBody] UserRegisterDto registerDto)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
 
-        await _userService.CreateUserAsync(registerDto);
+        // El servicio crea el usuario y devuelve el objeto/DTO creado con su ID
+        var createdUser = await _userService.CreateUserAsync(registerDto);
 
-        return Ok(new { message = "Usuario creado correctamente" });
+        return CreatedAtAction(
+            nameof(GetById),
+            new { id = createdUser.Id },
+            createdUser
+        );
     }
 
     [HttpPost("{id}/change-password")]
     [Authorize]
     public async Task<IActionResult> ChangePassword(int id, [FromBody] ChangePasswordDto passwordDto)
     {
-        // Extraer ID del token
         var userIdFromToken = User.FindFirst("sub")?.Value
                               ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
 
-        // Seguridad: Solo el dueño puede
         if (userIdFromToken != id.ToString())
         {
             return Forbid();
         }
 
-        // Llamar al servicio
         var result = await _userService.ChangePasswordAsync(id, passwordDto);
 
         if (!result)
@@ -76,17 +77,14 @@ public class UsersController : ControllerBase
     [Authorize] 
     public async Task<IActionResult> Delete(int id)
     {
-        // 1. Extraer el rol del token de quien está intentando borrar
         var currentUserRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value
                               ?? User.FindFirst("role")?.Value;
 
-        // 2. Control de acceso:
         if (!string.Equals(currentUserRole, "SUPERADMIN", StringComparison.OrdinalIgnoreCase))
         {
             return Forbid();
         }
 
-        // 3. Si el token es de un admin groso, procedemos con el borrado
         var result = await _userService.DeleteUserAsync(id);
         return result ? Ok(new { message = "Usuario eliminado" }) : NotFound();
     }
@@ -97,25 +95,21 @@ public class UsersController : ControllerBase
         [FromRoute] int id,
         [FromBody] UpdateUserBasicRequest request)
     {
-        // 1. Extraer el ID y el ROL del token
         var userIdFromToken = User.FindFirst("sub")?.Value
                               ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
 
-        // Asumiendo que el rol se guarda en el claim 'role'
         var userRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value
                        ?? User.FindFirst("role")?.Value;
 
-        // 2. Validación de seguridad: 
-        // Permitir si es el dueño (ID coincide) O si es 'SuperAdmin'
         bool isOwner = userIdFromToken == id.ToString();
-        bool isSuperAdmin = userRole == "SuperAdmin";
+        bool isSuperAdmin = string.Equals(userRole, "SUPERADMIN", StringComparison.OrdinalIgnoreCase) 
+                            || string.Equals(userRole, "SuperAdmin", StringComparison.OrdinalIgnoreCase);
 
         if (!isOwner && !isSuperAdmin)
         {
-            return Forbid(); // Retorna 403 Forbidden si no tiene permisos
+            return Forbid();
         }
 
-        // 3. Ejecutar la lógica de negocio
         var result = await _userService.UpdateBasicInfoAsync(id, request);
 
         if (!result)
@@ -133,7 +127,6 @@ public class UsersController : ControllerBase
         var currentUserRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value
                               ?? User.FindFirst("role")?.Value;
 
-        // Validación estricta con el texto de tu Token ("SUPERADMIN")
         if (!string.Equals(currentUserRole, "SUPERADMIN", StringComparison.OrdinalIgnoreCase))
         {
             return Forbid();
@@ -145,16 +138,12 @@ public class UsersController : ControllerBase
         return Ok(new { message = "Rol actualizado correctamente" });
     }
 
-    // =======================================================================
-    // LOGIN: ASÍNCRONO Y CONFIGURADO CORRECTAMENTE
-    // =======================================================================
     [HttpPost("login")]
     [AllowAnonymous]
     public async Task<IActionResult> Login([FromBody] AuthenticationRequest request)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
 
-        // Usamos el método asincrónico que respeta tu arquitectura limpia con await
         var token = await _authService.AuthenticationAsync(request);
 
         if (token == null)

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Dtos;
 using ClubApp.Domain.Entities;
+using ClubApp.Domain.Exceptions;
 using ClubApp.Infrastructure.Data;
 using System;
 using System.Collections.Generic;
@@ -26,6 +27,12 @@ public class MembershipService : IMembershipService
         return await _context.Memberships.ToListAsync();
     }
 
+    // 1. Método nuevo para consultar por ID propio de la membresía (necesario para CreatedAtAction)
+    public async Task<Membership?> GetMembershipByIdAsync(int id)
+    {
+        return await _context.Memberships.FindAsync(id);
+    }
+
     public async Task<Membership?> GetMembershipByUserIdAsync(int userId)
     {
         return await _context.Memberships
@@ -34,10 +41,14 @@ public class MembershipService : IMembershipService
             .FirstOrDefaultAsync();
     }
 
-    public async Task<string> CreateMembershipAsync(CreateMembershipDto dto)
+    // 2. Devuelve la entidad Membership recién creada con su ID generado por la BD
+    public async Task<Membership> CreateMembershipAsync(CreateMembershipDto dto)
     {
         var userExists = await _context.Users.AnyAsync(u => u.Id == dto.UserId);
-        if (!userExists) return "USER_NOT_FOUND";
+        if (!userExists)
+        {
+            throw new NotFoundException("User", dto.UserId);
+        }
 
         DateTime startTime = DateTime.UtcNow;
 
@@ -64,14 +75,15 @@ public class MembershipService : IMembershipService
 
         await _context.Memberships.AddAsync(membership);
         
+        await _context.SaveChangesAsync();
+
         await _notificationService.CreateNotificationAsync(new CreateNotificationDto {
             User_id = dto.UserId,
             Title = "Membresía Registrada",
             Message = $"Tu membresía fue procesada con éxito. Fecha de vencimiento: {endTime:dd/MM/yyyy}."
         });
 
-        await _context.SaveChangesAsync();
-        return "OK";
+        return membership;
     }
 
     public async Task<string> UpdateStatusAsync(int id, MembershipStatus newStatus)
@@ -103,7 +115,6 @@ public class MembershipService : IMembershipService
                 Message = $"Tu acceso al club vencerá en menos de 3 días ({m.EndTime:dd/MM/yyyy}). ¡Renová pronto para evitar cortes en el servicio!"
             });
         }
-
 
         var expiredMemberships = await _context.Memberships
             .Where(m => (m.Status == MembershipStatus.ACTIVE || m.Status == MembershipStatus.EXPIRING) && m.EndTime <= now)

@@ -17,7 +17,16 @@ public class PaymentService : IPaymentService
 
     public async Task<IEnumerable<Payment>> GetAllPaymentsAsync()
     {
-        return await _context.Payments.Include(p => p.Membership).ToListAsync();
+        return await _context.Payments
+            .Include(p => p.Membership)
+            .ToListAsync();
+    }
+
+    public async Task<Payment?> GetByIdAsync(int id)
+    {
+        return await _context.Payments
+            .Include(p => p.Membership)
+            .FirstOrDefaultAsync(p => p.Id == id);
     }
 
     public async Task<IEnumerable<Payment>> GetPaymentsByUserIdAsync(int userId)
@@ -28,18 +37,18 @@ public class PaymentService : IPaymentService
             .ToListAsync();
     }
 
-    public async Task<string> CreatePaymentAsync(int loggedInUserId, string loggedInUserRole, CreatePaymentDto dto)
+    public async Task<Payment> CreatePaymentAsync(int loggedInUserId, string loggedInUserRole, CreatePaymentDto dto)
     {
         var membership = await _context.Memberships.FindAsync(dto.MembershipId);
-        if (membership == null) return "MEMBERSHIP_NOT_FOUND";
+        if (membership == null)
+            throw new KeyNotFoundException($"No se encontró la membresía con ID {dto.MembershipId}.");
 
         if (loggedInUserRole != "ADMIN" && loggedInUserRole != "SUPERADMIN" && membership.User_id != loggedInUserId)
         {
-            return "NOT_AUTHORIZED";
+            throw new UnauthorizedAccessException("No tienes permisos para pagar esta membresía.");
         }
 
         var method = (PaymentMethod)dto.PaymentMethod;
-
 
         var payment = new Payment
         {
@@ -47,10 +56,9 @@ public class PaymentService : IPaymentService
             Amount = membership.MonthlyPrice, 
             PaymentDate = DateTime.UtcNow,
             Method = method,
-           
             Status = method == PaymentMethod.CASH && (loggedInUserRole == "ADMIN" || loggedInUserRole == "SUPERADMIN") 
-                            ? PaymentStatus.COMPLETED 
-                            : PaymentStatus.PENDING,
+                        ? PaymentStatus.COMPLETED 
+                        : PaymentStatus.PENDING,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -60,13 +68,16 @@ public class PaymentService : IPaymentService
         }
 
         await _context.Payments.AddAsync(payment);
-        await _context.SaveChangesAsync();
-        return "OK";
+        await _context.SaveChangesAsync(); 
+        return payment;
     }
 
     public async Task<string> UpdateStatusAsync(int paymentId, PaymentStatus newStatus)
     {
-        var payment = await _context.Payments.Include(p => p.Membership).FirstOrDefaultAsync(p => p.Id == paymentId);
+        var payment = await _context.Payments
+            .Include(p => p.Membership)
+            .FirstOrDefaultAsync(p => p.Id == paymentId);
+
         if (payment == null) return "NOT_FOUND";
 
         payment.Status = newStatus;

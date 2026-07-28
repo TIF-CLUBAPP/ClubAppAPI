@@ -1,5 +1,5 @@
 using ClubApp.Application.Interfaces;
-using ClubApp.Application.Dtos;
+using ClubApp.Application.Models.Dtos;
 using ClubApp.Domain.Entities;
 using ClubApp.Domain.Interfaces;
 using ClubApp.Domain.Exceptions;
@@ -25,6 +25,7 @@ public class ActivityService : IActivityService
 
         return activities.Select(a => new ActivityDto
         {
+            Id = a.Id,
             Name = a.Name,
             Description = a.Description,
             Schedule = a.Schedule,
@@ -33,7 +34,23 @@ public class ActivityService : IActivityService
         }).ToList();
     }
 
-    public async Task<bool> CreateActivityAsync(ActivityDto dto)
+    public async Task<ActivityDto?> GetActivityByIdAsync(int activityId)
+    {
+        var activity = await _activityRepository.GetByIdAsync(activityId);
+        if (activity == null) return null;
+
+        return new ActivityDto
+        {
+            Id = activity.Id,
+            Name = activity.Name,
+            Description = activity.Description,
+            Schedule = activity.Schedule,
+            MaxCapacity = activity.MaxCapacity,
+            IsActive = activity.IsActive
+        };
+    }
+
+    public async Task<ActivityDto> CreateActivityAsync(ActivityDto dto)
     {
         if (dto.MaxCapacity <= 0)
         {
@@ -50,7 +67,11 @@ public class ActivityService : IActivityService
         };
 
         await _activityRepository.AddAsync(newActivity);
-        return true;
+        
+        // Asignamos al DTO el ID generado por la base de datos
+        dto.Id = newActivity.Id;
+
+        return dto;
     }
 
     public async Task<bool> UpdateActivityAsync(int activityId, ActivityDto dto)
@@ -62,8 +83,10 @@ public class ActivityService : IActivityService
         }
 
         existing.Name = dto.Name;
+        existing.Description = dto.Description;
         existing.Schedule = dto.Schedule;
         existing.MaxCapacity = dto.MaxCapacity;
+        existing.IsActive = dto.IsActive;
 
         await _activityRepository.UpdateAsync(existing);
         return true;
@@ -81,7 +104,6 @@ public class ActivityService : IActivityService
         return true;
     }
 
-    // Este es el método que soluciona la lógica usando la tabla intermedia Enrollment
     public async Task<bool> EnrollMemberAsync(int userId, int activityId)
     {
         var activity = await _activityRepository.GetByIdAsync(activityId);
@@ -95,14 +117,12 @@ public class ActivityService : IActivityService
             throw new AppValidationException("La actividad seleccionada no se encuentra activa.");
         }
 
-        // Lógica de la tabla Enrollment: Contamos cuántos cupos van ocupados
         int currentEnrollments = await _enrollmentRepository.GetCountByActivityIdAsync(activityId);
         if (currentEnrollments >= activity.MaxCapacity)
         {
             throw new AppValidationException("No hay cupos disponibles para esta actividad.");
         }
 
-        // Si todo está ok, guardamos en la tabla intermedia
         var enrollment = new Enrollment
         {
             UserId = userId,
@@ -113,9 +133,5 @@ public class ActivityService : IActivityService
 
         await _enrollmentRepository.AddAsync(enrollment);
         return true;
-    }
-    public async Task<Activity?> GetActivityByIdAsync(int activityId)
-    {
-        return await _activityRepository.GetByIdAsync(activityId);
     }
 }

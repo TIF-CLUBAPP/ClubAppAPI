@@ -36,7 +36,7 @@ public class NotificationService : INotificationService
         return await _context.Notifications.FindAsync(id);
     }
 
-    public async Task<string> CreateNotificationAsync(CreateNotificationDto dto)
+    public async Task<Notification> CreateNotificationAsync(CreateNotificationDto dto)
     {
         var notification = new Notification
         {
@@ -50,7 +50,8 @@ public class NotificationService : INotificationService
 
         await _context.Notifications.AddAsync(notification);
         await _context.SaveChangesAsync();
-        return "OK";
+        
+        return notification;
     }
 
     public async Task<string> UpdateNotificationAsync(int id, UpdateNotificationDto dto)
