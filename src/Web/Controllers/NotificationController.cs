@@ -28,14 +28,6 @@ public class NotificationsController : ControllerBase
         return Ok(await _notificationService.GetMyNotificationsAsync(loggedInUserId));
     }
 
-    [HttpPost]
-    [Authorize(Roles = "ADMIN,SUPERADMIN")]
-    public async Task<IActionResult> Post([FromBody] CreateNotificationDto dto)
-    {
-        await _notificationService.CreateNotificationAsync(dto);
-        return Ok(new { message = "Notificación emitida con éxito." });
-    }
-
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
     {
@@ -51,6 +43,23 @@ public class NotificationsController : ControllerBase
         }
 
         return Ok(notification);
+    }
+
+    [HttpPost]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Post([FromBody] CreateNotificationDto dto)
+    {
+        // 1. El servicio crea la notificación y devuelve el objeto con su ID asignado
+        var createdNotification = await _notificationService.CreateNotificationAsync(dto);
+
+        // 2. Devolvemos 201 Created apuntando a GetById
+        return CreatedAtAction(
+            nameof(GetById), 
+            new { id = createdNotification.Id }, 
+            createdNotification
+        );
     }
 
     [HttpPut("{id:int}")]

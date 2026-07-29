@@ -11,6 +11,7 @@ using ClubApp.Infrastructure.Services;
 using Microsoft.Data.Sqlite;
 using ClubApp.Domain.Entities;
 using Microsoft.AspNetCore.Identity;
+using ClubApp.API.Middlewares; 
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,7 +28,7 @@ builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 // ==========================================
 // 2. SERVICIOS DEL SISTEMA Y AUTENTICACIÓN
 // ==========================================
-builder.Services.AddScoped<ICustomAuthenticationService, AutenticacionService>();
+builder.Services.AddScoped<ICustomAuthenticationService, AutenticacionService>(); // 👈 Corregido el ";s"
 
 builder.Services.AddControllers();
 
@@ -122,6 +123,8 @@ builder.Services.AddHttpClient<IWeatherService, WeatherService>();
 // 6. PIPELINE DE EJECUCIÓN (MIDDLEWARES)
 // ==========================================
 var app = builder.Build();
+
+app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
 #region Inicialización Automática de Base de Datos
 using (var scope = app.Services.CreateScope())

@@ -33,6 +33,17 @@ public class EnrollmentService : IEnrollmentService
 
     public async Task<string> CreateEnrollmentAsync(int userId, CreateEnrollmentDto dto)
     {
+        // 🛑 REGLA DE NEGOCIO (Módulo 3): Verificar si el usuario registra deudas o pagos vencidos
+        bool hasOverdueDebt = await _context.Payments
+            .AnyAsync(p => p.User_id == userId && 
+                          (p.Status == PaymentStatus.OVERDUE || 
+                          (p.Status == PaymentStatus.PENDING && DateTime.UtcNow > p.DueDate)));
+
+        if (hasOverdueDebt)
+        {
+            return "No puedes inscribirte a actividades porque registras deudas o cuotas vencidas pendientes.";
+        }
+
         var activity = await _context.Activities.FindAsync(dto.ActivityId);
         if (activity == null) return "La actividad no existe.";
         if (!activity.IsActive) return "La actividad no está disponible.";
@@ -60,12 +71,10 @@ public class EnrollmentService : IEnrollmentService
         return "OK";
     }
 
-
     public async Task<string> CancelEnrollmentAsync(int enrollmentId, int loggedInUserId, string loggedInUserRole)
     {
         var enrollment = await _context.Enrollments.FindAsync(enrollmentId);
         if (enrollment == null) return "NOT_FOUND";
-
 
         if (loggedInUserRole != "ADMIN" && loggedInUserRole != "SUPERADMIN" && enrollment.UserId != loggedInUserId)
         {

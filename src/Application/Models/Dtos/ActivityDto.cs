@@ -1,8 +1,8 @@
-namespace ClubApp.Application.Dtos;
+namespace ClubApp.Application.Models.Dtos;
 
 public class ActivityDto
 {
-
+    public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Schedule { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;

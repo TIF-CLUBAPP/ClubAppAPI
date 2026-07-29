@@ -1,45 +1,38 @@
-using ClubApp.Application.Interfaces;
-using ClubApp.Application.Requests;
-using ClubApp.Domain.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization; 
+using ClubApp.Application.Interfaces;
+using ClubApp.Application.Models.Request;
 
 namespace ClubApp.Web.Controllers;
 
-[Route("api/authentication")]
 [ApiController]
+[Route("api/authentication")]
 [AllowAnonymous]
 public class AuthenticationController : ControllerBase
 {
     private readonly ICustomAuthenticationService _customAuthenticationService;
 
-    public AuthenticationController(ICustomAuthenticationService autenticacionService)
+    public AuthenticationController(ICustomAuthenticationService customAuthenticationService)
     {
-        _customAuthenticationService = autenticacionService;
+        _customAuthenticationService = customAuthenticationService;
     }
 
     [HttpPost("authenticate")]
-    public async Task<ActionResult<string>> Authenticate([FromBody] AuthenticationRequest authenticationRequest)
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Authenticate([FromBody] AuthenticationRequest authenticationRequest)
     {
-        try
-        {
-            string? token = await _customAuthenticationService.AuthenticationAsync(authenticationRequest);
+        if (!ModelState.IsValid) 
+            return BadRequest(ModelState);
 
-            if (token == null)
-            {
-                return Unauthorized(new { message = "Usuario o contraseña incorrectos." });
-            }
+        string? token = await _customAuthenticationService.AuthenticationAsync(authenticationRequest);
 
-            // 2. Devolvemos el objeto JSON con el token
-            return Ok(new { token = token });
-        }
-        catch (NotAllowedException ex)
+        if (string.IsNullOrEmpty(token))
         {
-            return Unauthorized(ex.Message);
+            return Unauthorized(new { message = "Usuario o contraseña incorrectos." });
         }
-        catch (Exception ex)
-        {
-            return StatusCode(500, ex.Message);
-        }
+
+        return Ok(new { token = token });
     }
 }

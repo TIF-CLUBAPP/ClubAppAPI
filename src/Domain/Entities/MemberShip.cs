@@ -1,19 +1,14 @@
 namespace ClubApp.Domain.Entities;
 
-public enum MembershipStatus
-{
-    ACTIVE,
-    EXPIRED,
-    PENDING,
-    EXPIRING
-}
+public enum MembershipStatus { ACTIVE, INACTIVE, SUSPENDED, EXPIRED }
 
 public class Membership : BaseEntity
 {
-    // Id viene de BaseEntity (sería el Member_id del diagrama)
-    public int User_id { get; set; } // FK hacia el Usuario
-    public MembershipStatus Status { get; set; }
-    public DateTime StartTime { get; set; }
-    public DateTime EndTime { get; set; }
+    public int User_id { get; set; }
     public decimal MonthlyPrice { get; set; }
+    public MembershipStatus Status { get; set; } = MembershipStatus.INACTIVE;
+    public DateTime StartDate { get; set; } = DateTime.UtcNow;
+    public DateTime EndDate { get; set; } = DateTime.UtcNow.AddYears(1);
+    public virtual User User { get; set; } = null!;
+    public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
 }

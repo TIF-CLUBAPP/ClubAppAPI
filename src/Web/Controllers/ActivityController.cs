@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Dtos;
 using Microsoft.AspNetCore.Authorization;
+using ClubApp.Application.Models.Dtos;
 
 namespace ClubApp.API.Controllers;
 
@@ -18,11 +19,24 @@ public class ActivitiesController : ControllerBase
     }
 
     // =======================================================================
-    // ACCIÓN DISPONIBLE PARA CUALQUIER SOCIO LOGUEADO
+    // ACCIONES DISPONIBLES PARA CUALQUIER SOCIO LOGUEADO
     // =======================================================================
 
     [HttpGet]
     public async Task<IActionResult> Get() => Ok(await _activityService.GetAllAvailableActivitiesAsync());
+
+    [HttpGet("{activityId:int}")]
+    public async Task<IActionResult> GetById([FromRoute] int activityId)
+    {
+        var activity = await _activityService.GetActivityByIdAsync(activityId);
+
+        if (activity == null)
+        {
+            return NotFound(new { message = "Actividad no encontrada" });
+        }
+
+        return Ok(activity);
+    }
 
     // =======================================================================
     // ACCIONES EXCLUSIVAS PARA ADMINISTRADORES
@@ -30,10 +44,17 @@ public class ActivitiesController : ControllerBase
 
     [HttpPost]
     [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Post([FromBody] ActivityDto dto)
     {
-        await _activityService.CreateActivityAsync(dto);
-        return Ok("Actividad creada con éxito");
+        var createdActivity = await _activityService.CreateActivityAsync(dto);
+        
+        return CreatedAtAction(
+            nameof(GetById), 
+            new { activityId = createdActivity.Id }, 
+            createdActivity
+        );
     }
 
     [HttpPut("{activityId:int}")]
@@ -57,21 +78,4 @@ public class ActivitiesController : ControllerBase
 
         return Ok($"Actividad {activityId} eliminada");
     }
-
-    [HttpGet("{activityId:int}")]
-    public async Task<IActionResult> GetById([FromRoute] int activityId)
-    {
-        var activity = await _activityService.GetActivityByIdAsync(activityId);
-
-        if (activity == null)
-        {
-            return NotFound(new { message = "Actividad no encontrada" });
-        }
-
-        return Ok(activity);
-    }
-}
-
-internal class authorizeAttribute : Attribute
-{
 }

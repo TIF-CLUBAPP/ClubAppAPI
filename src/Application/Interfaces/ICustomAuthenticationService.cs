@@ -1,5 +1,5 @@
 using System.Threading.Tasks;
-using ClubApp.Application.Requests;
+using ClubApp.Application.Models.Request;
 
 namespace ClubApp.Application.Interfaces;
 

@@ -6,7 +6,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
 using ClubApp.Application.Interfaces;
-using ClubApp.Application.Requests;
+using ClubApp.Application.Models.Request;
 using ClubApp.Domain.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
