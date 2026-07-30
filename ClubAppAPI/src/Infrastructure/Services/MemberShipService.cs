@@ -37,7 +37,7 @@ public class MembershipService : IMembershipService
     {
         return await _context.Memberships
             .Where(m => m.User_id == userId)
-            .OrderByDescending(m => m.EndTime)
+            .OrderByDescending(m => m.EndDate) // Cambiado a EndDate
             .FirstOrDefaultAsync();
     }
 
@@ -54,12 +54,12 @@ public class MembershipService : IMembershipService
 
         var latestMembership = await _context.Memberships
             .Where(m => m.User_id == dto.UserId && m.Status != MembershipStatus.EXPIRED)
-            .OrderByDescending(m => m.EndTime)
+            .OrderByDescending(m => m.EndDate) // Cambiado a EndDate
             .FirstOrDefaultAsync();
 
-        if (latestMembership != null && latestMembership.EndTime > DateTime.UtcNow)
+        if (latestMembership != null && latestMembership.EndDate > DateTime.UtcNow) // Cambiado a EndDate
         {
-            startTime = latestMembership.EndTime;
+            startTime = latestMembership.EndDate; // Cambiado a EndDate
         }
 
         DateTime endTime = startTime.AddMonths(1);
@@ -67,8 +67,8 @@ public class MembershipService : IMembershipService
         var membership = new Membership
         {
             User_id = dto.UserId,
-            StartTime = startTime,
-            EndTime = endTime,
+            StartDate = startTime, // Cambiado a StartDate
+            EndDate = endTime,     // Cambiado a EndDate
             MonthlyPrice = dto.MonthlyPrice,
             Status = MembershipStatus.ACTIVE
         };
@@ -102,7 +102,7 @@ public class MembershipService : IMembershipService
         var warningThreshold = now.AddDays(3); 
 
         var expiringMemberships = await _context.Memberships
-            .Where(m => m.Status == MembershipStatus.ACTIVE && m.EndTime <= warningThreshold && m.EndTime > now)
+            .Where(m => m.Status == MembershipStatus.ACTIVE && m.EndDate <= warningThreshold && m.EndDate > now) // Cambiado a EndDate
             .ToListAsync();
 
         foreach (var m in expiringMemberships)
@@ -112,12 +112,12 @@ public class MembershipService : IMembershipService
             await _notificationService.CreateNotificationAsync(new CreateNotificationDto {
                 User_id = m.User_id,
                 Title = "Tu membresía está por vencer",
-                Message = $"Tu acceso al club vencerá en menos de 3 días ({m.EndTime:dd/MM/yyyy}). ¡Renová pronto para evitar cortes en el servicio!"
+                Message = $"Tu acceso al club vencerá en menos de 3 días ({m.EndDate:dd/MM/yyyy}). ¡Renová pronto para evitar cortes en el servicio!" // Cambiado a EndDate
             });
         }
 
         var expiredMemberships = await _context.Memberships
-            .Where(m => (m.Status == MembershipStatus.ACTIVE || m.Status == MembershipStatus.EXPIRING) && m.EndTime <= now)
+            .Where(m => (m.Status == MembershipStatus.ACTIVE || m.Status == MembershipStatus.EXPIRING) && m.EndDate <= now) // Cambiado a EndDate
             .ToListAsync();
 
         foreach (var m in expiredMemberships)

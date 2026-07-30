@@ -28,9 +28,22 @@ builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 // ==========================================
 // 2. SERVICIOS DEL SISTEMA Y AUTENTICACIÓN
 // ==========================================
-builder.Services.AddScoped<ICustomAuthenticationService, AutenticacionService>(); // 👈 Corregido el ";s"
+builder.Services.AddScoped<ICustomAuthenticationService, AutenticacionService>(); 
 
 builder.Services.AddControllers();
+
+// ------------------------------------------
+// CONFIGURACION DE CORS
+// ------------------------------------------
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReactApp", policy =>
+    {
+        policy.WithOrigins("http://localhost:5173") // URL de tu Frontend React
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
 
 string issuer = builder.Configuration["Authentication:Issuer"] ?? "ClubAppAPI";
 string audience = builder.Configuration["Authentication:Audience"] ?? "ClubAppUsers";
@@ -144,6 +157,8 @@ app.UseSwaggerUI(options =>
 });
 
 app.UseHttpsRedirection();
+
+app.UseCors("AllowReactApp");
 
 app.UseAuthentication();
 app.UseAuthorization();

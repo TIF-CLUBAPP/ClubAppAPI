@@ -1,6 +1,6 @@
 namespace ClubApp.Domain.Entities;
 
-public enum MembershipStatus { ACTIVE, INACTIVE, SUSPENDED, EXPIRED }
+public enum MembershipStatus { ACTIVE, INACTIVE, SUSPENDED, EXPIRED, EXPIRING }
 
 public class Membership : BaseEntity
 {
