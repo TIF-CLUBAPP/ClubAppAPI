@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lock, User as UserIcon, LogIn, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
   const { login } = useAuth();
+  const navigate = useNavigate(); 
   
-  const [email, setEmail] = useState(''); // 👈 Cambiado a email
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,6 +22,11 @@ export default function Login() {
     try {
       await login({ email, password });
       setSuccess(true);
+
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 1000);
+
     } catch (err: any) {
       const msg = err.response?.data?.message || err.response?.data?.title || 'No se pudo conectar con el servidor.';
       setError(msg);

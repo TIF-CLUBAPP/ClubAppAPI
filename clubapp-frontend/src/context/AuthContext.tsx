@@ -1,8 +1,9 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import type { AuthenticationRequest } from '../types/auth';
+import type { AuthenticationRequest, User } from '../types/auth';
 import { authService } from '../services/authService';
 
 interface AuthContextType {
+  user: User | null;
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -14,11 +15,21 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
-    if (savedToken) setToken(savedToken);
+    if (savedToken) {
+      setToken(savedToken);
+      setTimeout(() => {
+        setUser({
+          id: 'user-id',
+          email: 'user@example.com',
+          role: 'MEMBER'
+        });
+      }, 1000);
+    }
     setIsLoading(false);
   }, []);
 
@@ -36,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ token, isAuthenticated: !!token, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ token, user, isAuthenticated: !!token, isLoading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
