@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, Clock, CheckCircle2, Loader2, Users, Sparkles } from 'lucide-react';
+import { X, Calendar, Clock, CheckCircle2, Loader2, Sparkles } from 'lucide-react';
 
-interface Zone {
+export interface Zone {
   id: string;
   name: string;
   category: string;
@@ -11,7 +11,8 @@ interface Zone {
 }
 
 interface BookingModalProps {
-  zone: Zone | null;
+  zoneName?: string;
+  zone?: Zone;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -25,13 +26,17 @@ const TIME_SLOTS = [
   { id: '6', time: '21:00 - 22:00 hs', available: true },
 ];
 
-export default function BookingModal({ zone, isOpen, onClose }: BookingModalProps) {
+export default function BookingModal({ zone, zoneName, isOpen, onClose }: BookingModalProps) {
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
 
-  if (!isOpen || !zone) return null;
+  if (!isOpen) return null;
+
+  // Toma zoneName si viene de DailySchedule, o zone.name si viene de Dashboard
+  const title = zoneName || zone?.name || 'Reserva de Cancha';
+  const category = zone?.category || 'Instalaciones del Club';
 
   const handleBooking = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,8 +81,8 @@ export default function BookingModal({ zone, isOpen, onClose }: BookingModalProp
                 <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
                   <Sparkles size={14} /> Nueva Reserva
                 </span>
-                <h3 className="text-2xl font-black text-white mt-1">{zone.name}</h3>
-                <p className="text-xs text-slate-400">{zone.category}</p>
+                <h3 className="text-2xl font-black text-white mt-1">{title}</h3>
+                <p className="text-xs text-slate-400">{category}</p>
               </div>
 
               <form onSubmit={handleBooking} className="space-y-5">
@@ -149,13 +154,13 @@ export default function BookingModal({ zone, isOpen, onClose }: BookingModalProp
               </div>
               <h3 className="text-2xl font-black text-white">¡Reserva Confirmada!</h3>
               <p className="text-xs text-slate-300 max-w-xs mx-auto">
-                Reservaste **{zone.name}** para el día **{date}** en el turno de **{selectedSlot}**.
+                Reservaste <strong>{title}</strong> para el día <strong>{date}</strong> en el turno de <strong>{selectedSlot}</strong>.
               </p>
               <button
                 onClick={handleClose}
                 className="w-full py-3 px-4 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-xs transition-all mt-4"
               >
-                Volver al Dashboard
+                Volver
               </button>
             </motion.div>
           )}

@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './routes/ProtectedRoute';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import Reservations from './pages/Reservations'; 
 
 export default function App() {
   return (
@@ -16,9 +17,10 @@ export default function App() {
           {/* Rutas Protegidas (Requieren Token) */}
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/reservas" element={<Reservations />} /> 
           </Route>
 
-          {/* Redirección comodín: Si la ruta no existe o es '/', mandamos a /dashboard */}
+          {/* Redirección comodín */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>
