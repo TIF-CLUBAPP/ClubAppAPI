@@ -48,6 +48,15 @@ export const saveReservation = (newRes: Omit<Reservation, 'id' | 'status'>): Res
   return created;
 };
 
+// Cancelar una reserva
+export const cancelReservation = (id: string): void => {
+  const reservations = getReservations();
+  const updated = reservations.map((res) =>
+    res.id === id ? { ...res, status: 'cancelled' as const } : res
+  );
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+};
+
 // Verificar si una cancha está ocupada en cierta fecha y hora
 export const isCourtBooked = (courtId: string, date: string, startTime: string): boolean => {
   const reservations = getReservations();
