@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Filter, Settings, Wrench, CheckCircle2, User } from 'lucide-react';
-import type { Court, ClubScheduleConfig, SportDiscipline } from '../../types/reservation';
+import type { Court, ClubScheduleConfig, SportDiscipline, Reservation } from '../../types/reservation';
 import { useAuth } from '../../context/AuthContext';
-import BookingModal from '../dashboard/BookingModal'; 
+import BookingModal from '../dashboard/BookingModal';
+import { getReservations, saveReservation } from '../../services/reservationService';
+import ConfigModal from './ConfigModal';
 
 const INITIAL_COURTS: Court[] = [
   { id: 'c1', name: 'Cancha 1 - Polvo', discipline: 'Tenis', surface: 'Polvo de Ladrillo' },
@@ -27,9 +28,19 @@ export default function DailySchedule() {
   const [selectedDiscipline, setSelectedDiscipline] = useState<SportDiscipline | 'Todas'>('Todas');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [showConfigModal, setShowConfigModal] = useState(false);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
 
-  // Estado para controlar el modal de reserva seleccionado
+  // Estado para controlar el turno seleccionado para el modal de reserva
   const [selectedSlot, setSelectedSlot] = useState<{ court: Court; slot: { start: string; end: string } } | null>(null);
+
+  // Cargar reservas
+  const refreshReservations = () => {
+    setReservations(getReservations());
+  };
+
+  useEffect(() => {
+    refreshReservations();
+  }, [selectedDate]);
 
   const generateTimeSlots = () => {
     const slots = [];
@@ -67,6 +78,23 @@ export default function DailySchedule() {
     ? INITIAL_COURTS 
     : INITIAL_COURTS.filter(c => c.discipline === selectedDiscipline);
 
+  const handleBookingSuccess = () => {
+    if (!selectedSlot) return;
+
+    // Guardar en el almacenamiento local
+    saveReservation({
+      courtId: selectedSlot.court.id,
+      userEmail: user?.email || 'socio@club.com',
+      date: selectedDate,
+      startTime: selectedSlot.slot.start,
+      endTime: selectedSlot.slot.end,
+      bufferEndTime: selectedSlot.slot.end,
+    });
+
+    // Actualizar la vista al instante
+    refreshReservations();
+  };
+
   return (
     <div className="space-y-6">
       {/* Controles de Filtro y Configuración */}
@@ -101,7 +129,7 @@ export default function DailySchedule() {
 
           {isSuperAdmin && (
             <button
-              onClick={() => setShowConfigModal(!showConfigModal)}
+              onClick={() => setShowConfigModal(true)}
               className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-emerald-400 transition-all flex items-center gap-2 text-xs font-semibold"
             >
               <Settings size={16} /> Configurar Horarios
@@ -111,44 +139,12 @@ export default function DailySchedule() {
       </div>
 
       {/* Modal Ajustes SuperAdmin */}
-      {showConfigModal && (
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="bg-slate-900 border border-emerald-500/30 rounded-2xl p-5 space-y-4">
-          <h4 className="text-sm font-bold text-white flex items-center gap-2">
-            <Settings size={16} className="text-emerald-400" /> Horarios Operativos del Club
-          </h4>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-            <div>
-              <label className="text-slate-400 block mb-1">Apertura</label>
-              <input
-                type="time"
-                value={config.openTime}
-                onChange={(e) => setConfig({ ...config, openTime: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-white"
-              />
-            </div>
-            <div>
-              <label className="text-slate-400 block mb-1">Cierre</label>
-              <input
-                type="time"
-                value={config.closeTime}
-                onChange={(e) => setConfig({ ...config, closeTime: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-white"
-              />
-            </div>
-            <div>
-              <label className="text-slate-400 block mb-1">Intervalo Mantenimiento</label>
-              <select
-                value={config.bufferMinutes}
-                onChange={(e) => setConfig({ ...config, bufferMinutes: Number(e.target.value) })}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-white"
-              >
-                <option value={15}>15 minutos</option>
-                <option value={30}>30 minutos</option>
-              </select>
-            </div>
-          </div>
-        </motion.div>
-      )}
+      <ConfigModal
+        isOpen={showConfigModal}
+        onClose={() => setShowConfigModal(false)}
+        config={config}
+        onSave={(newConfig) => setConfig(newConfig)}
+      />
 
       {/* Tabla de Horarios */}
       <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 overflow-x-auto">
@@ -175,17 +171,19 @@ export default function DailySchedule() {
                   </span>
                 </div>
 
-                {filteredCourts.map((court, cIdx) => {
-                  const isReserved = (index + cIdx) % 3 === 0;
+                {filteredCourts.map((court) => {
+                  const existingRes = reservations.find(
+                    r => r.courtId === court.id && r.date === selectedDate && r.startTime === slot.start && r.status === 'confirmed'
+                  );
 
                   return (
                     <div key={court.id} className="text-center">
-                      {isReserved ? (
+                      {existingRes ? (
                         <div className="p-2.5 rounded-xl bg-slate-950 border border-amber-500/20 text-slate-400 text-xs flex items-center justify-between px-3">
-                          <span className="text-[11px] text-slate-300 font-medium flex items-center gap-1">
-                            <User size={12} className="text-amber-400" /> Reservado
+                          <span className="text-[11px] text-slate-300 font-medium flex items-center gap-1 truncate" title={existingRes.userEmail}>
+                            <User size={12} className="text-amber-400 shrink-0" /> {existingRes.userEmail.split('@')[0]}
                           </span>
-                          <span className="w-2 h-2 rounded-full bg-amber-400" />
+                          <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
                         </div>
                       ) : (
                         <button
@@ -210,6 +208,7 @@ export default function DailySchedule() {
           isOpen={!!selectedSlot}
           onClose={() => setSelectedSlot(null)}
           zoneName={`${selectedSlot.court.name} (${selectedSlot.slot.start} hs)`}
+          onSuccess={handleBookingSuccess}
         />
       )}
     </div>

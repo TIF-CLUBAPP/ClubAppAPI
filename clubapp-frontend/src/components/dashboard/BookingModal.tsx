@@ -15,6 +15,7 @@ interface BookingModalProps {
   zone?: Zone;
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: (bookingData: { date: string; slot: string }) => void; // 👈 Callback de éxito
 }
 
 const TIME_SLOTS = [
@@ -26,7 +27,7 @@ const TIME_SLOTS = [
   { id: '6', time: '21:00 - 22:00 hs', available: true },
 ];
 
-export default function BookingModal({ zone, zoneName, isOpen, onClose }: BookingModalProps) {
+export default function BookingModal({ zone, zoneName, isOpen, onClose, onSuccess }: BookingModalProps) {
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(false);
@@ -44,10 +45,15 @@ export default function BookingModal({ zone, zoneName, isOpen, onClose }: Bookin
 
     setLoading(true);
 
-    // Simulación de respuesta de API (Luego conectaremos con POST /api/reservations)
+    // Simulación de guardado
     setTimeout(() => {
       setLoading(false);
       setConfirmed(true);
+
+      // Notificamos al componente padre que la reserva fue exitosa
+      if (onSuccess) {
+        onSuccess({ date, slot: selectedSlot });
+      }
     }, 1200);
   };
 
