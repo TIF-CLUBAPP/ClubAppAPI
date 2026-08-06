@@ -1,3 +1,5 @@
+export type UserRole = 'SUPERADMIN' | 'ADMIN' | 'TEACHER' | 'MEMBER';
+
 export interface AuthenticationRequest {
   email: string;
   password: string;
@@ -5,11 +7,13 @@ export interface AuthenticationRequest {
 
 export interface AuthenticationResponse {
   token: string;
+  user?: User;
 }
 
 export interface User {
   id?: string;
-  userName?: string;
+  name?: string;
+  fullName?: string;
   email?: string;
-  role?: string;
+  role?: UserRole;
 }

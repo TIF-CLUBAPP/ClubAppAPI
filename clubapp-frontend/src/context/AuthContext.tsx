@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import type { AuthenticationRequest, User } from '../types/auth';
+import type { AuthenticationRequest, AuthenticationResponse, User } from '../types/auth';
 import { authService } from '../services/authService';
 
 interface AuthContextType {
@@ -13,41 +13,79 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const getStoredItem = (key: string) => localStorage.getItem(key) ?? sessionStorage.getItem(key);
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
-  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(() => getStoredItem('token'));
+  const [user, setUser] = useState<User | null>(() => {
+    const savedUser = getStoredItem('user');
+    if (!savedUser) return null;
+    try {
+      return JSON.parse(savedUser) as User;
+    } catch {
+      return null;
+    }
+  });
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    const savedToken = localStorage.getItem('token');
-    if (savedToken) {
+    const savedToken = getStoredItem('token');
+    const savedUser = getStoredItem('user');
+
+    if (savedToken && savedUser) {
       setToken(savedToken);
-      setTimeout(() => {
-        setUser({
-          id: 'user-id',
-          email: 'user@example.com',
-          role: 'MEMBER'
-        });
-      }, 1000);
+      try {
+        setUser(JSON.parse(savedUser) as User);
+      } catch {
+        setToken(null);
+        setUser(null);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('user');
+      }
+    } else {
+      setToken(null);
+      setUser(null);
     }
+
     setIsLoading(false);
   }, []);
 
   const login = async (credentials: AuthenticationRequest) => {
-    const data = await authService.login(credentials);
+    const data: AuthenticationResponse = await authService.login(credentials);
+
     if (data.token) {
       localStorage.setItem('token', data.token);
       setToken(data.token);
+    }
+
+    if (data.user) {
+      localStorage.setItem('user', JSON.stringify(data.user));
+      setUser(data.user);
     }
   };
 
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('user');
     setToken(null);
+    setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ token, user, isAuthenticated: !!token, isLoading, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        token,
+        user,
+        isAuthenticated: !!token && !!user,
+        isLoading,
+        login,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

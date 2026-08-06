@@ -1,18 +1,26 @@
-import React from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Bell, Sparkles } from 'lucide-react';
 
+const greetings = [
+  '¡Hola de nuevo! 👋',
+  '¡Qué bueno verte por acá! 👋',
+  '¡Excelente día para un partido! 🎾',
+  '¡Listo para otra jornada deportiva! 💪',
+];
+
 export default function Header() {
   const { user } = useAuth();
+  const displayName = user?.name || user?.fullName || user?.email || 'Usuario';
+  const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
 
   return (
     <header className="h-20 border-b border-slate-800/80 bg-slate-950/50 backdrop-blur-md px-6 md:px-8 flex items-center justify-between shrink-0">
       <div>
         <h2 className="text-xl md:text-2xl font-extrabold text-white flex items-center gap-2">
-          ¡Hola de nuevo! 👋
+          {randomGreeting}
         </h2>
         <p className="text-xs text-slate-400 hidden sm:block">
-          Bienvenido al panel de control de <strong className="text-slate-200">{user?.email}</strong>
+          Bienvenido, <strong className="text-slate-200">{displayName}</strong>
         </p>
       </div>
 
