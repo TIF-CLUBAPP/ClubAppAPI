@@ -35,7 +35,7 @@ public class EnrollmentService : IEnrollmentService
     {
         // 🛑 REGLA DE NEGOCIO (Módulo 3): Verificar si el usuario registra deudas o pagos vencidos
         bool hasOverdueDebt = await _context.Payments
-            .AnyAsync(p => p.User_id == userId && 
+            .AnyAsync(p => p.UserId == userId && 
                           (p.Status == PaymentStatus.OVERDUE || 
                           (p.Status == PaymentStatus.PENDING && DateTime.UtcNow > p.DueDate)));
 

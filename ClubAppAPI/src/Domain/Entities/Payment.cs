@@ -5,12 +5,12 @@ public enum PaymentStatus { COMPLETED, PENDING, FAILED, OVERDUE }
 
 public class Payment : BaseEntity
 {
-    public int User_id { get; set; }
-    public int Member_id { get; set; }
+    public int UserId { get; set; }
+    public int MembershipId { get; set; }
     
     public decimal Amount { get; set; }               // Monto original
     public decimal LateFee { get; set; } = 0m;        // Recargo por mora (10%)
-    public decimal TotalAmount => Amount + LateFee;    // Monto final calculado
+    public decimal TotalAmount => Amount + LateFee;    // Monto final calculated
 
     public PaymentMethod Method { get; set; }
     public PaymentStatus Status { get; set; } = PaymentStatus.PENDING;

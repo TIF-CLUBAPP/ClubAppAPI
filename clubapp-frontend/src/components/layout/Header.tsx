@@ -10,7 +10,7 @@ const greetings = [
 
 export default function Header() {
   const { user } = useAuth();
-  const displayName = user?.name || user?.fullName || user?.email || 'Usuario';
+  const displayName = user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email || 'Usuario' : 'Usuario';
   const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
 
   return (

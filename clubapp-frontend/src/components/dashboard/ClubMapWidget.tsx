@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, Users, Info, Sparkles, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
+import { MapPin, Users, Info, Sparkles, Clock } from 'lucide-react';
 import BookingModal from './BookingModal';
 
 interface Zone {
@@ -21,7 +21,7 @@ const ZONES: Zone[] = [
 ];
 
 export default function ClubMapWidget() {
-  const [selectedZone, setSelectedZone] = useState<Zone | null>(ZONES[0]);
+  const [selectedZone, setSelectedZone] = useState<Zone | undefined>(ZONES[0]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const getStatusBadge = (status: Zone['status']) => {

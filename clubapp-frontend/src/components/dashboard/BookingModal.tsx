@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import type { FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Calendar, Clock, CheckCircle2, Loader2, Sparkles } from 'lucide-react';
 
@@ -12,7 +13,7 @@ export interface Zone {
 
 interface BookingModalProps {
   zoneName?: string;
-  zone?: Zone;
+  zone?: Zone | null;
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: (bookingData: { date: string; slot: string }) => void; // 👈 Callback de éxito
@@ -39,7 +40,7 @@ export default function BookingModal({ zone, zoneName, isOpen, onClose, onSucces
   const title = zoneName || zone?.name || 'Reserva de Cancha';
   const category = zone?.category || 'Instalaciones del Club';
 
-  const handleBooking = async (e: React.FormEvent) => {
+  const handleBooking = async (e: FormEvent) => {
     e.preventDefault();
     if (!selectedSlot) return;
 

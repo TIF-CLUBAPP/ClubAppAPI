@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using ClubApp.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace ClubApp.Infrastructure.Data
 {
@@ -9,7 +10,8 @@ namespace ClubApp.Infrastructure.Data
     {
         public static void Seed(ApplicationContext context)
         {
-            context.Database.EnsureCreated();
+            // Use migrations to ensure schema is up-to-date (prevents divergence between EnsureCreated and migrations)
+            context.Database.Migrate();
 
             // ==========================================
             // 1. SEEDING DE USUARIOS (Sin forzar IDs)
@@ -30,6 +32,9 @@ namespace ClubApp.Infrastructure.Data
                         Email = $"superadmin{i}@clubapp.com",
                         PasswordHash = hashedPassword,
                         Role = UserRole.SUPERADMIN,
+                        Dni = $"1000000{i}", // seed DNI único
+                        Phone = "+54900000000",
+                        BirthDate = new DateTime(1985, 1, 1),
                         CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, DateTimeKind.Utc)
                     });
                 }
@@ -45,6 +50,9 @@ namespace ClubApp.Infrastructure.Data
                         Email = $"profesor{i}@clubapp.com",
                         PasswordHash = hashedPassword,
                         Role = UserRole.ADMIN,
+                        Dni = $"2000000{i}",
+                        Phone = $"+549111000{i:000}",
+                        BirthDate = new DateTime(1990, 1, 1).AddYears(i),
                         CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, DateTimeKind.Utc)
                     });
                 }
@@ -60,6 +68,9 @@ namespace ClubApp.Infrastructure.Data
                         Email = $"usuario{i}@clubapp.com",
                         PasswordHash = hashedPassword,
                         Role = UserRole.MEMBER,
+                        Dni = $"3000000{i}",
+                        Phone = $"+549222000{i:000}",
+                        BirthDate = new DateTime(2000, 1, 1).AddYears(i),
                         CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, DateTimeKind.Utc)
                     });
                 }
@@ -73,11 +84,46 @@ namespace ClubApp.Infrastructure.Data
                     Email = "deudor@clubapp.com",
                     PasswordHash = hashedPassword,
                     Role = UserRole.MEMBER,
+                    Dni = "39999999",
+                    Phone = "+54933333333",
+                    BirthDate = new DateTime(1995, 6, 15),
                     CreatedAt = new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Utc)
                 });
 
-                context.Users.AddRange(users);
-                context.SaveChanges();
+                // Insert each user defensively to avoid UNIQUE constraint failures
+                foreach (var u in users)
+                {
+                    var existsByEmail = context.Users.Any(x => x.Email == u.Email);
+                    var existsByDni = !string.IsNullOrWhiteSpace(u.Dni) && context.Users.Any(x => x.Dni == u.Dni);
+                    if (!existsByEmail && !existsByDni)
+                    {
+                        context.Users.Add(u);
+                    }
+                    else
+                    {
+                        // Si existe por email pero faltan datos, intentar actualizar campos faltantes
+                        var existing = context.Users.FirstOrDefault(x => x.Email == u.Email || (!string.IsNullOrWhiteSpace(u.Dni) && x.Dni == u.Dni));
+                        if (existing != null)
+                        {
+                            // Rellenar solo campos vacíos para no sobreescribir intencionalmente
+                            if (string.IsNullOrWhiteSpace(existing.Dni) && !string.IsNullOrWhiteSpace(u.Dni)) existing.Dni = u.Dni;
+                            if (string.IsNullOrWhiteSpace(existing.Phone) && !string.IsNullOrWhiteSpace(u.Phone)) existing.Phone = u.Phone;
+                            if (existing.BirthDate == null && u.BirthDate != null) existing.BirthDate = u.BirthDate;
+                            if (string.IsNullOrWhiteSpace(existing.PasswordHash) && !string.IsNullOrWhiteSpace(u.PasswordHash)) existing.PasswordHash = u.PasswordHash;
+                            context.Users.Update(existing);
+                        }
+                    }
+                }
+
+                try
+                {
+                    context.SaveChanges();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[DbInitializer] Error guardando usuarios seed: {ex.Message}");
+                    throw;
+                }
             }
 
             // ==========================================
@@ -130,7 +176,7 @@ namespace ClubApp.Infrastructure.Data
                     context.Memberships.AddRange(
                         new Membership
                         {
-                            User_id = userOk.Id,
+                            User = userOk,
                             Status = MembershipStatus.ACTIVE,
                             StartDate = DateTime.UtcNow.AddMonths(-1),
                             EndDate = DateTime.UtcNow.AddMonths(11),
@@ -139,7 +185,7 @@ namespace ClubApp.Infrastructure.Data
                         },
                         new Membership
                         {
-                            User_id = userDebtor.Id,
+                            User = userDebtor,
                             Status = MembershipStatus.INACTIVE,
                             StartDate = DateTime.UtcNow.AddMonths(-3),
                             EndDate = DateTime.UtcNow.AddMonths(9),
@@ -161,16 +207,16 @@ namespace ClubApp.Infrastructure.Data
 
                 if (userOk != null && userDebtor != null)
                 {
-                    var membershipOk = context.Memberships.FirstOrDefault(m => m.User_id == userOk.Id);
-                    var membershipDebtor = context.Memberships.FirstOrDefault(m => m.User_id == userDebtor.Id);
+                    var membershipOk = context.Memberships.FirstOrDefault(m => m.UserId == userOk.Id);
+                    var membershipDebtor = context.Memberships.FirstOrDefault(m => m.UserId == userDebtor.Id);
 
                     if (membershipOk != null && membershipDebtor != null)
                     {
                         context.Payments.AddRange(
                             new Payment
                             {
-                                User_id = userOk.Id,
-                                Member_id = membershipOk.Id,
+                                UserId = userOk.Id,
+                                MembershipId = membershipOk.Id, 
                                 Amount = 15000m,
                                 LateFee = 0m,
                                 Method = PaymentMethod.CASH,
@@ -181,8 +227,8 @@ namespace ClubApp.Infrastructure.Data
                             },
                             new Payment
                             {
-                                User_id = userDebtor.Id,
-                                Member_id = membershipDebtor.Id,
+                                UserId = userDebtor.Id,
+                                MembershipId = membershipDebtor.Id, 
                                 Amount = 15000m,
                                 LateFee = 1500m, // 10% de recargo
                                 Method = PaymentMethod.CASH,

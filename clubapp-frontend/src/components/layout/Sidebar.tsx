@@ -13,12 +13,12 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const role = user?.role ?? 'GUEST';
-  const displayName = user?.name || user?.fullName || user?.email || 'Invitado';
+  const displayName = user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email || 'Invitado' : 'Invitado';
   const initials = displayName
     .split(' ')
     .filter(Boolean)
     .slice(0, 2)
-    .map((word) => word[0].toUpperCase())
+    .map((word: string) => word[0].toUpperCase())
     .join('')
     .slice(0, 2) || displayName.slice(0, 2).toUpperCase();
 

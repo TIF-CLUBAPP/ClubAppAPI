@@ -4,11 +4,11 @@ export const api = axios.create({
   baseURL: 'http://localhost:5236/api',
 });
 
-// Adjunta automáticamente el token a cualquier petición futura
+// Adjunta automÃ¡ticamente el token a cualquier peticiÃ³n futura
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token && config.headers) {
-    config.headers.Authorization = `Bearer ${token}`;
+    config.headers.Authorization = 'Bearer ' + token;
   }
   return config;
 });

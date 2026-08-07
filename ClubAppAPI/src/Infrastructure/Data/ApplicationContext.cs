@@ -19,6 +19,17 @@ namespace ClubApp.Infrastructure.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            // Índice único para DNI
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.Dni)
+                .IsUnique();
+
+            // Configuración explícita de la relación Membership -> User para evitar FKs duplicadas
+            modelBuilder.Entity<Membership>()
+                .HasOne(m => m.User)
+                .WithMany(u => u.Memberships)
+                .HasForeignKey(m => m.UserId);
         }
     }
 }

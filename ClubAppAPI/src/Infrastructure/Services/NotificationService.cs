@@ -18,7 +18,7 @@ public class NotificationService : INotificationService
     public async Task<IEnumerable<Notification>> GetMyNotificationsAsync(int userId)
     {
         return await _context.Notifications
-            .Where(n => n.User_id == userId || n.User_id == null)
+                    .Where(n => n.UserId == userId || n.UserId == null)
             .OrderByDescending(n => n.SentAt)
             .ToListAsync();
     }
@@ -26,7 +26,7 @@ public class NotificationService : INotificationService
     public async Task<IEnumerable<Notification>> GetNotificationsByUserIdAsync(int userId)
     {
         return await _context.Notifications
-            .Where(n => n.User_id == userId)
+                    .Where(n => n.UserId == userId)
             .OrderByDescending(n => n.SentAt)
             .ToListAsync();
     }
@@ -40,7 +40,7 @@ public class NotificationService : INotificationService
     {
         var notification = new Notification
         {
-            User_id = dto.User_id,
+            UserId = dto.UserId,
             Title = dto.Title,
             Message = dto.Message,
             SentAt = DateTime.UtcNow,
@@ -81,7 +81,7 @@ public class NotificationService : INotificationService
         var notification = await _context.Notifications.FindAsync(notificationId);
         if (notification == null) return "NOT_FOUND";
         
-        if (notification.User_id != null && notification.User_id != loggedInUserId) 
+        if (notification.UserId != null && notification.UserId != loggedInUserId) 
             return "NOT_AUTHORIZED";
 
         notification.IsRead = true;

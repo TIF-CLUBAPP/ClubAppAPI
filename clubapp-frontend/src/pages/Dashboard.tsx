@@ -15,7 +15,7 @@ export default function Dashboard() {
 
   // Obtenemos el rol desde el AuthContext (MEMBER, ADMIN, SUPERADMIN)
   const role = user?.role || 'MEMBER';
-  const firstName = user?.name?.split(' ')[0] ?? user?.fullName?.split(' ')[0] ?? 'Usuario';
+  const firstName = user?.firstName ?? user?.fullName?.split(' ')[0] ?? 'Usuario';
 
   // Renderiza la vista completa adaptada al rol
   const renderDashboardByRole = () => {

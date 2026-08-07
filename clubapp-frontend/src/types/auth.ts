@@ -12,8 +12,23 @@ export interface AuthenticationResponse {
 
 export interface User {
   id?: string;
-  name?: string;
+  firstName?: string;
+  lastName?: string;
   fullName?: string;
   email?: string;
   role?: UserRole;
+  dni?: string;
+  phone?: string;
+  birthDate?: string; // ISO date string
+}
+
+export interface RegisterData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  confirmPassword?: string;
+  dni: string;
+  phone: string;
+  birthDate: string; // ISO date
 }

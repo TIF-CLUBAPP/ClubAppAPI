@@ -47,7 +47,7 @@ public class PaymentService : IPaymentService
     {
         var payments = await _context.Payments
             .Include(p => p.Membership)
-            .Where(p => p.Membership.User_id == userId) 
+            .Where(p => p.UserId == userId) 
             .ToListAsync();
 
         CheckAndUpdateOverdueStatus(payments);
@@ -62,7 +62,7 @@ public class PaymentService : IPaymentService
         if (membership == null)
             throw new NotFoundException($"No se encontró la membresía con ID {dto.MembershipId}.");
 
-        if (loggedInUserRole != "ADMIN" && loggedInUserRole != "SUPERADMIN" && membership.User_id != loggedInUserId)
+        if (loggedInUserRole != "ADMIN" && loggedInUserRole != "SUPERADMIN" && membership.UserId != loggedInUserId)
         {
             throw new NotAllowedException("No tienes permisos para pagar esta membresía.");
         }
@@ -71,8 +71,8 @@ public class PaymentService : IPaymentService
 
         var payment = new Payment
         {
-            User_id = membership.User_id,
-            Member_id = dto.MembershipId,
+            UserId = membership.UserId,
+            MembershipId = dto.MembershipId, 
             Amount = membership.MonthlyPrice, 
             DueDate = DateTime.UtcNow.AddDays(10), // Vencimiento a 10 dias por defecto
             PaymentDate = DateTime.UtcNow,

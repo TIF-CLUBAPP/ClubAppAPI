@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationContext))]
-    [Migration("20260628033326_RecreacionUsuarioConHashFijo")]
-    partial class RecreacionUsuarioConHashFijo
+    [Migration("20260807213648_InitialClean")]
+    partial class InitialClean
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -91,22 +91,24 @@ namespace Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTime>("EndTime")
+                    b.Property<DateTime>("EndDate")
                         .HasColumnType("TEXT");
 
                     b.Property<decimal>("MonthlyPrice")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTime>("StartTime")
+                    b.Property<DateTime>("StartDate")
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Status")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("User_id")
+                    b.Property<int>("UserId")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("UserId");
 
                     b.ToTable("Memberships");
                 });
@@ -127,19 +129,17 @@ namespace Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime>("SentAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("UserId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("User_id")
+                    b.Property<int?>("UserId")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("UserId");
 
                     b.ToTable("Notifications");
                 });
@@ -156,12 +156,15 @@ namespace Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime>("DueDate")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ExternalTransactionId")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("Member_id")
-                        .HasColumnType("INTEGER");
+                    b.Property<decimal>("LateFee")
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("MembershipId")
                         .HasColumnType("INTEGER");
@@ -176,9 +179,6 @@ namespace Infrastructure.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("UserId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("User_id")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
@@ -200,7 +200,14 @@ namespace Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("BirthDate")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Dni")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Email")
@@ -209,6 +216,9 @@ namespace Infrastructure.Migrations
 
                     b.Property<string>("FirstName")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("GoogleId")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("LastName")
@@ -222,168 +232,19 @@ namespace Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("Role")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
-                    b.ToTable("Users");
+                    b.HasIndex("Dni")
+                        .IsUnique();
 
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            BadgeNum = "000",
-                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Email = "superadmin1@clubapp.com",
-                            FirstName = "SuperAdmin1",
-                            LastName = "Admin",
-                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
-                            Role = 2
-                        },
-                        new
-                        {
-                            Id = 2,
-                            BadgeNum = "000",
-                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Email = "superadmin2@clubapp.com",
-                            FirstName = "SuperAdmin2",
-                            LastName = "Admin",
-                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
-                            Role = 2
-                        },
-                        new
-                        {
-                            Id = 3,
-                            BadgeNum = "000",
-                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Email = "profesor1@clubapp.com",
-                            FirstName = "Profesor1",
-                            LastName = "Profe",
-                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
-                            Role = 1
-                        },
-                        new
-                        {
-                            Id = 4,
-                            BadgeNum = "000",
-                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Email = "profesor2@clubapp.com",
-                            FirstName = "Profesor2",
-                            LastName = "Profe",
-                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
-                            Role = 1
-                        },
-                        new
-                        {
-                            Id = 5,
-                            BadgeNum = "000",
-                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Email = "profesor3@clubapp.com",
-                            FirstName = "Profesor3",
-                            LastName = "Profe",
-                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
-                            Role = 1
-                        },
-                        new
-                        {
-                            Id = 6,
-                            BadgeNum = "000",
-                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Email = "profesor4@clubapp.com",
-                            FirstName = "Profesor4",
-                            LastName = "Profe",
-                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
-                            Role = 1
-                        },
-                        new
-                        {
-                            Id = 7,
-                            BadgeNum = "000",
-                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Email = "usuario1@clubapp.com",
-                            FirstName = "Usuario1",
-                            LastName = "Member",
-                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
-                            Role = 0
-                        },
-                        new
-                        {
-                            Id = 8,
-                            BadgeNum = "000",
-                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Email = "usuario2@clubapp.com",
-                            FirstName = "Usuario2",
-                            LastName = "Member",
-                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
-                            Role = 0
-                        },
-                        new
-                        {
-                            Id = 9,
-                            BadgeNum = "000",
-                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Email = "usuario3@clubapp.com",
-                            FirstName = "Usuario3",
-                            LastName = "Member",
-                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
-                            Role = 0
-                        },
-                        new
-                        {
-                            Id = 10,
-                            BadgeNum = "000",
-                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Email = "usuario4@clubapp.com",
-                            FirstName = "Usuario4",
-                            LastName = "Member",
-                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
-                            Role = 0
-                        },
-                        new
-                        {
-                            Id = 11,
-                            BadgeNum = "000",
-                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Email = "usuario5@clubapp.com",
-                            FirstName = "Usuario5",
-                            LastName = "Member",
-                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
-                            Role = 0
-                        },
-                        new
-                        {
-                            Id = 12,
-                            BadgeNum = "000",
-                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Email = "usuario6@clubapp.com",
-                            FirstName = "Usuario6",
-                            LastName = "Member",
-                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
-                            Role = 0
-                        },
-                        new
-                        {
-                            Id = 13,
-                            BadgeNum = "000",
-                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Email = "usuario7@clubapp.com",
-                            FirstName = "Usuario7",
-                            LastName = "Member",
-                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
-                            Role = 0
-                        },
-                        new
-                        {
-                            Id = 14,
-                            BadgeNum = "000",
-                            CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Email = "usuario8@clubapp.com",
-                            FirstName = "Usuario8",
-                            LastName = "Member",
-                            PasswordHash = "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S",
-                            Role = 0
-                        });
+                    b.ToTable("Users");
                 });
 
             modelBuilder.Entity("ClubApp.Domain.Entities.Enrollment", b =>
@@ -405,10 +266,10 @@ namespace Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("ClubApp.Domain.Entities.Notification", b =>
+            modelBuilder.Entity("ClubApp.Domain.Entities.Membership", b =>
                 {
                     b.HasOne("ClubApp.Domain.Entities.User", "User")
-                        .WithMany()
+                        .WithMany("Memberships")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -419,7 +280,7 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("ClubApp.Domain.Entities.Payment", b =>
                 {
                     b.HasOne("ClubApp.Domain.Entities.Membership", "Membership")
-                        .WithMany()
+                        .WithMany("Payments")
                         .HasForeignKey("MembershipId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -440,9 +301,16 @@ namespace Infrastructure.Migrations
                     b.Navigation("Enrollments");
                 });
 
+            modelBuilder.Entity("ClubApp.Domain.Entities.Membership", b =>
+                {
+                    b.Navigation("Payments");
+                });
+
             modelBuilder.Entity("ClubApp.Domain.Entities.User", b =>
                 {
                     b.Navigation("Enrollments");
+
+                    b.Navigation("Memberships");
                 });
 #pragma warning restore 612, 618
         }

@@ -37,7 +37,7 @@ public class NotificationsController : ControllerBase
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
 
-        if (userRole != "ADMIN" && userRole != "SUPERADMIN" && notification.User_id.ToString() != userIdClaim)
+        if (userRole != "ADMIN" && userRole != "SUPERADMIN" && notification.UserId.ToString() != userIdClaim)
         {
             return StatusCode(403, "Acceso denegado.");
         }

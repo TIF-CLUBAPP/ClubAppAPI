@@ -36,7 +36,7 @@ public class MembershipService : IMembershipService
     public async Task<Membership?> GetMembershipByUserIdAsync(int userId)
     {
         return await _context.Memberships
-            .Where(m => m.User_id == userId)
+            .Where(m => m.UserId == userId)
             .OrderByDescending(m => m.EndDate) // Cambiado a EndDate
             .FirstOrDefaultAsync();
     }
@@ -53,7 +53,7 @@ public class MembershipService : IMembershipService
         DateTime startTime = DateTime.UtcNow;
 
         var latestMembership = await _context.Memberships
-            .Where(m => m.User_id == dto.UserId && m.Status != MembershipStatus.EXPIRED)
+            .Where(m => m.UserId == dto.UserId && m.Status != MembershipStatus.EXPIRED)
             .OrderByDescending(m => m.EndDate) // Cambiado a EndDate
             .FirstOrDefaultAsync();
 
@@ -66,7 +66,7 @@ public class MembershipService : IMembershipService
 
         var membership = new Membership
         {
-            User_id = dto.UserId,
+            UserId = dto.UserId,
             StartDate = startTime, // Cambiado a StartDate
             EndDate = endTime,     // Cambiado a EndDate
             MonthlyPrice = dto.MonthlyPrice,
@@ -78,7 +78,7 @@ public class MembershipService : IMembershipService
         await _context.SaveChangesAsync();
 
         await _notificationService.CreateNotificationAsync(new CreateNotificationDto {
-            User_id = dto.UserId,
+            UserId = dto.UserId,
             Title = "Membresía Registrada",
             Message = $"Tu membresía fue procesada con éxito. Fecha de vencimiento: {endTime:dd/MM/yyyy}."
         });
@@ -110,7 +110,7 @@ public class MembershipService : IMembershipService
             m.Status = MembershipStatus.EXPIRING;
             
             await _notificationService.CreateNotificationAsync(new CreateNotificationDto {
-                User_id = m.User_id,
+            UserId = m.UserId,
                 Title = "Tu membresía está por vencer",
                 Message = $"Tu acceso al club vencerá en menos de 3 días ({m.EndDate:dd/MM/yyyy}). ¡Renová pronto para evitar cortes en el servicio!" // Cambiado a EndDate
             });
@@ -125,7 +125,7 @@ public class MembershipService : IMembershipService
             m.Status = MembershipStatus.EXPIRED;
 
             await _context.Notifications.AddAsync(new Notification {
-                User_id = m.User_id,
+            UserId = m.UserId,
                 Title = "Membresía Vencida",
                 Message = "Tu membresía ha caducado. Por favor, realizá el pago de la nueva cuota para reactivar tu acceso a las instalaciones.",
                 SentAt = DateTime.UtcNow,

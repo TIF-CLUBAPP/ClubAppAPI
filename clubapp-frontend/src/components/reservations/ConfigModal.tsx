@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import type { FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Settings, Clock, Timer, DollarSign, Save, Sparkles } from 'lucide-react';
 import type { ClubScheduleConfig } from '../../types/reservation';
@@ -16,7 +17,7 @@ export default function ConfigModal({ isOpen, onClose, config, onSave }: ConfigM
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     onSave(formData);
     setSaved(true);

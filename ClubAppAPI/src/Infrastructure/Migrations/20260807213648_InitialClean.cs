@@ -3,12 +3,10 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-#pragma warning disable CA1814 // Prefer jagged arrays over multidimensional
-
 namespace Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class RecreacionUsuarioConHashFijo : Migration
+    public partial class InitialClean : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -32,21 +30,21 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Memberships",
+                name: "Notifications",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "INTEGER", nullable: false)
                         .Annotation("Sqlite:Autoincrement", true),
-                    User_id = table.Column<int>(type: "INTEGER", nullable: false),
-                    Status = table.Column<int>(type: "INTEGER", nullable: false),
-                    StartTime = table.Column<DateTime>(type: "TEXT", nullable: false),
-                    EndTime = table.Column<DateTime>(type: "TEXT", nullable: false),
-                    MonthlyPrice = table.Column<decimal>(type: "TEXT", nullable: false),
+                    UserId = table.Column<int>(type: "INTEGER", nullable: true),
+                    Title = table.Column<string>(type: "TEXT", nullable: false),
+                    Message = table.Column<string>(type: "TEXT", nullable: false),
+                    IsRead = table.Column<bool>(type: "INTEGER", nullable: false),
+                    SentAt = table.Column<DateTime>(type: "TEXT", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Memberships", x => x.Id);
+                    table.PrimaryKey("PK_Notifications", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -60,6 +58,10 @@ namespace Infrastructure.Migrations
                     LastName = table.Column<string>(type: "TEXT", nullable: false),
                     Email = table.Column<string>(type: "TEXT", nullable: false),
                     PasswordHash = table.Column<string>(type: "TEXT", nullable: false),
+                    Dni = table.Column<string>(type: "TEXT", nullable: false),
+                    Phone = table.Column<string>(type: "TEXT", nullable: false),
+                    BirthDate = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    GoogleId = table.Column<string>(type: "TEXT", nullable: true),
                     Role = table.Column<int>(type: "INTEGER", nullable: false),
                     LastPaymentDate = table.Column<DateTime>(type: "TEXT", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false)
@@ -99,23 +101,23 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Notifications",
+                name: "Memberships",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "INTEGER", nullable: false)
                         .Annotation("Sqlite:Autoincrement", true),
-                    User_id = table.Column<int>(type: "INTEGER", nullable: false),
-                    Title = table.Column<string>(type: "TEXT", nullable: false),
-                    Message = table.Column<string>(type: "TEXT", nullable: false),
-                    IsRead = table.Column<bool>(type: "INTEGER", nullable: false),
                     UserId = table.Column<int>(type: "INTEGER", nullable: false),
+                    MonthlyPrice = table.Column<decimal>(type: "TEXT", nullable: false),
+                    Status = table.Column<int>(type: "INTEGER", nullable: false),
+                    StartDate = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    EndDate = table.Column<DateTime>(type: "TEXT", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Notifications", x => x.Id);
+                    table.PrimaryKey("PK_Memberships", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_Notifications_Users_UserId",
+                        name: "FK_Memberships_Users_UserId",
                         column: x => x.UserId,
                         principalTable: "Users",
                         principalColumn: "Id",
@@ -128,15 +130,15 @@ namespace Infrastructure.Migrations
                 {
                     Id = table.Column<int>(type: "INTEGER", nullable: false)
                         .Annotation("Sqlite:Autoincrement", true),
-                    User_id = table.Column<int>(type: "INTEGER", nullable: false),
-                    Member_id = table.Column<int>(type: "INTEGER", nullable: false),
+                    UserId = table.Column<int>(type: "INTEGER", nullable: false),
+                    MembershipId = table.Column<int>(type: "INTEGER", nullable: false),
                     Amount = table.Column<decimal>(type: "TEXT", nullable: false),
+                    LateFee = table.Column<decimal>(type: "TEXT", nullable: false),
                     Method = table.Column<int>(type: "INTEGER", nullable: false),
                     Status = table.Column<int>(type: "INTEGER", nullable: false),
                     ExternalTransactionId = table.Column<string>(type: "TEXT", nullable: false),
+                    DueDate = table.Column<DateTime>(type: "TEXT", nullable: false),
                     PaymentDate = table.Column<DateTime>(type: "TEXT", nullable: false),
-                    UserId = table.Column<int>(type: "INTEGER", nullable: false),
-                    MembershipId = table.Column<int>(type: "INTEGER", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
@@ -156,27 +158,6 @@ namespace Infrastructure.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
-            migrationBuilder.InsertData(
-                table: "Users",
-                columns: new[] { "Id", "BadgeNum", "CreatedAt", "Email", "FirstName", "LastName", "LastPaymentDate", "PasswordHash", "Role" },
-                values: new object[,]
-                {
-                    { 1, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "superadmin1@clubapp.com", "SuperAdmin1", "Admin", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 2 },
-                    { 2, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "superadmin2@clubapp.com", "SuperAdmin2", "Admin", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 2 },
-                    { 3, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "profesor1@clubapp.com", "Profesor1", "Profe", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 1 },
-                    { 4, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "profesor2@clubapp.com", "Profesor2", "Profe", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 1 },
-                    { 5, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "profesor3@clubapp.com", "Profesor3", "Profe", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 1 },
-                    { 6, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "profesor4@clubapp.com", "Profesor4", "Profe", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 1 },
-                    { 7, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "usuario1@clubapp.com", "Usuario1", "Member", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 0 },
-                    { 8, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "usuario2@clubapp.com", "Usuario2", "Member", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 0 },
-                    { 9, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "usuario3@clubapp.com", "Usuario3", "Member", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 0 },
-                    { 10, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "usuario4@clubapp.com", "Usuario4", "Member", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 0 },
-                    { 11, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "usuario5@clubapp.com", "Usuario5", "Member", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 0 },
-                    { 12, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "usuario6@clubapp.com", "Usuario6", "Member", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 0 },
-                    { 13, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "usuario7@clubapp.com", "Usuario7", "Member", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 0 },
-                    { 14, "000", new DateTime(2026, 6, 26, 0, 0, 0, 0, DateTimeKind.Utc), "usuario8@clubapp.com", "Usuario8", "Member", null, "$2a$11$e/y6pI44H6J63P.6lZ2Yte3sQy.l51/2y/GgL2iCg.b.7kQ1W6Z7S", 0 }
-                });
-
             migrationBuilder.CreateIndex(
                 name: "IX_Enrollments_ActivityId",
                 table: "Enrollments",
@@ -188,8 +169,8 @@ namespace Infrastructure.Migrations
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Notifications_UserId",
-                table: "Notifications",
+                name: "IX_Memberships_UserId",
+                table: "Memberships",
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
@@ -201,6 +182,12 @@ namespace Infrastructure.Migrations
                 name: "IX_Payments_UserId",
                 table: "Payments",
                 column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Users_Dni",
+                table: "Users",
+                column: "Dni",
+                unique: true);
         }
 
         /// <inheritdoc />
