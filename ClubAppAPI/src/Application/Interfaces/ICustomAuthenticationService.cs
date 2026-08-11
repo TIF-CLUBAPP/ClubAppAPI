@@ -15,4 +15,8 @@ public interface ICustomAuthenticationService
 
     // Completar perfil para usuarios creados vía Google. Devuelve token JWT si todo OK.
     Task<(bool Success, string? Token, string? ErrorMessage)> CompleteGoogleProfileAsync(ClubApp.Application.Dtos.CompleteProfileDto dto);
+
+    // Recuperación de contraseña
+    Task<(bool Success, string? ErrorMessage)> ForgotPasswordAsync(ClubApp.Application.Dtos.ForgotPasswordDto dto);
+    Task<(bool Success, string? ErrorMessage)> ResetPasswordAsync(ClubApp.Application.Dtos.ResetPasswordDto dto);
 }

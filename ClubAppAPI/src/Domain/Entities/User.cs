@@ -25,6 +25,9 @@ public class User : BaseEntity
     public DateTime? BirthDate { get; set; }
     public string? GoogleId { get; set; } = null;
 
+    public string? PasswordResetToken { get; set; } = null;
+    public DateTime? PasswordResetTokenExpiration { get; set; } = null;
+
     public UserRole Role { get; set; } = UserRole.MEMBER; 
     public DateTime? LastPaymentDate { get; set; }
 

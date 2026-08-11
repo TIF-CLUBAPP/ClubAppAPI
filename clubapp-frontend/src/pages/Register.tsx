@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UserPlus, ArrowLeft } from 'lucide-react';
+import { UserPlus, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
 import { authService } from '../services/authService';
 import type { RegisterData } from '../types/auth';
@@ -22,6 +22,8 @@ export default function Register() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Estado para completar perfil tras Google
   const [requiresCompletion, setRequiresCompletion] = useState(false);
@@ -161,13 +163,43 @@ export default function Register() {
 
           <div>
             <label className="block text-sm text-slate-300">Contraseña</label>
-            <input type="password" className="mt-1 w-full rounded-md p-2 bg-slate-800 text-white" value={form.password} onChange={(e) => handleChange('password', e.target.value)} />
+            <div className="relative flex items-center mt-1">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                className="w-full rounded-md p-2 pr-10 bg-slate-800 text-white border border-slate-700 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                value={form.password}
+                onChange={(e) => handleChange('password', e.target.value)}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-2 p-1 text-slate-400 hover:text-emerald-400 transition-colors focus:outline-none"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
             {errors.password && <p className="text-xs text-rose-400 mt-1">{errors.password}</p>}
           </div>
 
           <div>
             <label className="block text-sm text-slate-300">Confirmar Contraseña</label>
-            <input type="password" className="mt-1 w-full rounded-md p-2 bg-slate-800 text-white" value={form.confirmPassword} onChange={(e) => handleChange('confirmPassword', e.target.value)} />
+            <div className="relative flex items-center mt-1">
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                className="w-full rounded-md p-2 pr-10 bg-slate-800 text-white border border-slate-700 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                value={form.confirmPassword}
+                onChange={(e) => handleChange('confirmPassword', e.target.value)}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-2 p-1 text-slate-400 hover:text-emerald-400 transition-colors focus:outline-none"
+                tabIndex={-1}
+              >
+                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
             {errors.confirmPassword && <p className="text-xs text-rose-400 mt-1">{errors.confirmPassword}</p>}
           </div>
 

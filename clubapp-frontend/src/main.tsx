@@ -4,11 +4,11 @@ import './index.css'
 import App from './App.tsx'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 
-const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <GoogleOAuthProvider clientId={googleClientId ?? ''}>
+    <GoogleOAuthProvider clientId={googleClientId}>
       <App />
     </GoogleOAuthProvider>
   </StrictMode>,

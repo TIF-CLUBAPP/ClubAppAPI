@@ -21,11 +21,13 @@ namespace ClubApp.Infrastructure.Services
     {
         private readonly IUserRepository _userRepository;
         private readonly IConfiguration _configuration;
+        private readonly IEmailService _emailService;
 
-        public AutenticacionService(IUserRepository userRepository, IConfiguration configuration)
+        public AutenticacionService(IUserRepository userRepository, IConfiguration configuration, IEmailService emailService)
         {
             _userRepository = userRepository;
             _configuration = configuration;
+            _emailService = emailService;
         }
 
         public async Task<string?> AuthenticationAsync(AuthenticationRequest request)
@@ -80,7 +82,14 @@ namespace ClubApp.Infrastructure.Services
             GoogleJsonWebSignature.Payload payload;
             try
             {
-                payload = await GoogleJsonWebSignature.ValidateAsync(dto.IdToken);
+                var googleClientId = _configuration["Authentication:Google:ClientId"];
+                var settings = new GoogleJsonWebSignature.ValidationSettings();
+                if (!string.IsNullOrWhiteSpace(googleClientId))
+                {
+                    settings.Audience = new[] { googleClientId };
+                }
+
+                payload = await GoogleJsonWebSignature.ValidateAsync(dto.IdToken, settings);
             }
             catch (Exception ex)
             {
@@ -195,6 +204,67 @@ namespace ClubApp.Infrastructure.Services
             var age = today.Year - birthDate.Value.Date.Year;
             if (birthDate.Value.Date > today.AddYears(-age)) age--;
             return age;
+        }
+
+        public async Task<(bool Success, string? ErrorMessage)> ForgotPasswordAsync(ForgotPasswordDto dto)
+        {
+            var users = await _userRepository.GetAllAsync();
+            var user = users.FirstOrDefault(u => u.Email.Equals(dto.Email, StringComparison.OrdinalIgnoreCase));
+
+            if (user == null)
+            {
+                // Devolver true para no revelar la existencia de emails por motivos de seguridad
+                return (true, null);
+            }
+
+            // Generar token seguro de recuperación
+            var tokenBytes = new byte[32];
+            using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create())
+            {
+                rng.GetBytes(tokenBytes);
+            }
+            string token = Convert.ToHexString(tokenBytes);
+
+            user.PasswordResetToken = token;
+            user.PasswordResetTokenExpiration = DateTime.UtcNow.AddHours(24);
+
+            await _userRepository.UpdateAsync(user);
+
+            string baseUrl = _configuration["FrontendUrl"] ?? "http://localhost:5173";
+            string resetLink = $"{baseUrl}/reset-password?token={Uri.EscapeDataString(token)}&email={Uri.EscapeDataString(user.Email)}";
+
+            await _emailService.SendPasswordResetEmailAsync(user.Email, resetLink);
+
+            return (true, null);
+        }
+
+        public async Task<(bool Success, string? ErrorMessage)> ResetPasswordAsync(ResetPasswordDto dto)
+        {
+            var users = await _userRepository.GetAllAsync();
+            var user = users.FirstOrDefault(u => u.Email.Equals(dto.Email, StringComparison.OrdinalIgnoreCase));
+
+            if (user == null || string.IsNullOrEmpty(user.PasswordResetToken))
+            {
+                return (false, "El token de recuperación es inválido o ha expirado.");
+            }
+
+            if (!string.Equals(user.PasswordResetToken, dto.Token, StringComparison.Ordinal))
+            {
+                return (false, "El token de recuperación es inválido.");
+            }
+
+            if (!user.PasswordResetTokenExpiration.HasValue || user.PasswordResetTokenExpiration.Value < DateTime.UtcNow)
+            {
+                return (false, "El token de recuperación ha expirado.");
+            }
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+            user.PasswordResetToken = null;
+            user.PasswordResetTokenExpiration = null;
+
+            await _userRepository.UpdateAsync(user);
+
+            return (true, null);
         }
     }
 }
