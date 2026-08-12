@@ -36,7 +36,7 @@ public class PaymentsController : ControllerBase
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         var userRoleClaim = User.FindFirst(ClaimTypes.Role)?.Value;
 
-        if (userRoleClaim != "ADMIN" && userRoleClaim != "SUPERADMIN" && payment.Membership?.UserId.ToString() != userIdClaim)
+        if (userRoleClaim != "ADMIN" && userRoleClaim != "SUPERADMIN" && payment.UserId.ToString() != userIdClaim)
         {
             return StatusCode(403, new { message = "No tienes permiso para ver este registro de pago." });
         }

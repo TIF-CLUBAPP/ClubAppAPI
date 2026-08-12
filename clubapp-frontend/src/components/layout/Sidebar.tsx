@@ -6,6 +6,7 @@ import {
   CreditCard, 
   Users, 
   AlertTriangle,
+  DollarSign,
   LogOut 
 } from 'lucide-react';
 
@@ -77,12 +78,16 @@ export default function Sidebar() {
             <Calendar size={18} /> Reservas & Agenda
           </Link>
 
-          {role === 'SUPERADMIN' && (
+          {(role === 'ADMIN' || role === 'SUPERADMIN') && (
             <Link 
               to="/pagos" 
-              className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all"
+              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
+                location.pathname === '/pagos'
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+              }`}
             >
-              <CreditCard size={18} /> Pagos & Cuotas
+              <DollarSign size={18} /> Pagos & Cuotas
             </Link>
           )}
 
@@ -108,7 +113,7 @@ export default function Sidebar() {
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
               }`}
             >
-              <Users size={18} /> Socios & Alumnos
+              <Users size={18} /> Socios
             </Link>
           )}
         </nav>

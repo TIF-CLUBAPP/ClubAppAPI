@@ -37,6 +37,9 @@ public class User : BaseEntity
     // Soft delete: en lugar de borrar físicamente, marcamos al usuario como eliminado.
     public bool IsDeleted { get; set; } = false;
 
+    // Exención de cuotas: si es true, el usuario no genera cuotas mensuales
+    public bool IsExemptFromFees { get; set; } = false;
+
     public virtual ICollection<Enrollment> Enrollments { get; set; } = new List<Enrollment>();
 
     // Relación con membresías

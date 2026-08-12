@@ -126,17 +126,21 @@ function ActionButtons({
         onClick={() => onStatus(item)}
         disabled={disabled}
         title={disabled ? disabledTooltip : item.isActive ? 'Bloquear usuario' : 'Desbloquear usuario'}
-        className={`${baseClass} hover:bg-amber-500/15 hover:text-amber-300`}
+        className={`${baseClass} ${
+          item.isActive
+            ? 'hover:bg-amber-500/15 hover:text-amber-400'
+            : 'hover:bg-emerald-500/15 hover:text-emerald-400'
+        }`}
       >
-        {item.isActive ? <Lock size={16} /> : <LockOpen size={16} />}
+        {item.isActive ? <Lock size={16} className="text-amber-400" /> : <LockOpen size={16} className="text-emerald-400" />}
       </button>
       <button
         onClick={() => onDelete(item)}
         disabled={disabled}
         title={disabled ? disabledTooltip : 'Eliminar usuario'}
-        className={`${baseClass} hover:bg-rose-500/15 hover:text-rose-300`}
+        className={`${baseClass} hover:bg-rose-500/15 hover:text-rose-400`}
       >
-        <Trash2 size={16} />
+        <Trash2 size={16} className="text-rose-400" />
       </button>
     </div>
   );
@@ -313,6 +317,7 @@ function ConfirmModal({
   error,
   onConfirm,
   onClose,
+  confirmColor,
 }: {
   variant: 'warning' | 'danger';
   title: string;
@@ -322,14 +327,18 @@ function ConfirmModal({
   error: string | null;
   onConfirm: () => void;
   onClose: () => void;
+  confirmColor?: 'amber' | 'green' | 'rose';
 }) {
   const isDanger = variant === 'danger';
   const iconBox = isDanger
     ? 'bg-rose-500/10 border-rose-500/20 text-rose-400'
     : 'bg-amber-500/10 border-amber-500/20 text-amber-400';
-  const confirmClass = isDanger
-    ? 'bg-rose-500 hover:bg-rose-400 text-slate-950'
-    : 'bg-amber-500 hover:bg-amber-400 text-slate-950';
+  
+  const getConfirmClass = () => {
+    if (confirmColor === 'green') return 'bg-emerald-500 hover:bg-emerald-400 text-slate-950';
+    if (confirmColor === 'rose') return 'bg-rose-500 hover:bg-rose-400 text-slate-950';
+    return 'bg-amber-500 hover:bg-amber-400 text-slate-950';
+  };
 
   return (
     <ModalShell onClose={onClose}>
@@ -339,7 +348,10 @@ function ConfirmModal({
         </div>
 
         <h3 className="mt-4 text-lg font-black text-white">{title}</h3>
-        <p className="mt-1.5 text-xs text-slate-400 max-w-xs">{description}</p>
+        <div 
+          className="mt-1.5 text-xs text-slate-400 max-w-xs" 
+          dangerouslySetInnerHTML={{ __html: description }}
+        />
 
         {error && (
           <div className="mt-4 w-full flex items-center gap-2 px-4 py-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300 text-left">
@@ -358,7 +370,7 @@ function ConfirmModal({
           <button
             onClick={onConfirm}
             disabled={processing}
-            className={`py-3 rounded-2xl text-sm font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50 ${confirmClass}`}
+            className={`py-3 rounded-2xl text-sm font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50 ${getConfirmClass()}`}
           >
             {processing ? <Loader2 size={15} className="animate-spin" /> : null}
             {confirmLabel}
@@ -410,7 +422,7 @@ export default function Socios() {
       setUsers(list);
     } catch (err) {
       console.error('Error cargando usuarios:', err);
-      setError('No se pudieron cargar los socios y alumnos en este momento.');
+      setError('No se pudieron cargar los socios en este momento.');
     } finally {
       setLoading(false);
     }
@@ -578,7 +590,7 @@ export default function Socios() {
               <AlertTriangle className="mx-auto text-amber-400" size={40} />
               <h2 className="mt-4 text-xl font-black text-white">Acceso restringido</h2>
               <p className="mt-2 text-sm text-slate-400">
-                Solo los administradores pueden gestionar socios y alumnos.
+                Solo los administradores pueden gestionar socios.
               </p>
               <button
                 onClick={() => navigate('/dashboard')}
@@ -593,9 +605,9 @@ export default function Socios() {
               <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <Users size={14} /> Administración · Miembros
+                    <Users size={14} /> Administración · Socios
                   </span>
-                  <h1 className="text-2xl font-black text-white mt-1">Socios &amp; Alumnos</h1>
+                  <h1 className="text-2xl font-black text-white mt-1">Socios</h1>
                   <p className="text-xs text-slate-400">
                     Buscá, filtrá y gestioná los usuarios registrados en el club.
                   </p>
@@ -689,7 +701,7 @@ export default function Socios() {
                 <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-10 text-center">
                   <Loader2 className="mx-auto animate-spin text-emerald-400" size={32} />
                   <p className="mt-3 text-xs text-slate-400 font-medium">
-                    Cargando socios y alumnos...
+                    Cargando socios...
                   </p>
                 </div>
               ) : error ? (
@@ -713,7 +725,7 @@ export default function Socios() {
                   <p className="mt-1 text-xs text-slate-400">
                     {hasFilters
                       ? 'Probá con otros términos de búsqueda o filtros.'
-                      : 'Todavía no hay socios ni alumnos registrados.'}
+                      : 'Todavía no hay socios registrados.'}
                   </p>
                   {hasFilters && (
                     <button
@@ -834,15 +846,16 @@ export default function Socios() {
                 variant="warning"
                 title={
                   statusTarget.isActive
-                    ? `¿Estás seguro de bloquear a ${statusTarget.fullName}?`
-                    : `¿Estás seguro de desbloquear a ${statusTarget.fullName}?`
+                    ? '⚠️ Advertencia de Bloqueo de Cuenta'
+                    : '🔓 Restablecer Acceso de Usuario'
                 }
                 description={
                   statusTarget.isActive
-                    ? 'El usuario no podrá ingresar a la app hasta que sea desbloqueado.'
-                    : 'El usuario volverá a poder ingresar a la app con su cuenta.'
+                    ? `Si bloqueas al usuario <strong>${statusTarget.fullName}</strong>, perderá inmediatamente el acceso a la plataforma y no podrá disfrutar de los beneficios ni reservar instalaciones en el club. ¿Deseas continuar?`
+                    : `¿Deseas desbloquear al usuario <strong>${statusTarget.fullName}</strong>? Al hacerlo, recuperará el acceso a la plataforma y a las actividades del club.`
                 }
-                confirmLabel={statusTarget.isActive ? 'Sí, bloquear' : 'Sí, desbloquear'}
+                confirmLabel={statusTarget.isActive ? 'Confirmar Bloqueo' : 'Confirmar Desbloqueo'}
+                confirmColor={statusTarget.isActive ? 'amber' : 'green'}
                 processing={statusProcessing}
                 error={statusError}
                 onConfirm={confirmStatus}
@@ -856,9 +869,10 @@ export default function Socios() {
             {deleteTarget && (
               <ConfirmModal
                 variant="danger"
-                title={`¿Eliminar definitivamente a ${deleteTarget.fullName}?`}
-                description="Esta acción no se puede deshacer. La cuenta será eliminada y el usuario perderá el acceso a la app."
-                confirmLabel="Eliminar definitivamente"
+                title={`🛑 Confirmación de Eliminación Definitiva`}
+                description={`Atención: Una vez eliminado el usuario <strong>${deleteTarget.fullName}</strong>, esta acción NO se podrá deshacer. Se borrará su cuenta y su historial de forma permanente. ¿Estás seguro de que deseas eliminarlo?`}
+                confirmLabel="Eliminar Definitivamente"
+                confirmColor="rose"
                 processing={deleteProcessing}
                 error={deleteError}
                 onConfirm={confirmDelete}

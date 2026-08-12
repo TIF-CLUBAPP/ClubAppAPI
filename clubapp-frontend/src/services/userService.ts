@@ -8,7 +8,7 @@ export interface GetUsersParams {
 }
 
 export const userService = {
-  /** Lista de socios y alumnos con búsqueda/filtros opcionales (solo ADMIN/SUPERADMIN). */
+  /** Lista de socios con búsqueda/filtros opcionales (solo ADMIN/SUPERADMIN). */
   getUsers: async (params?: GetUsersParams): Promise<UserListItem[]> => {
     const response = await api.get<UserListItem[]>('/users', { params });
     return response.data;

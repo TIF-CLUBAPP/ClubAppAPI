@@ -23,7 +23,7 @@ import Header from '../components/layout/Header';
 import Sidebar from '../components/layout/Sidebar';
 import { useAuth } from '../context/AuthContext';
 import { cuotasService } from '../services/cuotasService';
-import type { CuotaVencida, CuotasVencidasStats } from '../types/cuotas';
+import type { CuotaVencida, CuotasVencidasStats } from '../types/deudores';
 
 const formatNumber = (value: number) => value.toLocaleString('es-AR');
 

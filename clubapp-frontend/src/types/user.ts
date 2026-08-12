@@ -29,7 +29,7 @@ export interface RoleOption {
 export const ROLE_OPTIONS: RoleOption[] = [
   {
     value: 'MEMBER',
-    label: 'Socio / Alumno',
+    label: 'Socio',
     badgeClasses: 'text-slate-200 bg-slate-500/10 border-slate-500/30',
     numeric: 0,
   },

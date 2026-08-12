@@ -7,23 +7,30 @@ namespace ClubApp.Application.Interfaces;
 
 public interface IPaymentService
 {
+    // ========== Pagos básicos ==========
     Task<IEnumerable<Payment>> GetAllPaymentsAsync();
     Task<Payment?> GetByIdAsync(int id);
     Task<IEnumerable<Payment>> GetPaymentsByUserIdAsync(int userId);
     Task<Payment> CreatePaymentAsync(int loggedInUserId, string userRole, CreatePaymentDto dto); 
     Task<string> UpdateStatusAsync(int paymentId, PaymentStatus status);
 
+    // ========== Configuración de cuotas (FeeSettings) ==========
+    Task<FeeSettingsDto> GetFeeSettingsAsync();
+    Task<FeeSettingsDto> UpdateFeeSettingsAsync(UpdateFeeSettingsDto dto);
+
+    // ========== Exenciones ==========
+    Task<ExemptionsResponseDto> GetExemptionsAsync();
+    Task<UserExemptionDto?> ToggleUserExemptionAsync(int userId, bool isExempt);
+    Task<RoleExemptionDto?> ToggleRoleExemptionAsync(string roleName, bool areFeesExempt);
+
+    // ========== Listado de pagos con filtros ==========
+    Task<PagedPaymentsResponseDto> GetPaymentsAsync(PaymentFilterDto filter);
+
+    // ========== Registro manual de pago ==========
+    Task<PaymentDto?> RegisterPaymentAsync(RegisterPaymentDto dto);
+
     // ========== Cuotas vencidas / Gestión de deudores ==========
-
-    /// <summary>Cantidad total de cuotas impagas y monto total adeudado.</summary>
     Task<CuotasVencidasStatsDto> GetOverdueCuotasStatsAsync();
-
-    /// <summary>Lista detallada de socios con cuotas impagas agrupadas por socio.</summary>
     Task<List<CuotaVencidaDto>> GetOverdueCuotasListAsync();
-
-    /// <summary>
-    /// Marca una cuota como pagada (cobro en caja).
-    /// Devuelve "OK", "NOT_FOUND" o "ALREADY_PAID".
-    /// </summary>
     Task<string> RegistrarPagoAsync(int cuotaId);
 }

@@ -33,11 +33,10 @@ public class EnrollmentService : IEnrollmentService
 
     public async Task<string> CreateEnrollmentAsync(int userId, CreateEnrollmentDto dto)
     {
-        // 🛑 REGLA DE NEGOCIO (Módulo 3): Verificar si el usuario registra deudas o pagos vencidos
+        // REGLA DE NEGOCIO (M�dulo 3): Verificar si el usuario registra deudas o pagos vencidos
         bool hasOverdueDebt = await _context.Payments
-            .AnyAsync(p => p.UserId == userId && 
-                          (p.Status == PaymentStatus.OVERDUE || 
-                          (p.Status == PaymentStatus.PENDING && DateTime.UtcNow > p.DueDate)));
+            .AnyAsync(p => p.UserId == userId &&
+                          (p.Status == PaymentStatus.Overdue || p.Status == PaymentStatus.Pending));
 
         if (hasOverdueDebt)
         {
@@ -46,11 +45,11 @@ public class EnrollmentService : IEnrollmentService
 
         var activity = await _context.Activities.FindAsync(dto.ActivityId);
         if (activity == null) return "La actividad no existe.";
-        if (!activity.IsActive) return "La actividad no está disponible.";
+        if (!activity.IsActive) return "La actividad no esta disponible.";
 
         var alreadyEnrolled = await _context.Enrollments
             .AnyAsync(e => e.ActivityId == dto.ActivityId && e.UserId == userId && e.Status == EnrollmentStatus.ACTIVE);
-        if (alreadyEnrolled) return "Ya estás inscrito en esta actividad.";
+        if (alreadyEnrolled) return "Ya estas inscrito en esta actividad.";
 
         var currentReservations = await _context.Enrollments
             .CountAsync(e => e.ActivityId == dto.ActivityId && e.Status == EnrollmentStatus.ACTIVE);
@@ -63,7 +62,7 @@ public class EnrollmentService : IEnrollmentService
             ActivityId = dto.ActivityId,
             EnrollmentDate = DateTime.UtcNow,
             Status = EnrollmentStatus.ACTIVE,
-            CreatedAt = DateTime.UtcNow 
+            CreatedAt = DateTime.UtcNow
         };
 
         await _context.Enrollments.AddAsync(enrollment);

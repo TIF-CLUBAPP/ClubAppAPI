@@ -34,27 +34,25 @@ public class DashboardRepository : IDashboardRepository
             .Distinct()
             .CountAsync();
 
-        // 4. Recaudación del mes: suma de pagos COMPLETED del mes en curso.
-        //    Se usa (Amount + LateFee) en vez de TotalAmount porque TotalAmount es
-        //    una propiedad calculada que EF Core no puede traducir a SQL en SQLite.
+        // 4. Recaudación del mes: suma de pagos Paid del mes en curso.
         var monthlyRevenue = await _context.Payments
-            .Where(p => p.PaymentDate >= monthStart && p.Status == PaymentStatus.COMPLETED)
-            .SumAsync(p => p.Amount + p.LateFee);
+            .Where(p => p.PaymentDate >= monthStart && p.Status == PaymentStatus.Paid)
+            .SumAsync(p => p.Amount + p.LateFeeApplied);
 
         // 5. Total emitido del mes (para calcular el % cobrado)
         var monthlyIssued = await _context.Payments
             .Where(p => p.PaymentDate >= monthStart)
-            .SumAsync(p => p.Amount + p.LateFee);
+            .SumAsync(p => p.Amount + p.LateFeeApplied);
 
         // 6. Cuotas vencidas: cantidad y monto total adeudado.
-        //    Se consideran OVERDUE o PENDING cuyo vencimiento ya pasó (misma regla que /api/cuotas/vencidas).
+        //    Se consideran Overdue o Pending (misma regla que /api/cuotas/vencidas).
         var overduePayments = await _context.Payments
-            .Where(p => p.Status == PaymentStatus.OVERDUE || (p.Status == PaymentStatus.PENDING && p.DueDate < now))
-            .Select(p => new { p.Amount, p.LateFee })
+            .Where(p => p.Status == PaymentStatus.Overdue || p.Status == PaymentStatus.Pending)
+            .Select(p => new { p.Amount, p.LateFeeApplied })
             .ToListAsync();
 
         var cuotasVencidas = overduePayments.Count;
-        var montoTotalDeuda = overduePayments.Sum(p => p.Amount + p.LateFee);
+        var montoTotalDeuda = overduePayments.Sum(p => p.Amount + p.LateFeeApplied);
 
         var collectedPercentage = monthlyIssued > 0
             ? Math.Round(monthlyRevenue / monthlyIssued * 100m, 0)

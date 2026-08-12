@@ -212,28 +212,29 @@ namespace ClubApp.Infrastructure.Data
 
                     if (membershipOk != null && membershipDebtor != null)
                     {
+                        string periodOk = $"{DateTime.UtcNow.AddMonths(-1):MM/yyyy}";
+                        string periodDebtor = $"{DateTime.UtcNow.AddMonths(-2):MM/yyyy}";
+                        
                         context.Payments.AddRange(
                             new Payment
                             {
                                 UserId = userOk.Id,
-                                MembershipId = membershipOk.Id, 
+                                Period = periodOk,
                                 Amount = 15000m,
-                                LateFee = 0m,
-                                Method = PaymentMethod.CASH,
-                                Status = PaymentStatus.COMPLETED,
-                                DueDate = DateTime.UtcNow.AddDays(15),
+                                LateFeeApplied = 0m,
+                                PaymentMethod = "CASH",
+                                Status = PaymentStatus.Paid,
                                 PaymentDate = DateTime.UtcNow.AddDays(-5),
                                 CreatedAt = DateTime.UtcNow.AddDays(-5)
                             },
                             new Payment
                             {
                                 UserId = userDebtor.Id,
-                                MembershipId = membershipDebtor.Id, 
+                                Period = periodDebtor,
                                 Amount = 15000m,
-                                LateFee = 1500m, // 10% de recargo
-                                Method = PaymentMethod.CASH,
-                                Status = PaymentStatus.OVERDUE,
-                                DueDate = DateTime.UtcNow.AddMonths(-2),
+                                LateFeeApplied = 1500m, // 10% de recargo
+                                PaymentMethod = "CASH",
+                                Status = PaymentStatus.Overdue,
                                 PaymentDate = DateTime.UtcNow.AddMonths(-2),
                                 CreatedAt = DateTime.UtcNow.AddMonths(-2)
                             }
