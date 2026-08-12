@@ -3,11 +3,13 @@ import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UserPlus, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
+import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/authService';
 import type { RegisterData } from '../types/auth';
 
 export default function Register() {
   const navigate = useNavigate();
+  const { setSession } = useAuth();
 
   const [form, setForm] = useState<RegisterData>({
     firstName: '',
@@ -81,7 +83,7 @@ export default function Register() {
         setRequiresCompletion(true);
         setGoogleUserId(res.userId ?? null);
       } else if (res.token) {
-        localStorage.setItem('token', res.token);
+        setSession(res.token, res.user ?? null);
         navigate('/dashboard');
       }
     } catch (err: any) {
@@ -89,7 +91,7 @@ export default function Register() {
     }
   };
 
-  const handleGoogleFailure = (e: any) => {
+  const handleGoogleFailure = () => {
     setErrors({ form: 'Fallo en autenticación con Google.' });
   };
 
@@ -99,7 +101,7 @@ export default function Register() {
       const res = await authService.completeGoogleProfile({ userId: googleUserId, dni, phone, birthDate });
       setRequiresCompletion(false);
       if (res.token) {
-        localStorage.setItem('token', res.token);
+        setSession(res.token, res.user ?? null);
         navigate('/dashboard');
       } else {
         navigate('/login');
@@ -205,14 +207,14 @@ export default function Register() {
 
           {errors.form && <p className="text-sm text-rose-400">{errors.form}</p>}
 
-          <button disabled={loading} type="submit" className="w-full py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-semibold">
+          <button disabled={loading} type="submit" className="w-full py-3 rounded-2xl bg-linear-to-r from-emerald-500 to-teal-500 text-slate-950 font-semibold">
             Crear cuenta
           </button>
 
           <div className="text-center text-sm text-slate-300">O registrate con</div>
 
           <div className="flex justify-center">
-            <GoogleLogin onSuccess={(res: any) => handleGoogleSuccess(res)} onError={(err: any) => handleGoogleFailure(err)} />
+            <GoogleLogin onSuccess={(res: any) => handleGoogleSuccess(res)} onError={handleGoogleFailure} />
           </div>
 
           <div className="flex gap-3">

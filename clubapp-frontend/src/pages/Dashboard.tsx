@@ -10,12 +10,13 @@ import AdminDashboard from '../components/dashboard/views/AdminDashboard';
 import MemberDashboard from '../components/dashboard/views/MemberDashboard';
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   // Obtenemos el rol desde el AuthContext (MEMBER, ADMIN, SUPERADMIN)
   const role = user?.role || 'MEMBER';
-  const firstName = user?.firstName ?? user?.fullName?.split(' ')[0] ?? 'Usuario';
+  const firstName =
+    user?.firstName ?? user?.fullName?.split(' ')[0] ?? user?.email?.split('@')[0] ?? 'Usuario';
 
   // Renderiza la vista completa adaptada al rol
   const renderDashboardByRole = () => {
@@ -42,7 +43,7 @@ export default function Dashboard() {
 
         {/* 3. Vista dinámica según el Rol (incluye los widgets y las métricas) */}
         <main className="flex-1 p-6 md:p-8 overflow-y-auto">
-          {user ? (
+          {isAuthenticated ? (
             <div className="space-y-6">
               <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6">
                 <h1 className="text-3xl font-extrabold text-white sm:text-4xl">Bienvenido, {firstName}</h1>

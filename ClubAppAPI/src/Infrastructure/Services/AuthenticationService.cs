@@ -30,7 +30,7 @@ namespace ClubApp.Infrastructure.Services
             _emailService = emailService;
         }
 
-        public async Task<string?> AuthenticationAsync(AuthenticationRequest request)
+        public async Task<(string? Token, User? User)> AuthenticationAsync(AuthenticationRequest request)
         {
             var users = await _userRepository.GetAllAsync();
 
@@ -39,10 +39,17 @@ namespace ClubApp.Infrastructure.Services
             if (user == null || string.IsNullOrEmpty(user.PasswordHash) || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             {
                 System.Diagnostics.Debug.WriteLine("Intento de inicio de sesión fallido: Credenciales inválidas.");
-                return null;
+                return (null, null);
             }
 
-            return GenerateToken(user);
+            // Cuentas bloqueadas o eliminadas no pueden iniciar sesión
+            if (!user.IsActive || user.IsDeleted)
+            {
+                System.Diagnostics.Debug.WriteLine("Intento de inicio de sesión fallido: Cuenta bloqueada o eliminada.");
+                return (null, null);
+            }
+
+            return (GenerateToken(user), user);
         }
 
         public async Task<(bool Success, string? ErrorMessage)> RegisterAsync(UserRegisterDto dto)
@@ -77,7 +84,7 @@ namespace ClubApp.Infrastructure.Services
             return (true, null);
         }
 
-        public async Task<(bool Success, string? Token, bool RequiresProfileCompletion, int? UserId, string? ErrorMessage)> GoogleSignInAsync(GoogleAuthDto dto)
+        public async Task<(bool Success, string? Token, bool RequiresProfileCompletion, int? UserId, User? User, string? ErrorMessage)> GoogleSignInAsync(GoogleAuthDto dto)
         {
             GoogleJsonWebSignature.Payload payload;
             try
@@ -93,12 +100,12 @@ namespace ClubApp.Infrastructure.Services
             }
             catch (Exception ex)
             {
-                return (false, null, false, null, $"Token de Google inválido: {ex.Message}");
+                return (false, null, false, null, null, $"Token de Google inválido: {ex.Message}");
             }
 
             if (string.IsNullOrEmpty(payload?.Email))
             {
-                return (false, null, false, null, "El token de Google no contiene correo electrónico.");
+                return (false, null, false, null, null, "El token de Google no contiene correo electrónico.");
             }
 
             var existing = await _userRepository.GetUserByEmail(payload.Email);
@@ -114,12 +121,12 @@ namespace ClubApp.Infrastructure.Services
                 // Si faltan datos personales requeridos, indicar completion
                 if (string.IsNullOrEmpty(existing.Dni) || string.IsNullOrEmpty(existing.Phone) || !existing.BirthDate.HasValue)
                 {
-                    return (true, null, true, existing.Id, null);
+                    return (true, null, true, existing.Id, existing, null);
                 }
 
                 // Generar token
                 var token = GenerateToken(existing);
-                return (true, token, false, existing.Id, null);
+                return (true, token, false, existing.Id, existing, null);
             }
 
             // Crear usuario base
@@ -136,21 +143,21 @@ namespace ClubApp.Infrastructure.Services
             await _userRepository.AddAsync(newUser);
 
             // Indicar que se requiere completar perfil y devolver Id
-            return (true, null, true, newUser.Id, null);
+            return (true, null, true, newUser.Id, newUser, null);
         }
 
-        public async Task<(bool Success, string? Token, string? ErrorMessage)> CompleteGoogleProfileAsync(CompleteProfileDto dto)
+        public async Task<(bool Success, string? Token, User? User, string? ErrorMessage)> CompleteGoogleProfileAsync(CompleteProfileDto dto)
         {
             // Política: permitir completar perfil aunque sea menor de edad. Restricción de suscripciones se manejará en endpoints de pago.
 
             var user = await _userRepository.GetByIdAsync(dto.UserId);
-            if (user == null) return (false, null, "Usuario no encontrado.");
+            if (user == null) return (false, null, null, "Usuario no encontrado.");
 
             // Validar que el DNI no esté registrado por otro usuario
             var users = await _userRepository.GetAllAsync();
             if (users.Any(u => u.Dni == dto.Dni && u.Id != dto.UserId))
             {
-                return (false, null, "El DNI ya está registrado por otro usuario.");
+                return (false, null, null, "El DNI ya está registrado por otro usuario.");
             }
 
             user.Dni = dto.Dni;
@@ -161,7 +168,7 @@ namespace ClubApp.Infrastructure.Services
 
             // Generar token para iniciar sesión automático tras completar perfil
             var token = GenerateToken(user);
-            return (true, token, null);
+            return (true, token, user, null);
         }
 
         private string? GenerateToken(User user)

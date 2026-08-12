@@ -18,17 +18,22 @@ public class UserService : IUserService
         _userRepository = userRepository;
     }
 
-    public async Task<IEnumerable<UserDto>> GetAllUsersAsync()
+    public async Task<IEnumerable<UserDto>> GetAllUsersAsync(string? searchQuery = null, UserRole? role = null, bool? isActive = null)
     {
-        var users = await _userRepository.GetAllAsync();
+        var users = await _userRepository.GetFilteredAsync(searchQuery, role, isActive);
 
         return users.Select(u => new UserDto
         {
             Id = u.Id,
             FirstName = u.FirstName,
             LastName = u.LastName,
+            FullName = u.FullName,
             Email = u.Email,
+            Dni = u.Dni,
+            Phone = u.Phone,
+            BirthDate = u.BirthDate,
             Role = u.Role,
+            IsActive = u.IsActive,
             BadgeNum = u.BadgeNum,
             CreatedAt = u.CreatedAt,
         }).ToList();
@@ -47,8 +52,13 @@ public class UserService : IUserService
             Id = user.Id,
             FirstName = user.FirstName,
             LastName = user.LastName,
+            FullName = user.FullName,
             Email = user.Email,
+            Dni = user.Dni,
+            Phone = user.Phone,
+            BirthDate = user.BirthDate,
             Role = user.Role,
+            IsActive = user.IsActive,
             BadgeNum = user.BadgeNum,
             CreatedAt = user.CreatedAt
         };
@@ -118,7 +128,23 @@ public class UserService : IUserService
             throw new NotFoundException("User", id);
         }
 
-        await _userRepository.DeleteAsync(id);
+        // Soft delete: conservamos el registro para no romper referencias (enrollments,
+        // memberships, pagos), pero el usuario deja de aparecer en la gestión.
+        user.IsDeleted = true;
+        user.IsActive = false;
+
+        await _userRepository.UpdateAsync(user);
+        return true;
+    }
+
+    public async Task<bool> SetUserStatusAsync(int id, bool isActive)
+    {
+        var user = await _userRepository.GetByIdAsync(id);
+        if (user == null) return false;
+
+        user.IsActive = isActive;
+
+        await _userRepository.UpdateAsync(user);
         return true;
     }
 

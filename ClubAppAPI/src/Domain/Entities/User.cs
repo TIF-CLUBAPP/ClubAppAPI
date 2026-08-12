@@ -31,6 +31,12 @@ public class User : BaseEntity
     public UserRole Role { get; set; } = UserRole.MEMBER; 
     public DateTime? LastPaymentDate { get; set; }
 
+    // Estado de la cuenta: permite deshabilitar el acceso sin eliminar el registro.
+    public bool IsActive { get; set; } = true;
+
+    // Soft delete: en lugar de borrar físicamente, marcamos al usuario como eliminado.
+    public bool IsDeleted { get; set; } = false;
+
     public virtual ICollection<Enrollment> Enrollments { get; set; } = new List<Enrollment>();
 
     // Relación con membresías

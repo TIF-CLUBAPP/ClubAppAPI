@@ -30,7 +30,7 @@ export default function Login() {
       }, 1000);
 
     } catch (err: any) {
-      const msg = err.response?.data?.message || err.response?.data?.title || 'No se pudo conectar con el servidor.';
+      const msg = err.response?.data?.message || err.response?.data?.title || err.message || 'No se pudo conectar con el servidor.';
       setError(msg);
     } finally {
       setLoading(false);
@@ -134,7 +134,7 @@ export default function Login() {
             disabled={loading || success}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold rounded-xl shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+            className="w-full py-3.5 px-4 bg-linear-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold rounded-xl shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
           >
             {loading ? (
               <Loader2 className="animate-spin" size={20} />

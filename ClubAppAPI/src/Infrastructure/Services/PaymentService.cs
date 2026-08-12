@@ -4,6 +4,7 @@ using ClubApp.Application.Dtos;
 using ClubApp.Domain.Entities;
 using ClubApp.Domain.Exceptions;
 using ClubApp.Infrastructure.Data;
+using System.Globalization;
 
 namespace ClubApp.Infrastructure.Services;
 
@@ -127,5 +128,111 @@ public class PaymentService : IPaymentService
                 payment.LateFee = payment.Amount * 0.10m; // Recargo automatico del 10%
             }
         }
+    }
+
+    // ==============================================================
+    // Cuotas vencidas / Gestión de deudores
+    // ==============================================================
+
+    public async Task<CuotasVencidasStatsDto> GetOverdueCuotasStatsAsync()
+    {
+        var now = DateTime.UtcNow;
+
+        var overdue = await _context.Payments
+            .Where(p => p.Status == PaymentStatus.OVERDUE || (p.Status == PaymentStatus.PENDING && p.DueDate < now))
+            .Select(p => new { p.Amount, p.LateFee })
+            .ToListAsync();
+
+        return new CuotasVencidasStatsDto
+        {
+            TotalCuotasVencidas = overdue.Count,
+            MontoTotalDeuda = overdue.Sum(p => p.Amount + p.LateFee)
+        };
+    }
+
+    public async Task<List<CuotaVencidaDto>> GetOverdueCuotasListAsync()
+    {
+        var now = DateTime.UtcNow;
+
+        var overduePayments = await _context.Payments
+            .Include(p => p.User)
+            .Where(p => p.Status == PaymentStatus.OVERDUE || (p.Status == PaymentStatus.PENDING && p.DueDate < now))
+            .OrderBy(p => p.User.LastName)
+            .ThenBy(p => p.User.FirstName)
+            .ThenBy(p => p.DueDate)
+            .ToListAsync();
+
+        return overduePayments
+            .GroupBy(p => p.UserId)
+            .Select(g =>
+            {
+                var user = g.First().User;
+                var maxDueDate = g.Max(p => p.DueDate);
+                var totalAdeudado = g.Sum(p => p.Amount + p.LateFee);
+
+                return new CuotaVencidaDto
+                {
+                    SocioId = user.Id,
+                    Nombre = user.FirstName,
+                    Apellido = user.LastName,
+                    Email = user.Email,
+                    Telefono = user.Phone,
+                    Dni = user.Dni,
+                    CantidadCuotasImpagas = g.Count(),
+                    PeriodosVencidos = g
+                        .OrderBy(p => p.DueDate)
+                        .Select(p => FormatPeriodo(p.DueDate))
+                        .ToList(),
+                    MontoTotalAdeudado = totalAdeudado,
+                    DiasDeAtraso = Math.Max(0, (int)(now.Date - maxDueDate.Date).TotalDays),
+                    PaymentIds = g.Select(p => p.Id).OrderBy(id => id).ToList()
+                };
+            })
+            .OrderByDescending(d => d.MontoTotalAdeudado)
+            .ToList();
+    }
+
+    public async Task<string> RegistrarPagoAsync(int cuotaId)
+    {
+        var payment = await _context.Payments
+            .Include(p => p.Membership)
+            .FirstOrDefaultAsync(p => p.Id == cuotaId);
+
+        if (payment == null) return "NOT_FOUND";
+        if (payment.Status == PaymentStatus.COMPLETED) return "ALREADY_PAID";
+
+        var now = DateTime.UtcNow;
+
+        // Si la cuota está vencida y aún no tiene recargo, se liquida con el 10% de mora
+        if (now > payment.DueDate && payment.LateFee == 0m)
+        {
+            payment.LateFee = payment.Amount * 0.10m;
+        }
+
+        payment.Status = PaymentStatus.COMPLETED;
+        payment.PaymentDate = now;
+
+        if (payment.Membership != null)
+        {
+            payment.Membership.Status = MembershipStatus.ACTIVE;
+        }
+
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == payment.UserId);
+        if (user != null)
+        {
+            user.LastPaymentDate = now;
+        }
+
+        await _context.SaveChangesAsync();
+        return "OK";
+    }
+
+    // Ej: "Julio 2026"
+    private static string FormatPeriodo(DateTime dueDate)
+    {
+        var culture = CultureInfo.GetCultureInfo("es-AR");
+        var monthName = culture.DateTimeFormat.GetMonthName(dueDate.Month);
+        var capitalized = char.ToUpperInvariant(monthName[0]) + monthName.Substring(1);
+        return $"{capitalized} {dueDate.Year}";
     }
 }

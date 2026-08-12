@@ -1,13 +1,14 @@
 using ClubApp.Application.Dtos;
 using ClubApp.Application.DTOs;
 using ClubApp.Application.Models.Request;
+using ClubApp.Domain.Entities;
 using ClubApp.Models.DTOs;
 
 namespace ClubApp.Application.Interfaces;
 
 public interface IUserService
 {
-    Task<IEnumerable<UserDto>> GetAllUsersAsync();
+    Task<IEnumerable<UserDto>> GetAllUsersAsync(string? searchQuery = null, UserRole? role = null, bool? isActive = null);
     Task<UserDto> GetUserByIdAsync(int id);
     Task<UserDto> CreateUserAsync(UserRegisterDto userDto); 
     Task<bool> UpdateUserAsync(int id, UserDto userDto);
@@ -15,4 +16,5 @@ public interface IUserService
     Task<bool> UpdateBasicInfoAsync(int id, UpdateUserBasicRequest request);
     Task<bool> ChangePasswordAsync(int id, ChangePasswordDto dto);
     Task<bool> UpdateUserRoleAsync(int id, UpdateRoleDto dto);
+    Task<bool> SetUserStatusAsync(int id, bool isActive);
 }

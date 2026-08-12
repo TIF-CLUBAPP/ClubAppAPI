@@ -5,11 +5,12 @@ import {
   Calendar, 
   CreditCard, 
   Users, 
+  AlertTriangle,
   LogOut 
 } from 'lucide-react';
 
 export default function Sidebar() {
-  const { user, logout } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const role = user?.role ?? 'GUEST';
@@ -85,10 +86,27 @@ export default function Sidebar() {
             </Link>
           )}
 
+          {role === 'SUPERADMIN' && (
+            <Link
+              to="/deudores"
+              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
+                location.pathname === '/deudores'
+                  ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+              }`}
+            >
+              <AlertTriangle size={18} /> Deudores & Cuotas
+            </Link>
+          )}
+
           {(role === 'ADMIN' || role === 'SUPERADMIN') && (
             <Link 
               to="/socios" 
-              className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all"
+              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
+                location.pathname === '/socios'
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+              }`}
             >
               <Users size={18} /> Socios & Alumnos
             </Link>
@@ -98,7 +116,7 @@ export default function Sidebar() {
 
       {/* Tarjeta Perfil & Logout */}
       <div className="pt-4 border-t border-slate-800/80">
-        {user ? (
+        {isAuthenticated ? (
             <>
               <div className="flex items-center gap-3 px-2 mb-3">
                 <div className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-emerald-400 font-bold text-xs shrink-0">

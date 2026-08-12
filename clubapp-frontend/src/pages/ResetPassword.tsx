@@ -101,7 +101,7 @@ export default function ResetPassword() {
             </div>
           </div>
 
-          <motion.button type="submit" disabled={loading || success} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50">
+          <motion.button type="submit" disabled={loading || success} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="w-full py-3.5 px-4 bg-linear-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50">
             {loading ? <Loader2 className="animate-spin" size={20} /> : <span>Restablecer Contraseña</span>}
           </motion.button>
 

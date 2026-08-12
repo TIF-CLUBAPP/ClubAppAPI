@@ -12,6 +12,7 @@ var dbPath = args[0];
 var createIndex = args.Length > 1 && args[1].Equals("createIndex", StringComparison.OrdinalIgnoreCase);
 var addColumns = args.Length > 1 && args[1].Equals("addColumns", StringComparison.OrdinalIgnoreCase);
 var addColumnsAndCreate = args.Length > 1 && args[1].Equals("addColumnsAndCreate", StringComparison.OrdinalIgnoreCase);
+var purgeDeleted = args.Length > 1 && args[1].Equals("purgeDeleted", StringComparison.OrdinalIgnoreCase);
 
 var connString = $"Data Source={dbPath}";
 
@@ -19,6 +20,18 @@ using var conn = new SqliteConnection(connString);
 conn.Open();
 
 Console.WriteLine($"Connected to DB: {dbPath}");
+
+// Purge fisico de filas con soft delete (IsDeleted = 1)
+if (purgeDeleted)
+{
+    using (var cmd = conn.CreateCommand())
+    {
+        cmd.CommandText = "DELETE FROM Users WHERE IsDeleted = 1;";
+        var affected = cmd.ExecuteNonQuery();
+        Console.WriteLine($"Purgadas {affected} fila(s) con soft delete en Users.");
+    }
+    return;
+}
 
 // Print existing tables/indexes
 using (var tcmd = conn.CreateCommand())

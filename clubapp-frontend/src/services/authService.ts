@@ -1,5 +1,5 @@
 import { api } from './api';
-import type { AuthenticationRequest, AuthenticationResponse, RegisterData } from '../types/auth';
+import type { AuthenticationRequest, AuthenticationResponse, RegisterData, User } from '../types/auth';
 
 export const authService = {
   login: async (credentials: AuthenticationRequest): Promise<AuthenticationResponse> => {
@@ -14,12 +14,12 @@ export const authService = {
 
   googleSignIn: async (idToken: string) => {
     const response = await api.post('/auth/google', { idToken });
-    return response.data as { token?: string; requiresProfileCompletion?: boolean; userId?: number };
+    return response.data as { token?: string; requiresProfileCompletion?: boolean; userId?: number; user?: User };
   },
 
   completeGoogleProfile: async (payload: { userId: number; dni: string; phone: string; birthDate: string }) => {
     const response = await api.post('/auth/complete-google-profile', payload);
-    return response.data as { message?: string; token?: string };
+    return response.data as { message?: string; token?: string; user?: User };
   },
 
   forgotPassword: async (email: string) => {

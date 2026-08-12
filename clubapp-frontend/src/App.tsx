@@ -7,6 +7,8 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import Reservations from './pages/Reservations'; 
+import Deudores from './pages/Deudores';
+import Socios from './pages/Socios';
 
 export default function App() {
   return (
@@ -23,6 +25,8 @@ export default function App() {
           {/* Rutas Protegidas (Requieren Token) */}
           <Route element={<ProtectedRoute />}>
             <Route path="/reservas" element={<Reservations />} /> 
+            <Route path="/deudores" element={<Deudores />} />
+            <Route path="/socios" element={<Socios />} />
           </Route>
 
           {/* Redirección comodín */}

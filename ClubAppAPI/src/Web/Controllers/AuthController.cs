@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Dtos;
+using ClubApp.Domain.Entities;
 
 namespace ClubApp.Web.Controllers;
 
@@ -33,10 +34,16 @@ public class AuthController : ControllerBase
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
 
-        var (success, token, requiresCompletion, userId, error) = await _authService.GoogleSignInAsync(dto);
+        var (success, token, requiresCompletion, userId, user, error) = await _authService.GoogleSignInAsync(dto);
         if (!success) return BadRequest(new { message = error });
 
-        return Ok(new { token, requiresProfileCompletion = requiresCompletion, userId });
+        return Ok(new
+        {
+            token,
+            requiresProfileCompletion = requiresCompletion,
+            userId,
+            user = user == null ? null : MapUser(user)
+        });
     }
 
     [HttpPost("complete-google-profile")]
@@ -44,10 +51,15 @@ public class AuthController : ControllerBase
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
 
-        var (success, token, error) = await _authService.CompleteGoogleProfileAsync(dto);
+        var (success, token, user, error) = await _authService.CompleteGoogleProfileAsync(dto);
         if (!success) return BadRequest(new { message = error });
 
-        return Ok(new { message = "Perfil completado correctamente.", token });
+        return Ok(new
+        {
+            message = "Perfil completado correctamente.",
+            token,
+            user = user == null ? null : MapUser(user)
+        });
     }
 
     [HttpPost("forgot-password")]
@@ -70,5 +82,21 @@ public class AuthController : ControllerBase
         if (!success) return BadRequest(new { message = error });
 
         return Ok(new { message = "La contraseña ha sido restablecida con éxito." });
+    }
+
+    private static object MapUser(User user)
+    {
+        return new
+        {
+            id = user.Id,
+            firstName = user.FirstName,
+            lastName = user.LastName,
+            fullName = user.FullName,
+            email = user.Email,
+            role = user.Role.ToString(),
+            dni = user.Dni,
+            phone = user.Phone,
+            birthDate = user.BirthDate
+        };
     }
 }

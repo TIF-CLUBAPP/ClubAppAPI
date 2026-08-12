@@ -1,6 +1,6 @@
 import ClubMapWidget from '../ClubMapWidget';
 import WeatherWidget from '../WeatherWidget';
-import { CreditCard, CalendarCheck, ArrowRight, ShieldCheck } from 'lucide-react';
+import { CreditCard, CalendarCheck, ArrowRight } from 'lucide-react';
 
 export default function MemberDashboard() {
   return (
