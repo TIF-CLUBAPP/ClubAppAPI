@@ -10,14 +10,6 @@ import type {
   Payment
 } from '../types/cuotas';
 
-export interface PaymentFilter {
-  status?: string;
-  search?: string;
-  period?: string;
-  page?: number;
-  pageSize?: number;
-}
-
 export const paymentsService = {
   // ========== Configuración de cuotas ==========
   /** Obtener configuración actual de cuotas (GET /api/payments/settings) */

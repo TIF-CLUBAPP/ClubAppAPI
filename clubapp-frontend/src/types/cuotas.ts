@@ -2,6 +2,7 @@
 export interface FeeSettings {
   baseFeeAmount: number;
   lateFeePercentage: number;
+  lateFeeType: 'percentage' | 'fixed';
   dueDayOfMonth: number;
 }
 
@@ -56,3 +57,33 @@ export interface RegisterPaymentRequest {
   paymentMethod: string;
   amount: number;
 }
+
+export interface PaymentFilter {
+  status?: string;
+  search?: string;
+  period?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+
+// Estadísticas de deuda
+export interface CuotasVencidasStats {
+  totalCuotasVencidas: number;
+  montoTotalDeuda: number;
+}
+
+export interface CuotaVencida {
+  socioId: number;
+  nombre: string;
+  apellido: string;
+  email: string;
+  telefono: string;
+  dni: string;
+  cantidadCuotasImpagas: number;
+  periodosVencidos: string[];
+  montoTotalAdeudado: number;
+  diasDeAtraso: number;
+  paymentIds: number[];
+}
+

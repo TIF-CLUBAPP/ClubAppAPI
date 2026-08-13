@@ -3,7 +3,6 @@ import { useAuth } from '../../context/AuthContext';
 import { 
   Activity, 
   Calendar, 
-  CreditCard, 
   Users, 
   AlertTriangle,
   DollarSign,
