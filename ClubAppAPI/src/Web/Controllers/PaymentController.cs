@@ -94,4 +94,100 @@ public class PaymentsController : ControllerBase
 
         return Ok(new { message = "Estado de pago actualizado en caja." });
     }
+
+    // ========== Configuración de cuotas (FeeSettings) ==========
+    /// <summary>
+    /// Obtener configuración actual de cuotas.
+    /// </summary>
+    [HttpGet("settings")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetFeeSettings()
+    {
+        return Ok(await _paymentService.GetFeeSettingsAsync());
+    }
+
+    /// <summary>
+    /// Actualizar configuración de cuotas.
+    /// </summary>
+    [HttpPut("settings")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> UpdateFeeSettings([FromBody] UpdateFeeSettingsDto dto)
+    {
+        var updated = await _paymentService.UpdateFeeSettingsAsync(dto);
+        return Ok(updated);
+    }
+
+    // ========== Exenciones ==========
+    /// <summary>
+    /// Obtener todas las exenciones (usuarios y roles).
+    /// </summary>
+    [HttpGet("exemptions")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetExemptions()
+    {
+        return Ok(await _paymentService.GetExemptionsAsync());
+    }
+
+    /// <summary>
+    /// Alternar exención de cuotas para un usuario específico.
+    /// </summary>
+    [HttpPut("exemptions/user/{userId:int}")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ToggleUserExemption(int userId, [FromBody] ToggleUserExemptionDto dto)
+    {
+        var result = await _paymentService.ToggleUserExemptionAsync(userId, dto.IsExemptFromFees);
+        if (result == null)
+            return NotFound(new { message = $"Usuario {userId} no encontrado." });
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Alternar exención de cuotas para un rol específico.
+    /// </summary>
+    [HttpPut("exemptions/role/{roleName}")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ToggleRoleExemption(string roleName, [FromBody] ToggleRoleExemptionDto dto)
+    {
+        var result = await _paymentService.ToggleRoleExemptionAsync(roleName, dto.AreFeesExempt);
+        if (result == null)
+            return NotFound(new { message = $"Rol {roleName} no encontrado." });
+        return Ok(result);
+    }
+
+    // ========== Listado de pagos con filtros ==========
+    /// <summary>
+    /// Obtener lista paginada de pagos con filtros.
+    /// </summary>
+    [HttpGet("paged")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPaymentsPaged([FromQuery] PaymentFilterDto filter)
+    {
+        return Ok(await _paymentService.GetPaymentsAsync(filter));
+    }
+
+    // ========== Registro manual de pago ==========
+    /// <summary>
+    /// Registrar un pago manualmente.
+    /// </summary>
+    [HttpPost("register")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RegisterPayment([FromBody] RegisterPaymentDto dto)
+    {
+        var result = await _paymentService.RegisterPaymentAsync(dto);
+        if (result == null)
+            return NotFound(new { message = "No se pudo registrar el pago." });
+        return Ok(result);
+    }
 }

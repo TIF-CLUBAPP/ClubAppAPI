@@ -10,7 +10,7 @@ import {
   RefreshCw 
 } from 'lucide-react';
 import { paymentsService } from '../services/paymentsService';
-import { FeeSettings, RoleExemption, UserExemption } from '../types/cuotas';
+import type { FeeSettings, RoleExemption, UserExemption } from '../types/cuotas';
 
 export const PagosCuotas: React.FC = () => {
   // Estados de Configuración
@@ -203,25 +203,25 @@ export const PagosCuotas: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {roleExemptions.map(role => (
             <div
-              key={role.roleName}
+              key={role.Role}
               className="flex items-center justify-between p-4 bg-slate-950 border border-slate-800 rounded-xl"
             >
               <div>
-                <p className="font-medium">{role.roleName}</p>
+                <p className="font-medium">{role.Role}</p>
                 <p className="text-xs text-slate-400">
-                  {role.isExempt ? 'Exento de pago' : 'Obligado a pagar'}
+                  {role.AreFeesExempt ? 'Exento de pago' : 'Obligado a pagar'}
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => handleToggleRoleExemption(role.roleName, role.isExempt)}
+                onClick={() => handleToggleRoleExemption(role.Role, role.AreFeesExempt)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                  role.isExempt
+                  role.AreFeesExempt
                     ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
                     : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                 }`}
               >
-                {role.isExempt ? 'Exento' : 'Paga Cuota'}
+                {role.AreFeesExempt ? 'Exento' : 'Paga Cuota'}
               </button>
             </div>
           ))}
@@ -256,14 +256,14 @@ export const PagosCuotas: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-800/50">
               {filteredUsers.map(user => (
-                <tr key={user.userId} className="hover:bg-slate-800/30 transition">
+                <tr key={user.UserId} className="hover:bg-slate-800/30 transition">
                   <td className="p-3">
-                    <p className="font-medium">{user.fullName}</p>
-                    <p className="text-xs text-slate-500">{user.email}</p>
+                    <p className="font-medium">{user.FullName}</p>
+                    <p className="text-xs text-slate-500">{user.Email}</p>
                   </td>
-                  <td className="p-3 text-slate-400">{user.role}</td>
+                  <td className="p-3 text-slate-400">{user.Role}</td>
                   <td className="p-3">
-                    {user.isExempt ? (
+                    {user.IsExemptFromFees ? (
                       <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">
                         <UserX className="w-3 h-3" /> Exento
                       </span>
@@ -275,14 +275,14 @@ export const PagosCuotas: React.FC = () => {
                   </td>
                   <td className="p-3 text-right">
                     <button
-                      onClick={() => handleToggleUserExemption(user.userId, user.isExempt)}
+                      onClick={() => handleToggleUserExemption(user.UserId, user.IsExemptFromFees)}
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                        user.isExempt
+                        user.IsExemptFromFees
                           ? 'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30'
                           : 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30'
                       }`}
                     >
-                      {user.isExempt ? 'Quitar Exención' : 'Eximir de Cuota'}
+                      {user.IsExemptFromFees ? 'Quitar Exención' : 'Eximir de Cuota'}
                     </button>
                   </td>
                 </tr>

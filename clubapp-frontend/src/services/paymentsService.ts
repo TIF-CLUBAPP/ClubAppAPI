@@ -41,13 +41,15 @@ export const paymentsService = {
 
   /** Alternar exención de un usuario (PUT /api/payments/exemptions/user/{userId}) */
   toggleUserExemption: async (userId: string, isExempt: boolean): Promise<UserExemption> => {
-    const response = await api.put<UserExemption>(`/payments/exemptions/user/${userId}`, { isExempt });
+    // Backend expects: { IsExemptFromFees: boolean }
+    const response = await api.put<UserExemption>(`/payments/exemptions/user/${userId}`, { IsExemptFromFees: isExempt });
     return response.data;
   },
 
   /** Alternar exención de un rol (PUT /api/payments/exemptions/role/{roleName}) */
   toggleRoleExemption: async (roleName: string, isExempt: boolean): Promise<RoleExemption> => {
-    const response = await api.put<RoleExemption>(`/payments/exemptions/role/${roleName}`, { isExempt });
+    // Backend expects: { AreFeesExempt: boolean }
+    const response = await api.put<RoleExemption>(`/payments/exemptions/role/${roleName}`, { AreFeesExempt: isExempt });
     return response.data;
   },
 
