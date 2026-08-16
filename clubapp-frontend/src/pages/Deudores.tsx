@@ -9,6 +9,7 @@ import {
   Clock,
   CreditCard,
   FileText,
+  IdCard,
   Inbox,
   Loader2,
   Mail,
@@ -18,6 +19,8 @@ import {
   Search,
   Users,
   X,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 import Header from '../components/layout/Header';
 import Sidebar from '../components/layout/Sidebar';
@@ -34,6 +37,85 @@ const getInitials = (nombre: string, apellido: string) =>
   `${nombre[0] ?? ''}${apellido[0] ?? ''}`.toUpperCase() || '?';
 
 /**
+ * Mapeo de nombres de meses en español a número (0-11 para Date)
+ */
+const MESES_MAP: Record<string, number> = {
+  'enero': 0, 'febrero': 1, 'marzo': 2, 'abril': 3,
+  'mayo': 4, 'junio': 5, 'julio': 6, 'agosto': 7,
+  'septiembre': 8, 'octubre': 9, 'noviembre': 10, 'diciembre': 11,
+  'ene': 0, 'feb': 1, 'mar': 2, 'abr': 3,
+  'may': 4, 'jun': 5, 'jul': 6, 'ago': 7,
+  'sep': 8, 'oct': 9, 'nov': 10, 'dic': 11,
+};
+
+/**
+ * Parsea un período string ("Mes Año" o "MM/YYYY") y devuelve un objeto Date
+ * representando la fecha de vencimiento (día 10 del mes).
+ * Retorna null si no se puede parsear.
+ */
+const parsePeriodoToDate = (periodo: string): Date | null => {
+  if (!periodo) return null;
+  
+  // Formato MM/YYYY
+  const matchMMYYYY = periodo.match(/^(\d{2})\/(\d{4})$/);
+  if (matchMMYYYY) {
+    const [, mesStr, añoStr] = matchMMYYYY;
+    const mes = parseInt(mesStr, 10) - 1; // 0-indexed
+    const año = parseInt(añoStr, 10);
+    if (mes >= 0 && mes <= 11) {
+      return new Date(año, mes, 10); // Día 10 como fecha de vencimiento
+    }
+    return null;
+  }
+  
+  // Formato "Mes Año" (ej: "Julio 2026", "sep 2025")
+  const matchMesAño = periodo.match(/^(\w+)\s+(\d{4})$/i);
+  if (matchMesAño) {
+    const [, mesStr, añoStr] = matchMesAño;
+    const mesLower = mesStr.toLowerCase();
+    const mes = MESES_MAP[mesLower] ?? MESES_MAP[mesLower.substring(0, 3)];
+    const año = parseInt(añoStr, 10);
+    if (mes !== undefined) {
+      return new Date(año, mes, 10); // Día 10 como fecha de vencimiento
+    }
+    return null;
+  }
+  
+  return null;
+};
+
+/**
+ * Calcula los días de mora basándose en el período más antiguo adeudado.
+ * Busca la fecha de vencimiento más antigua entre todos los periodosVencidos
+ * y calcula la diferencia con la fecha actual.
+ */
+const calcularDiasMora = (periodosVencidos: string[]): number => {
+  if (!periodosVencidos || periodosVencidos.length === 0) return 0;
+  
+  const hoy = new Date();
+  // Normalizar a solo fecha (sin hora) para comparación justa
+  hoy.setHours(0, 0, 0, 0);
+  
+  let fechaVencimientoMasAntigua: Date | null = null;
+  
+  for (const periodo of periodosVencidos) {
+    const fechaVenc = parsePeriodoToDate(periodo);
+    if (fechaVenc) {
+      if (!fechaVencimientoMasAntigua || fechaVenc < fechaVencimientoMasAntigua) {
+        fechaVencimientoMasAntigua = fechaVenc;
+      }
+    }
+  }
+  
+  if (!fechaVencimientoMasAntigua) return 0;
+  
+  const diffTiempo = hoy.getTime() - fechaVencimientoMasAntigua.getTime();
+  const diasMora = Math.max(0, Math.floor(diffTiempo / (1000 * 60 * 60 * 24)));
+  
+  return diasMora;
+};
+
+/**
  * Formatea un período de "Mes Año" (ej. "Julio 2026") a "MM/YYYY" (ej. "07/2026")
  * También maneja formatos como "MM/YYYY" directamente.
  */
@@ -43,23 +125,16 @@ const formatPeriodo = (periodo: string): string => {
   // Si ya está en formato MM/YYYY, devolverlo tal cual
   if (/^\d{2}\/\d{4}$/.test(periodo)) return periodo;
   
-  // Mapeo de nombres de meses en español a número
-  const meses: Record<string, string> = {
-    'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04',
-    'mayo': '05', 'junio': '06', 'julio': '07', 'agosto': '08',
-    'septiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12',
-    'ene': '01', 'feb': '02', 'mar': '03', 'abr': '04',
-    'may': '05', 'jun': '06', 'jul': '07', 'ago': '08',
-    'sep': '09', 'oct': '10', 'nov': '11', 'dic': '12',
-  };
-  
   // Intentar parsear "Mes Año" o "MesAño"
   const match = periodo.match(/^(\w+)\s+(\d{4})$/i);
   if (match) {
     const [, mesStr, año] = match;
     const mesLower = mesStr.toLowerCase();
-    const mesNum = meses[mesLower] || meses[mesLower.substring(0, 3)];
-    if (mesNum) return `${mesNum}/${año}`;
+    const mesNum = MESES_MAP[mesLower] ?? MESES_MAP[mesLower.substring(0, 3)];
+    if (mesNum !== undefined) {
+      const mesFormatted = String(mesNum + 1).padStart(2, '0');
+      return `${mesFormatted}/${año}`;
+    }
   }
   
   // Fallback: devolver el original si no se puede parsear
@@ -205,6 +280,7 @@ export default function Deudores() {
   const [sort, setSort] = useState<SortKey>('deuda-desc');
 
   const [paymentTarget, setPaymentTarget] = useState<CuotaVencida | null>(null);
+  const [blockTarget, setBlockTarget] = useState<{ debtor: CuotaVencida; status: boolean } | null>(null);
   const [modalStatus, setModalStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
   const [modalError, setModalError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -215,10 +291,17 @@ export default function Deudores() {
     setLoading(true);
     setError(null);
     try {
-      const [list, statsData] = await Promise.all([
+      const [listRaw, statsData] = await Promise.all([
         cuotasService.getOverdueList(),
         cuotasService.getOverdueStats(),
       ]);
+      
+      // Enriquecer con cálculo de días de mora real
+      const list = listRaw.map(d => ({
+        ...d,
+        diasDeAtraso: calcularDiasMora(d.periodosVencidos)
+      }));
+
       setDebtors(list);
       setStats(statsData);
     } catch (err) {
@@ -305,16 +388,23 @@ export default function Deudores() {
   };
 
   // Alternar bloqueo manual
-  const toggleUserStatus = async (socioId: number, estaBloqueado: boolean) => {
-    if (!window.confirm(`¿Estás seguro de que deseas ${estaBloqueado ? 'bloquear' : 'desbloquear'} a este socio?`)) return;
+  const initiateToggleUserStatus = (debtor: CuotaVencida, currentStatus: boolean) => {
+    setBlockTarget({ debtor, status: currentStatus });
+  };
 
+  const toggleUserStatus = async () => {
+    if (!blockTarget) return;
+    const { debtor, status: estaBloqueado } = blockTarget;
+    
     try {
-      await cuotasService.updateUserStatus(socioId, !estaBloqueado); // isActive = !estaBloqueado
+      await cuotasService.updateUserStatus(debtor.socioId, !estaBloqueado); // isActive = !estaBloqueado
       showToast(`Socio ${estaBloqueado ? 'bloqueado' : 'desbloqueado'} correctamente.`);
+      setBlockTarget(null);
       loadData(); // Recargar datos
     } catch (err) {
       console.error('Error al actualizar estado:', err);
       showToast('Error al actualizar el estado del socio.');
+      setBlockTarget(null);
     }
   };
 
@@ -329,23 +419,27 @@ export default function Deudores() {
     }
   };
 
-  // Notificar por WhatsApp (o mail si no hay teléfono)
-  const notifyDebtor = (d: CuotaVencida) => {
+  const notifyByWhatsApp = (d: CuotaVencida) => {
     const periodosFormateados = d.periodosVencidos.map(p => formatPeriodo(p)).join(', ');
     const message =
       `Hola ${d.nombre}, te recordamos que tenés ${d.cantidadCuotasImpagas} cuota(s) impaga(s) ` +
       `(${periodosFormateados}) por un total de ${formatCurrency(d.montoTotalAdeudado)}. ` +
       `Acercate a caja para regularizar tu situación. ¡Gracias!`;
     const digits = (d.telefono || '').replace(/\D/g, '');
-    if (digits.length >= 8) {
-      window.open(`https://wa.me/${digits}?text=${encodeURIComponent(message)}`, '_blank', 'noopener');
-    } else {
-      window.open(
+    window.open(`https://wa.me/${digits}?text=${encodeURIComponent(message)}`, '_blank', 'noopener');
+  };
+
+  const notifyByEmail = (d: CuotaVencida) => {
+    const periodosFormateados = d.periodosVencidos.map(p => formatPeriodo(p)).join(', ');
+    const message =
+      `Hola ${d.nombre}, te recordamos que tenés ${d.cantidadCuotasImpagas} cuota(s) impaga(s) ` +
+      `(${periodosFormateados}) por un total de ${formatCurrency(d.montoTotalAdeudado)}. ` +
+      `Acercate a caja para regularizar tu situación. ¡Gracias!`;
+    window.open(
         `mailto:${d.email}?subject=${encodeURIComponent('Recordatorio de cuota vencida')}&body=${encodeURIComponent(message)}`,
         '_blank',
         'noopener'
-      );
-    }
+    );
   };
 
   return (
@@ -503,18 +597,18 @@ export default function Deudores() {
                         <table className="w-full text-left text-sm min-w-245">
                       <thead>
                         <tr className="border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-500">
-                          <th className="px-4 py-3 sm:px-5 sm:py-3.5 font-bold whitespace-nowrap min-w-55">Socio</th>
-                          <th className="px-4 py-3 sm:px-5 sm:py-3.5 font-bold whitespace-nowrap min-w-37.5">DNI / Teléfono</th>
-                          <th className="px-4 py-3 sm:px-5 sm:py-3.5 font-bold whitespace-nowrap min-w-50">Períodos adeudados</th>
-                          <th className="px-4 py-3 sm:px-5 sm:py-3.5 font-bold whitespace-nowrap text-right min-w-30">Monto</th>
-                          <th className="px-4 py-3 sm:px-5 sm:py-3.5 font-bold whitespace-nowrap min-w-27.5">Antigüedad</th>
-                          <th className="px-4 py-3 sm:px-5 sm:py-3.5 font-bold whitespace-nowrap text-right min-w-55">Acciones</th>
+                          <th className="px-4 py-3 sm:px-5 sm:py-3.5 text-center font-bold text-slate-500 whitespace-nowrap min-w-55">SOCIO</th>
+                          <th className="px-4 py-3 sm:px-5 sm:py-3.5 text-center font-bold text-slate-500 whitespace-nowrap min-w-37.5">DNI / Teléfono</th>
+                          <th className="px-4 py-3 sm:px-5 sm:py-3.5 text-center font-bold text-slate-500 whitespace-nowrap min-w-50">Períodos adeudados</th>
+                          <th className="px-4 py-3 sm:px-5 sm:py-3.5 text-center font-bold text-slate-500 whitespace-nowrap min-w-30">Monto</th>
+                          <th className="px-4 py-3 sm:px-5 sm:py-3.5 text-center font-bold text-slate-500 whitespace-nowrap min-w-27.5">DÍAS EN MORA</th>
+                          <th className="px-4 py-3 sm:px-5 sm:py-3.5 text-center font-bold text-slate-500 whitespace-nowrap min-w-55">Acciones</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800/60">
                         {sorted.map((d) => (
                           <tr key={d.socioId} className="hover:bg-slate-800/20 transition-colors">
-                            <td className="px-4 py-3 sm:px-5 sm:py-4">
+                            <td className="px-4 py-3 sm:px-5 sm:py-4 min-w-55">
                               <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-linear-to-tr from-slate-800 to-slate-700 border border-slate-700 flex items-center justify-center text-emerald-400 font-bold text-xs shrink-0">
                                   {getInitials(d.nombre, d.apellido)}
@@ -527,30 +621,35 @@ export default function Deudores() {
                                 </div>
                               </div>
                             </td>
-                            <td className="px-4 py-3 sm:px-5 sm:py-4">
-                              <p className="text-slate-300">{d.dni || '—'}</p>
-                              <p className="text-xs text-slate-500 flex items-center gap-1">
-                                <Phone size={11} /> {d.telefono || '—'}
-                              </p>
+                            <td className="px-6 py-4 text-center align-middle">
+                              <div className="flex flex-col items-center gap-1.5">
+                                <div className="flex items-center gap-1.5 text-slate-300">
+                                  <IdCard className="w-4 h-4 text-slate-400" />
+                                  {d.dni ? Number(d.dni).toLocaleString('es-AR') : '—'}
+                                </div>
+                                <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                                  <Phone size={11} /> {d.telefono || '—'}
+                                </div>
+                              </div>
                             </td>
-                            <td className="px-4 py-3 sm:px-5 sm:py-4">
+                            <td className="px-4 py-3 sm:px-5 sm:py-4 text-center">
                               <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
                                 {getTextoPeriodos(d)}
                               </span>
                             </td>
-                            <td className="px-4 py-3 sm:px-5 sm:py-4 text-right whitespace-nowrap">
+                            <td className="px-4 py-3 sm:px-5 sm:py-4 text-center whitespace-nowrap">
                               <p className="font-black text-rose-400">{formatCurrency(d.montoTotalAdeudado)}</p>
                               <p className="text-[10px] text-slate-500">
                                 {d.cantidadCuotasImpagas} cuota{d.cantidadCuotasImpagas !== 1 ? 's' : ''}
                               </p>
                             </td>
-                            <td className="px-4 py-3 sm:px-5 sm:py-4 whitespace-nowrap">
+                            <td className="px-4 py-3 sm:px-5 sm:py-4 text-center whitespace-nowrap">
                               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/20 text-[10px] font-bold">
                                 <Clock size={11} /> {d.diasDeAtraso} día{d.diasDeAtraso !== 1 ? 's' : ''}
                               </span>
                             </td>
                             <td className="px-4 py-3 sm:px-5 sm:py-4">
-                              <div className="flex items-center justify-end gap-2">
+                              <div className="flex items-center justify-center gap-2">
                                 <button
                                   onClick={() => openPaymentModal(d)}
                                   className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition-all"
@@ -559,15 +658,15 @@ export default function Deudores() {
                                 </button>
                                 {/* Botón Bloquear/Desbloquear */}
                                 <button
-                                  onClick={() => toggleUserStatus(d.socioId, !d.estaBloqueado)}
+                                  onClick={() => initiateToggleUserStatus(d, d.estaBloqueado)}
                                   className={`p-2 rounded-xl border border-slate-700 transition-all ${
                                     d.estaBloqueado
-                                      ? 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20'
+                                      ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
                                       : 'bg-slate-800 hover:bg-slate-700 text-slate-400'
                                   }`}
                                   title={d.estaBloqueado ? 'Desbloquear socio' : 'Bloquear socio'}
                                 >
-                                  {d.estaBloqueado ? <CheckCircle2 size={15} /> : <X size={15} />}
+                                  {d.estaBloqueado ? <Unlock size={15} /> : <Lock size={15} />}
                                 </button>
                                 <button
                                   onClick={() => notifyDebtor(d)}
@@ -709,6 +808,89 @@ export default function Deudores() {
                   </div>
                 </>
               )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal de confirmación de Bloqueo/Desbloqueo */}
+      <AnimatePresence>
+        {blockTarget && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            onClick={() => setBlockTarget(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6 text-center">
+                <div className="mx-auto mb-4 w-16 h-16 rounded-full flex items-center justify-center"
+                     style={{
+                       backgroundColor: blockTarget.status ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                       borderColor: blockTarget.status ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                     }}>
+                  {blockTarget.status ? (
+                    <Unlock size={32} className="text-emerald-500" />
+                  ) : (
+                    <Lock size={32} className="text-red-500" />
+                  )}
+                </div>
+                <h3 className="mb-2 text-lg font-bold text-white">
+                  {blockTarget.status ? 'Confirmar Desbloqueo de Cuenta' : 'Confirmar Bloqueo de Cuenta'}
+                </h3>
+                <p className="text-slate-300 text-sm leading-relaxed">
+                  {blockTarget.status
+                    ? (
+                      <>
+                        Al desbloquear al usuario{' '}
+                        <strong className="text-white">{blockTarget.debtor.nombre} {blockTarget.debtor.apellido}</strong>
+                        , recuperará el acceso inmediato a todas las funciones de la plataforma.{' '}
+                        <strong>¿Deseas continuar?</strong>
+                      </>
+                    )
+                    : (
+                      <>
+                        Si bloqueas al usuario{' '}
+                        <strong className="text-white">{blockTarget.debtor.nombre} {blockTarget.debtor.apellido}</strong>
+                        , perderá inmediatamente el acceso a las funciones activas de la plataforma.{' '}
+                        <strong>¿Deseas continuar?</strong>
+                      </>
+                    )}
+                </p>
+              </div>
+              <div className="border-t border-slate-800 p-4 flex flex-col sm:flex-row gap-3 justify-end">
+                <button
+                  onClick={() => setBlockTarget(null)}
+                  className="flex-1 py-3 rounded-2xl border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 text-sm font-bold transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={toggleUserStatus}
+                  className={`flex-1 py-3 rounded-2xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                    blockTarget.status
+                      ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                      : 'bg-red-600 hover:bg-red-700 text-white'
+                  }`}
+                >
+                  {blockTarget.status ? (
+                    <>
+                      <Unlock size={15} /> Confirmar Desbloqueo
+                    </>
+                  ) : (
+                    <>
+                      <Lock size={15} /> Confirmar Bloqueo
+                    </>
+                  )}
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}
