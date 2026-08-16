@@ -12,3 +12,23 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// Interceptor de respuesta: si recibimos 401, limpiamos la sesión y redirigimos a login
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Token inválido o expirado - limpiar almacenamiento local
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('user');
+      
+      // Redirigir a login si no estamos ya ahí
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);

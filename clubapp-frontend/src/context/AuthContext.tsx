@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { AuthenticationRequest, AuthenticationResponse, User } from '../types/auth';
 import { authService } from '../services/authService';
+import { api } from '../services/api';
 
 interface AuthContextType {
   user: User | null;
@@ -47,53 +48,114 @@ function decodeJwt(token: string): User | null {
   }
 }
 
+/**
+ * Verifica si un token JWT ha expirado (validación del lado del cliente).
+ */
+function isTokenExpired(token: string): boolean {
+  try {
+    const base64Url = token.split('.')[1];
+    if (!base64Url) return true;
+
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+
+    const payload = JSON.parse(jsonPayload);
+    const exp = payload.exp;
+    if (!exp) return true;
+    
+    // exp está en segundos, Date.now() en milisegundos
+    return Date.now() >= exp * 1000;
+  } catch {
+    return true;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() => getStoredItem('token'));
-  const [user, setUser] = useState<User | null>(() => {
-    const savedUser = getStoredItem('user');
-    if (!savedUser) return null;
-    try {
-      return JSON.parse(savedUser) as User;
-    } catch {
-      return null;
-    }
-  });
+  const [token, setToken] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    const savedToken = getStoredItem('token');
-    const savedUser = getStoredItem('user');
+    let mounted = true;
 
-    if (savedToken) {
-      setToken(savedToken);
+    const initializeAuth = async () => {
+      const savedToken = getStoredItem('token');
+      const savedUser = getStoredItem('user');
 
-      let parsedUser: User | null = null;
-      if (savedUser) {
-        try {
-          parsedUser = JSON.parse(savedUser) as User;
-        } catch {
-          parsedUser = null;
+      if (savedToken) {
+        // Validación rápida del lado del cliente: verificar expiración del JWT
+        if (isTokenExpired(savedToken)) {
+          console.log('[Auth] Token expirado, limpiando sesión');
+          clearSession();
+          if (mounted) setIsLoading(false);
+          return;
         }
-      }
 
-      // Si no hay usuario persistido, intentamos reconstruirlo desde el JWT
-      if (!parsedUser) parsedUser = decodeJwt(savedToken);
+        // Token no expirado localmente, validar con el backend
+        // El endpoint /authentication/validate-token devuelve 401 si el token es inválido
+        // El interceptor de api.ts limpiará la sesión automáticamente en ese caso
+        try {
+          await api.get('/authentication/validate-token');
+        } catch {
+          // El interceptor de respuesta ya limpió la sesión si fue 401
+          // Si llegamos aquí, la sesión fue invalidada
+          if (mounted) {
+            setIsLoading(false);
+            setToken(null);
+            setUser(null);
+          }
+          return;
+        }
 
-      if (parsedUser) {
-        setUser(parsedUser);
-        // Sincronizamos el usuario en localStorage para futuras recargas
-        localStorage.setItem('user', JSON.stringify(parsedUser));
+        // Si llegamos aquí sin que el interceptor haya limpiado, asumimos token válido
+        setToken(savedToken);
+
+        let parsedUser: User | null = null;
+        if (savedUser) {
+          try {
+            parsedUser = JSON.parse(savedUser) as User;
+          } catch {
+            parsedUser = null;
+          }
+        }
+
+        // Si no hay usuario persistido, intentamos reconstruirlo desde el JWT
+        if (!parsedUser) parsedUser = decodeJwt(savedToken);
+
+        if (parsedUser && mounted) {
+          setUser(parsedUser);
+          // Sincronizamos el usuario en localStorage para futuras recargas
+          localStorage.setItem('user', JSON.stringify(parsedUser));
+        } else if (mounted) {
+          setUser(null);
+        }
       } else {
-        setUser(null);
+        // No hay token guardado
+        clearSession();
       }
-    } else {
-      setToken(null);
-      setUser(null);
+
+      if (mounted) setIsLoading(false);
+    };
+
+    const clearSession = () => {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
       sessionStorage.removeItem('token');
       sessionStorage.removeItem('user');
-    }
+      setToken(null);
+      setUser(null);
+    };
 
-    setIsLoading(false);
+    initializeAuth();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   /**

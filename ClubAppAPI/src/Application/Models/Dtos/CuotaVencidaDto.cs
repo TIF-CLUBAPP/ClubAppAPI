@@ -27,6 +27,15 @@ public class CuotaVencidaDto
 
     /// <summary>Cantidad de cuotas impagas del socio.</summary>
     public int CantidadCuotasImpagas { get; set; }
+    
+    /// <summary>Indica si el socio está bloqueado automáticamente por morosidad (> 2 cuotas).</summary>
+    public bool EsAutoBloqueado => CantidadCuotasImpagas > 2;
+
+    /// <summary>Indica si el socio fue bloqueado manualmente por un admin.</summary>
+    public bool EsBloqueadoManual { get; set; }
+
+    /// <summary>Bloqueado total (auto o manual).</summary>
+    public bool EstaBloqueado => EsAutoBloqueado || EsBloqueadoManual;
 
     /// <summary>Períodos vencidos en formato legible, ej: ["Junio 2026", "Julio 2026"].</summary>
     public List<string> PeriodosVencidos { get; set; } = new();

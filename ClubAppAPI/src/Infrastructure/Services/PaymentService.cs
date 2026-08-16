@@ -383,7 +383,8 @@ public class PaymentService : IPaymentService
                     CantidadCuotasImpagas = g.Count(),
                     PeriodosVencidos = g
                         .OrderBy(p => p.Period)
-                        .Select(p => FormatPeriodo(p.Period))
+                        .Select(p => FormatPeriodo(p.Period, p.CreatedAt))
+                        .Where(p => !string.IsNullOrWhiteSpace(p))
                         .ToList(),
                     MontoTotalAdeudado = totalAdeudado,
                     DiasDeAtraso = 0,
@@ -426,19 +427,49 @@ public class PaymentService : IPaymentService
     }
 
     // Ej: "Julio 2026"
-    private static string FormatPeriodo(string period)
+    private static string FormatPeriodo(string period, DateTime? fallbackDate = null)
     {
-        // period = "MM/yyyy"
-        if (string.IsNullOrWhiteSpace(period) || period.Length < 7)
-            return period ?? string.Empty;
+        // period = "yyyy-MM" (formato estándar ISO) o "MM/yyyy" (legacy) o "Mes Año" (legacy)
+        bool hasValidPeriod = !string.IsNullOrWhiteSpace(period) && period.Length >= 7;
 
-        if (!int.TryParse(period.AsSpan(0, 2), out int month) ||
-            !int.TryParse(period.AsSpan(3, 4), out int year))
-            return period;
+        if (hasValidPeriod)
+        {
+            int month = 0, year = 0;
+            
+            // Intentar parsear como "yyyy-MM" (nuevo formato estándar)
+            if (period.Contains("-") && int.TryParse(period.AsSpan(0, 4), out year) && int.TryParse(period.AsSpan(5, 2), out month))
+            {
+                var culture = CultureInfo.GetCultureInfo("es-AR");
+                var monthName = culture.DateTimeFormat.GetMonthName(month);
+                var capitalized = char.ToUpperInvariant(monthName[0]) + monthName.Substring(1);
+                return $"{capitalized} {year}";
+            }
+            
+            // Intentar parsear como "MM/yyyy" (legacy)
+            if (period.Contains("/") && int.TryParse(period.AsSpan(0, 2), out month) && int.TryParse(period.AsSpan(3, 4), out year))
+            {
+                var culture = CultureInfo.GetCultureInfo("es-AR");
+                var monthName = culture.DateTimeFormat.GetMonthName(month);
+                var capitalized = char.ToUpperInvariant(monthName[0]) + monthName.Substring(1);
+                return $"{capitalized} {year}";
+            }
+            
+            // Si ya está en formato "Mes Año" (longitud > 7), devolver tal cual
+            if (period.Length > 7)
+            {
+                return period;
+            }
+        }
 
-        var culture = CultureInfo.GetCultureInfo("es-AR");
-        var monthName = culture.DateTimeFormat.GetMonthName(month);
-        var capitalized = char.ToUpperInvariant(monthName[0]) + monthName.Substring(1);
-        return $"{capitalized} {year}";
+        // Si no hay período válido, generar desde fallbackDate (CreatedAt o DueDate)
+        if (fallbackDate.HasValue)
+        {
+            var culture = CultureInfo.GetCultureInfo("es-AR");
+            var monthName = culture.DateTimeFormat.GetMonthName(fallbackDate.Value.Month);
+            var capitalized = char.ToUpperInvariant(monthName[0]) + monthName.Substring(1);
+            return $"{capitalized} {fallbackDate.Value.Year}";
+        }
+
+        return "Adeuda cuota";
     }
 }

@@ -17,7 +17,7 @@ namespace ClubApp.Domain.Entities
         public int UserId { get; set; }
 
         [Required]
-        [MaxLength(7)] // Formato "MM/YYYY"
+        [MaxLength(20)] // Formato "MM/YYYY" o "Mes Año"
         public string Period { get; set; } = string.Empty;
 
         [Required]

@@ -33,6 +33,55 @@ const formatCurrency = (value: number) =>
 const getInitials = (nombre: string, apellido: string) =>
   `${nombre[0] ?? ''}${apellido[0] ?? ''}`.toUpperCase() || '?';
 
+/**
+ * Formatea un período de "Mes Año" (ej. "Julio 2026") a "MM/YYYY" (ej. "07/2026")
+ * También maneja formatos como "MM/YYYY" directamente.
+ */
+const formatPeriodo = (periodo: string): string => {
+  if (!periodo) return '—';
+  
+  // Si ya está en formato MM/YYYY, devolverlo tal cual
+  if (/^\d{2}\/\d{4}$/.test(periodo)) return periodo;
+  
+  // Mapeo de nombres de meses en español a número
+  const meses: Record<string, string> = {
+    'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04',
+    'mayo': '05', 'junio': '06', 'julio': '07', 'agosto': '08',
+    'septiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12',
+    'ene': '01', 'feb': '02', 'mar': '03', 'abr': '04',
+    'may': '05', 'jun': '06', 'jul': '07', 'ago': '08',
+    'sep': '09', 'oct': '10', 'nov': '11', 'dic': '12',
+  };
+  
+  // Intentar parsear "Mes Año" o "MesAño"
+  const match = periodo.match(/^(\w+)\s+(\d{4})$/i);
+  if (match) {
+    const [, mesStr, año] = match;
+    const mesLower = mesStr.toLowerCase();
+    const mesNum = meses[mesLower] || meses[mesLower.substring(0, 3)];
+    if (mesNum) return `${mesNum}/${año}`;
+  }
+  
+  // Fallback: devolver el original si no se puede parsear
+  return periodo;
+};
+
+/**
+ * Obtiene el texto formateado para mostrar en la columna "PERÍODOS ADEUDADOS".
+ * Si no hay períodos válidos, devuelve "Adeuda cuota".
+ */
+function getTextoPeriodos(deudor: CuotaVencida): string {
+  const periodosValidos = Array.isArray(deudor?.periodosVencidos)
+    ? deudor.periodosVencidos.filter(p => p && String(p).trim() !== '')
+    : [];
+
+  if (periodosValidos.length > 0) {
+    return periodosValidos.join(', ');
+  }
+
+  return 'Adeuda cuota';
+}
+
 type SortKey = 'deuda-desc' | 'deuda-asc' | 'atraso-desc' | 'atraso-asc' | 'nombre';
 
 function SummaryCard({
@@ -99,20 +148,12 @@ function DebtorCard({
       </div>
 
       {/* Períodos adeudados */}
-      <div className="mt-2.5 flex flex-wrap gap-1.5">
-        {debtor.periodosVencidos.map((p) => (
-          <span
-            key={p}
-            className="px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-300 border border-rose-500/20 text-[10px] font-bold whitespace-nowrap"
-          >
-            {p}
+      <div className="mt-2.5">
+        <div className="flex flex-wrap gap-1">
+          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+            {getTextoPeriodos(debtor)}
           </span>
-        ))}
-        {debtor.cantidadCuotasImpagas > debtor.periodosVencidos.length && (
-          <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[10px] font-bold">
-            +{debtor.cantidadCuotasImpagas - debtor.periodosVencidos.length}
-          </span>
-        )}
+        </div>
       </div>
 
       {/* Monto adeudado + antigüedad */}
@@ -263,6 +304,20 @@ export default function Deudores() {
     }
   };
 
+  // Alternar bloqueo manual
+  const toggleUserStatus = async (socioId: number, estaBloqueado: boolean) => {
+    if (!window.confirm(`¿Estás seguro de que deseas ${estaBloqueado ? 'bloquear' : 'desbloquear'} a este socio?`)) return;
+
+    try {
+      await cuotasService.updateUserStatus(socioId, !estaBloqueado); // isActive = !estaBloqueado
+      showToast(`Socio ${estaBloqueado ? 'bloqueado' : 'desbloqueado'} correctamente.`);
+      loadData(); // Recargar datos
+    } catch (err) {
+      console.error('Error al actualizar estado:', err);
+      showToast('Error al actualizar el estado del socio.');
+    }
+  };
+
   const finishPayment = () => {
     const debtor = paymentTarget;
     closePaymentModal();
@@ -276,9 +331,10 @@ export default function Deudores() {
 
   // Notificar por WhatsApp (o mail si no hay teléfono)
   const notifyDebtor = (d: CuotaVencida) => {
+    const periodosFormateados = d.periodosVencidos.map(p => formatPeriodo(p)).join(', ');
     const message =
       `Hola ${d.nombre}, te recordamos que tenés ${d.cantidadCuotasImpagas} cuota(s) impaga(s) ` +
-      `(${d.periodosVencidos.join(', ')}) por un total de ${formatCurrency(d.montoTotalAdeudado)}. ` +
+      `(${periodosFormateados}) por un total de ${formatCurrency(d.montoTotalAdeudado)}. ` +
       `Acercate a caja para regularizar tu situación. ¡Gracias!`;
     const digits = (d.telefono || '').replace(/\D/g, '');
     if (digits.length >= 8) {
@@ -478,21 +534,9 @@ export default function Deudores() {
                               </p>
                             </td>
                             <td className="px-4 py-3 sm:px-5 sm:py-4">
-                              <div className="flex flex-wrap gap-1.5 max-w-65">
-                                {d.periodosVencidos.map((p) => (
-                                  <span
-                                    key={p}
-                                    className="px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-300 border border-rose-500/20 text-[10px] font-bold whitespace-nowrap"
-                                  >
-                                    {p}
-                                  </span>
-                                ))}
-                                {d.cantidadCuotasImpagas > d.periodosVencidos.length && (
-                                  <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[10px] font-bold">
-                                    +{d.cantidadCuotasImpagas - d.periodosVencidos.length}
-                                  </span>
-                                )}
-                              </div>
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                                {getTextoPeriodos(d)}
+                              </span>
                             </td>
                             <td className="px-4 py-3 sm:px-5 sm:py-4 text-right whitespace-nowrap">
                               <p className="font-black text-rose-400">{formatCurrency(d.montoTotalAdeudado)}</p>
@@ -512,6 +556,18 @@ export default function Deudores() {
                                   className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition-all"
                                 >
                                   <CreditCard size={13} /> Registrar Pago
+                                </button>
+                                {/* Botón Bloquear/Desbloquear */}
+                                <button
+                                  onClick={() => toggleUserStatus(d.socioId, !d.estaBloqueado)}
+                                  className={`p-2 rounded-xl border border-slate-700 transition-all ${
+                                    d.estaBloqueado
+                                      ? 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20'
+                                      : 'bg-slate-800 hover:bg-slate-700 text-slate-400'
+                                  }`}
+                                  title={d.estaBloqueado ? 'Desbloquear socio' : 'Bloquear socio'}
+                                >
+                                  {d.estaBloqueado ? <CheckCircle2 size={15} /> : <X size={15} />}
                                 </button>
                                 <button
                                   onClick={() => notifyDebtor(d)}
@@ -612,15 +668,12 @@ export default function Deudores() {
                       </div>
                     </div>
 
-                    <div className="mt-4 flex flex-wrap gap-1.5">
-                      {paymentTarget.periodosVencidos.map((p) => (
-                        <span
-                          key={p}
-                          className="px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-300 border border-rose-500/20 text-[10px] font-bold"
-                        >
-                          {p}
+                    <div className="mt-4">
+                      <div className="flex flex-wrap gap-1">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                          {getTextoPeriodos(paymentTarget)}
                         </span>
-                      ))}
+                      </div>
                     </div>
 
                     <div className="mt-4 pt-4 border-t border-slate-800 flex items-center justify-between">

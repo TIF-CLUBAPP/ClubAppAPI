@@ -34,6 +34,7 @@ public class UserService : IUserService
             BirthDate = u.BirthDate,
             Role = u.Role,
             IsActive = u.IsActive,
+            IsBlocked = !u.IsActive,
             BadgeNum = u.BadgeNum,
             CreatedAt = u.CreatedAt,
         }).ToList();
@@ -59,6 +60,7 @@ public class UserService : IUserService
             BirthDate = user.BirthDate,
             Role = user.Role,
             IsActive = user.IsActive,
+            IsBlocked = !user.IsActive,
             BadgeNum = user.BadgeNum,
             CreatedAt = user.CreatedAt
         };

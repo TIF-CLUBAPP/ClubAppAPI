@@ -85,5 +85,8 @@ export interface CuotaVencida {
   montoTotalAdeudado: number;
   diasDeAtraso: number;
   paymentIds: number[];
+  esAutoBloqueado: boolean;
+  esBloqueadoManual: boolean;
+  estaBloqueado: boolean;
 }
 

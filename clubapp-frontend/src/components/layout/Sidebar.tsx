@@ -66,18 +66,21 @@ export default function Sidebar() {
             <Activity size={18} /> Dashboard
           </Link>
 
-          <Link 
-            to="/reservas" 
-            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
-              location.pathname === '/reservas'
-                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-            }`}
-          >
-            <Calendar size={18} /> Reservas & Agenda
-          </Link>
+          {/* Rutas protegidas - solo usuarios autenticados */}
+          {isAuthenticated && (
+            <Link 
+              to="/reservas" 
+              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
+                location.pathname === '/reservas'
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+              }`}
+            >
+              <Calendar size={18} /> Reservas & Agenda
+            </Link>
+          )}
 
-          {(role === 'ADMIN' || role === 'SUPERADMIN') && (
+          {isAuthenticated && (role === 'ADMIN' || role === 'SUPERADMIN') && (
             <Link 
               to="/pagos" 
               className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
@@ -90,7 +93,7 @@ export default function Sidebar() {
             </Link>
           )}
 
-          {role === 'SUPERADMIN' && (
+          {isAuthenticated && (role === 'SUPERADMIN') && (
             <Link
               to="/deudores"
               className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
@@ -103,7 +106,7 @@ export default function Sidebar() {
             </Link>
           )}
 
-          {(role === 'ADMIN' || role === 'SUPERADMIN') && (
+          {isAuthenticated && (role === 'ADMIN' || role === 'SUPERADMIN') && (
             <Link 
               to="/socios" 
               className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${

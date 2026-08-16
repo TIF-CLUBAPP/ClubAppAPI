@@ -200,23 +200,49 @@ namespace ClubApp.Infrastructure.Data
             // ==========================================
             // 4. SEEDING DE PAGOS (Bloque independiente)
             // ==========================================
-            if (!context.Payments.Any())
+            var debtorUser = context.Users.FirstOrDefault(u => u.Email == "deudor@clubapp.com");
+            if (debtorUser != null)
             {
-                var userOk = context.Users.FirstOrDefault(u => u.Email == "usuario1@clubapp.com");
-                var userDebtor = context.Users.FirstOrDefault(u => u.Email == "deudor@clubapp.com");
+                // Asegurar que el usuario deudor tenga al menos las 3 cuotas de prueba (meses -2, -3, -4)
+                for (int i = 2; i <= 4; i++)
+                {
+                    var targetDate = DateTime.UtcNow.AddMonths(-i);
+                    // Formato ISO: YYYY-MM
+                    string periodName = $"{targetDate:yyyy-MM}";
 
-                if (userOk != null && userDebtor != null)
+                    // Verificar si ya existe una cuota para este periodo para este usuario
+                    bool exists = context.Payments.Any(p => p.UserId == debtorUser.Id && p.Period == periodName);
+                    
+                    if (!exists)
+                    {
+                        context.Payments.Add(new Payment
+                        {
+                            UserId = debtorUser.Id,
+                            Period = periodName,
+                            Amount = 15000m,
+                            LateFeeApplied = 1500m * (i - 1),
+                            PaymentMethod = "CASH",
+                            Status = PaymentStatus.Overdue,
+                            PaymentDate = targetDate,
+                            CreatedAt = targetDate
+                        });
+                    }
+                }
+                
+                // Crear una cuota pagada para usuario1@clubapp.com (mes -1)
+                var userOk = context.Users.FirstOrDefault(u => u.Email == "usuario1@clubapp.com");
+                if (userOk != null)
                 {
                     var membershipOk = context.Memberships.FirstOrDefault(m => m.UserId == userOk.Id);
-                    var membershipDebtor = context.Memberships.FirstOrDefault(m => m.UserId == userDebtor.Id);
+                    var membershipDebtor = context.Memberships.FirstOrDefault(m => m.UserId == debtorUser.Id);
 
                     if (membershipOk != null && membershipDebtor != null)
                     {
-                        string periodOk = $"{DateTime.UtcNow.AddMonths(-1):MM/yyyy}";
-                        string periodDebtor = $"{DateTime.UtcNow.AddMonths(-2):MM/yyyy}";
+                        string periodOk = $"{DateTime.UtcNow.AddMonths(-1):yyyy-MM}";
                         
-                        context.Payments.AddRange(
-                            new Payment
+                        if (!context.Payments.Any(p => p.UserId == userOk.Id && p.Period == periodOk))
+                        {
+                            context.Payments.Add(new Payment
                             {
                                 UserId = userOk.Id,
                                 Period = periodOk,
@@ -226,23 +252,53 @@ namespace ClubApp.Infrastructure.Data
                                 Status = PaymentStatus.Paid,
                                 PaymentDate = DateTime.UtcNow.AddDays(-5),
                                 CreatedAt = DateTime.UtcNow.AddDays(-5)
-                            },
-                            new Payment
-                            {
-                                UserId = userDebtor.Id,
-                                Period = periodDebtor,
-                                Amount = 15000m,
-                                LateFeeApplied = 1500m, // 10% de recargo
-                                PaymentMethod = "CASH",
-                                Status = PaymentStatus.Overdue,
-                                PaymentDate = DateTime.UtcNow.AddMonths(-2),
-                                CreatedAt = DateTime.UtcNow.AddMonths(-2)
-                            }
-                        );
-                        context.SaveChanges();
+                            });
+                        }
                     }
                 }
+                
+                context.SaveChanges();
             }
+
+            // ==========================================
+            // 5. REPARACIÓN DE DATOS (Idempotente)
+            // ==========================================
+            // Reparar formatos antiguos ("MM/yyyy", "Mes Año") a nuevo estándar "yyyy-MM"
+            // Resolver duplicados añadiendo sufijo numérico si es necesario
+            var corruptPayments = context.Payments
+                .Where(p => string.IsNullOrEmpty(p.Period) || p.Period.Contains("/") || !p.Period.Contains("-"))
+                .ToList();
+
+            if (corruptPayments.Any())
+            {
+                var existingPeriods = new HashSet<string>(context.Payments
+                    .Where(p => !string.IsNullOrEmpty(p.Period) && p.Period.Contains("-") && !p.Period.Contains("/"))
+                    .Select(p => $"{p.UserId}:{p.Period}"));
+                
+                foreach (var payment in corruptPayments)
+                {
+                    // Intentar derivar del CreatedAt si es necesario, o intentar parsear
+                    var targetDate = payment.CreatedAt;
+                    string newPeriod = $"{targetDate:yyyy-MM}";
+                    string key = $"{payment.UserId}:{newPeriod}";
+                    
+                    // Si ya existe, buscar el siguiente mes disponible hacia atrás
+                    int suffix = 0;
+                    DateTime testDate = targetDate;
+                    while (existingPeriods.Contains(key))
+                    {
+                        suffix++;
+                        testDate = targetDate.AddMonths(-suffix);
+                        newPeriod = $"{testDate:yyyy-MM}";
+                        key = $"{payment.UserId}:{newPeriod}";
+                    }
+                    
+                    payment.Period = newPeriod;
+                    existingPeriods.Add(key);
+                }
+                context.SaveChanges();
+            }
+
         }
     }
 }

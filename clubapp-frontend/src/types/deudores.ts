@@ -13,8 +13,14 @@ export interface CuotaVencida {
   telefono: string;
   dni: string;
   cantidadCuotasImpagas: number;
+  cuotasPendientes?: number;
+  cuotasImpagas?: number;
   periodosVencidos: string[];
   montoTotalAdeudado: number;
   diasDeAtraso: number;
   paymentIds: number[];
+  esAutoBloqueado: boolean;
+  esBloqueadoManual: boolean;
+  estaBloqueado: boolean;
+
 }

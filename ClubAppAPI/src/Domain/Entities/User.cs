@@ -34,6 +34,9 @@ public class User : BaseEntity
     // Estado de la cuenta: permite deshabilitar el acceso sin eliminar el registro.
     public bool IsActive { get; set; } = true;
 
+    // Propiedad calculada para bloqueo por morosidad
+    public bool IsBlocked => !IsActive;
+
     // Soft delete: en lugar de borrar físicamente, marcamos al usuario como eliminado.
     public bool IsDeleted { get; set; } = false;
 

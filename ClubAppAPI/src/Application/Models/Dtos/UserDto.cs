@@ -18,5 +18,6 @@ public class UserDto
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public UserRole Role { get; set; }
     public bool IsActive { get; set; } = true;
+    public bool IsBlocked { get; set; }
     public DateTime CreatedAt { get; set; }
 }
