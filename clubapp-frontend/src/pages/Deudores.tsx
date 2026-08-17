@@ -188,13 +188,14 @@ function SummaryCard({
 function DebtorCard({
   debtor,
   onPay,
-  onNotify,
+  onNotifyWhatsApp,
+  onNotifyEmail,
 }: {
   debtor: CuotaVencida;
   onPay: (d: CuotaVencida) => void;
-  onNotify: (d: CuotaVencida) => void;
+  onNotifyWhatsApp: (d: CuotaVencida) => void;
+  onNotifyEmail: (d: CuotaVencida) => void;
 }) {
-  const hasPhone = (debtor.telefono || '').replace(/\D/g, '').length >= 8;
   const cuotasLabel = `${debtor.cantidadCuotasImpagas} cuota${debtor.cantidadCuotasImpagas !== 1 ? 's' : ''}`;
   const diasLabel = `${debtor.diasDeAtraso} día${debtor.diasDeAtraso !== 1 ? 's' : ''}`;
 
@@ -254,12 +255,21 @@ function DebtorCard({
         >
           <CreditCard size={14} /> Registrar Pago
         </button>
+        {/* Botón Notificar WhatsApp */}
         <button
-          onClick={() => onNotify(debtor)}
-          title="Notificar por WhatsApp o email"
+          onClick={() => onNotifyWhatsApp(debtor)}
+          title="Notificar por WhatsApp"
           className="shrink-0 p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 transition-all"
         >
-          {hasPhone ? <MessageCircle size={16} /> : <Mail size={16} />}
+          <MessageCircle size={16} />
+        </button>
+        {/* Botón Notificar Email */}
+        <button
+          onClick={() => onNotifyEmail(debtor)}
+          title="Notificar por Email"
+          className="shrink-0 p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 transition-all"
+        >
+          <Mail size={16} />
         </button>
       </div>
     </div>
@@ -586,7 +596,8 @@ export default function Deudores() {
                           key={d.socioId}
                           debtor={d}
                           onPay={openPaymentModal}
-                          onNotify={notifyDebtor}
+                          onNotifyWhatsApp={notifyByWhatsApp}
+                          onNotifyEmail={notifyByEmail}
                         />
                       ))}
                     </div>
@@ -668,17 +679,22 @@ export default function Deudores() {
                                 >
                                   {d.estaBloqueado ? <Unlock size={15} /> : <Lock size={15} />}
                                 </button>
-                                <button
-                                  onClick={() => notifyDebtor(d)}
-                                  title="Notificar por WhatsApp o email"
-                                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 transition-all"
-                                >
-                                  {(d.telefono || '').replace(/\D/g, '').length >= 8 ? (
-                                    <MessageCircle size={15} />
-                                  ) : (
-                                    <Mail size={15} />
-                                  )}
-                                </button>
+                                {/* Botón Notificar WhatsApp */}
+                                 <button
+                                   onClick={() => notifyByWhatsApp(d)}
+                                   title="Notificar por WhatsApp"
+                                   className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 transition-all"
+                                 >
+                                   <MessageCircle size={15} />
+                                 </button>
+                                 {/* Botón Notificar Email */}
+                                 <button
+                                   onClick={() => notifyByEmail(d)}
+                                   title="Notificar por Email"
+                                   className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 transition-all"
+                                 >
+                                   <Mail size={15} />
+                                 </button>
                               </div>
                             </td>
                           </tr>
