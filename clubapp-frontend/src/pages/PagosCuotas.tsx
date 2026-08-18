@@ -56,6 +56,18 @@ export const PagosCuotas: React.FC = () => {
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validación de seguridad antes de enviar
+    if (settings.baseFeeAmount < 0 || settings.lateFeePercentage < 0) {
+      setMessage({ text: 'Los valores de precio y recargo no pueden ser negativos.', type: 'error' });
+      return;
+    }
+    
+    if (settings.dueDayOfMonth < 1 || settings.dueDayOfMonth > 31) {
+      setMessage({ text: 'El día de vencimiento debe estar entre 1 y 31.', type: 'error' });
+      return;
+    }
+
     try {
       setSavingSettings(true);
       await paymentsService.updateSettings(settings);
@@ -149,8 +161,10 @@ export const PagosCuotas: React.FC = () => {
                       <span className="absolute left-3 top-2.5 text-slate-500">$</span>
                       <input
                         type="number"
+                        min="0"
+                        onKeyDown={(e) => ["-", "e", "E"].includes(e.key) && e.preventDefault()}
                         value={settings.baseFeeAmount}
-                        onChange={e => setSettings({ ...settings, baseFeeAmount: Number(e.target.value) })}
+                        onChange={e => setSettings({ ...settings, baseFeeAmount: Math.max(0, Number(e.target.value)) })}
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-4 py-2 text-white focus:outline-none focus:border-emerald-500"
                         required
                       />
@@ -178,8 +192,10 @@ export const PagosCuotas: React.FC = () => {
                       )}
                       <input
                         type="number"
+                        min="0"
+                        onKeyDown={(e) => ["-", "e", "E"].includes(e.key) && e.preventDefault()}
                         value={settings.lateFeePercentage}
-                        onChange={e => setSettings({ ...settings, lateFeePercentage: Number(e.target.value) })}
+                        onChange={e => setSettings({ ...settings, lateFeePercentage: Math.max(0, Number(e.target.value)) })}
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-white focus:outline-none focus:border-emerald-500"
                         required
                       />
@@ -196,8 +212,14 @@ export const PagosCuotas: React.FC = () => {
                         type="number"
                         min="1"
                         max="31"
+                        onKeyDown={(e) => ["-", "e", "E"].includes(e.key) && e.preventDefault()}
                         value={settings.dueDayOfMonth}
-                        onChange={e => setSettings({ ...settings, dueDayOfMonth: Number(e.target.value) })}
+                        onChange={e => {
+                          const val = Number(e.target.value);
+                          if (val >= 1 && val <= 31) {
+                            setSettings({ ...settings, dueDayOfMonth: val });
+                          }
+                        }}
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-white focus:outline-none focus:border-emerald-500"
                         required
                       />
