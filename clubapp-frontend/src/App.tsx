@@ -10,6 +10,7 @@ import Reservations from './pages/Reservations';
 import Deudores from './pages/Deudores';
 import Socios from './pages/Socios';
 import { PagosCuotas } from './pages/PagosCuotas';
+import { MisCuotas } from './pages/MisCuotas';
 // Error pages
 import Forbidden403 from './pages/errors/Forbidden403';
 import Unauthorized401 from './pages/errors/Unauthorized401';
@@ -50,6 +51,7 @@ export default function App() {
             <Route path="/deudores" element={<Deudores />} />
             <Route path="/socios" element={<Socios />} />
             <Route path="/pagos" element={<PagosCuotas />} />
+            <Route path="/mis-cuotas" element={<MisCuotas />} />
           </Route>
 
           {/* 404 - Página no encontrada (comodín) */}

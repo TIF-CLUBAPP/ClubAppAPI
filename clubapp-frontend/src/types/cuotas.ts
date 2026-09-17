@@ -13,13 +13,19 @@ export interface UserExemption {
   Email: string;
   Role: string;
   IsExemptFromFees: boolean;
+  dni?: string;
+  category?: 'Discapacidad' | 'Jubilado' | 'Beca Social/Deportiva' | 'Socio Vitalicio' | 'Otro' | string;
+  discountPercentage?: number; // 1 - 100%
+  reason?: string; // Observaciones / Motivo
 }
 
 // Exención de rol (GET /api/payments/exemptions)
 export interface RoleExemption {
   Role: string;
   AreFeesExempt: boolean;
+  discountPercentage?: number; // 0 - 100%
   Description?: string;
+  userCount?: number;
 }
 
 // Respuesta completa de exenciones
@@ -88,5 +94,24 @@ export interface CuotaVencida {
   esAutoBloqueado: boolean;
   esBloqueadoManual: boolean;
   estaBloqueado: boolean;
+}
+
+
+export interface MemberCuota {
+  id: string;
+  periodo: string; // ej. "Septiembre 2026"
+  mesAno: string; // ej. "2026-09"
+  fechaVencimiento: string; // ej. "15/09/2026"
+  baseAmount: number;
+  discountPercentage: number;
+  discountReason?: string;
+  isOverdue: boolean;
+  lateFeeAmount: number;
+  lateFeeLabel?: string;
+  totalAmount: number;
+  status: 'PAGADA' | 'PENDIENTE' | 'EN_MORA';
+  paidAt?: string;
+  paymentMethod?: string;
+  receiptNumber?: string;
 }
 
