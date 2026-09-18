@@ -1,0 +1,60 @@
+﻿41|     {
+42|         return Ok(await _paymentService.GetOverdueCuotasListAsync());
+43|     }
+44| 
+45|     /// <summary>
+46|     /// Marca una cuota vencida (o deuda) como pagada. Registra el cobro en caja,
+47|     /// liquida el 10% de mora si corresponde y reactiva la membresía del socio.
+48|     /// </summary>
+49|     [HttpPost("{id:int}/registrar-pago")]
+50|     [Authorize(Roles = "ADMIN,SUPERADMIN")]
+51|     [ProducesResponseType(StatusCodes.Status200OK)]
+52|     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+53|     [ProducesResponseType(StatusCodes.Status404NotFound)]
+54|     public async Task<IActionResult> RegistrarPago(int id)
+55|     {
+56|         var result = await _paymentService.RegistrarPagoAsync(id);
+57| 
+58|         return result switch
+59|         {
+60|             "NOT_FOUND" => NotFound(new { message = $"No se encontró la cuota {id}." }),
+61|             "ALREADY_PAID" => BadRequest(new { message = "La cuota ya fue registrada como pagada." }),
+62|             _ => Ok(new { message = "Pago registrado correctamente.", cuotaId = id })
+63|         };
+64|     }
+65| 
+66|     /// <summary>
+67|     /// Cobro parcial: registra el pago únicamente de las cuotas seleccionadas por el
+68|     /// usuario en caja, dejando el resto en estado impago.
+69|     /// </summary>
+70|     [HttpPost("registrar-pago")]
+71|     [Authorize(Roles = "ADMIN,SUPERADMIN")]
+72|     [ProducesResponseType(StatusCodes.Status200OK)]
+73|     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+74|     public async Task<IActionResult> RegistrarPagoParcial([FromBody] RegistrarPagoParcialDto dto)
+75|     {
+76|         if (dto?.CuotaIds == null || dto.CuotaIds.Count == 0)
+77|         {
+78|             return BadRequest(new { message = "Debe seleccionar al menos una cuota para registrar el pago." });
+79|         }
+80| 
+81|         var resultado = await _paymentService.RegistrarPagoParcialAsync(dto.CuotaIds);
+82| 
+83|         return Ok(new
+84|         {
+85|             message = $"Se registraron {resultado.CuotasPagadas} cuota(s) correctamente.",
+86|             cuotasPagadas = resultado.CuotasPagadas,
+87|             cuotasOmitidas = resultado.CuotasOmitidas,
+88|             montoTotal = resultado.MontoTotal
+89|         });
+90|     }
+91| }
+92| 
+93| /// <summary>
+94| /// DTO de entrada para el cobro parcial: lista de IDs de cuotas a abonar.
+95| /// </summary>
+96| public class RegistrarPagoParcialDto
+97| {
+98|     public List<int> CuotaIds { get; set; } = new();
+99| }
+100| }

@@ -118,43 +118,144 @@ public class PaymentService : IPaymentService
 
 // ========== Configuración de cuotas (FeeSettings) ==========
 
+    /// <summary>
+    /// Calcula el primer día del mes siguiente (UTC). La nueva tarifa rige desde esa fecha,
+    /// de modo que las cuotas y deudas ya emitidas del mes en curso no se modifican.
+    /// </summary>
+    private static DateTime CalcularVigenciaProximoMes(DateTime? now = null)
+    {
+        var baseDate = now ?? DateTime.UtcNow;
+        return new DateTime(baseDate.Year, baseDate.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(1);
+    }
+
     public async Task<FeeSettingsDto> GetFeeSettingsAsync()
     {
-        var settings = await _context.FeeSettings.FirstOrDefaultAsync();
+        // La tarifa vigente es la fila marcada como actual; si no existe,
+        // se toma la más reciente por fecha de vigencia.
+        var settings = await _context.FeeSettings
+            .Where(f => f.IsCurrent)
+            .OrderByDescending(f => f.EffectiveFromDate)
+            .FirstOrDefaultAsync()
+            ?? await _context.FeeSettings
+                .OrderByDescending(f => f.EffectiveFromDate)
+                .FirstOrDefaultAsync();
+
         if (settings == null)
         {
-            return new FeeSettingsDto { BaseFeeAmount = 0, LateFeePercentage = 10, DueDayOfMonth = 10 };
+            return new FeeSettingsDto
+            {
+                BaseFeeAmount = 0,
+                LateFeePercentage = 10,
+                DueDayOfMonth = 10,
+                EffectiveFromDate = null,
+                PendingEffectiveFromDate = null
+            };
+        }
+
+        // Si el último cambio registrado aún no entró en vigencia (fecha futura),
+        // se informa como pendiente sin aplicarlo todavía.
+        var ultimoCambio = await _context.FeeSettingsHistory
+            .OrderByDescending(h => h.ChangedAt)
+            .FirstOrDefaultAsync();
+
+        DateTime? pendiente = null;
+        if (ultimoCambio != null && ultimoCambio.EffectiveFromDate > DateTime.UtcNow)
+        {
+            pendiente = ultimoCambio.EffectiveFromDate;
         }
 
         return new FeeSettingsDto
         {
             BaseFeeAmount = settings.BaseFeeAmount,
             LateFeePercentage = settings.LateFeePercentage,
-            DueDayOfMonth = settings.DueDayOfMonth
+            DueDayOfMonth = settings.DueDayOfMonth,
+            EffectiveFromDate = settings.EffectiveFromDate,
+            PendingEffectiveFromDate = pendiente
         };
     }
 
-    public async Task<FeeSettingsDto> UpdateFeeSettingsAsync(UpdateFeeSettingsDto dto)
+    public async Task<FeeSettingsDto> UpdateFeeSettingsAsync(UpdateFeeSettingsDto dto, int? changedByUserId = null)
     {
-        var settings = await _context.FeeSettings.FirstOrDefaultAsync();
-        if (settings == null)
+        var vigencia = CalcularVigenciaProximoMes();
+
+        var actual = await _context.FeeSettings
+            .Where(f => f.IsCurrent)
+            .OrderByDescending(f => f.EffectiveFromDate)
+            .FirstOrDefaultAsync();
+
+        if (actual == null)
         {
-            settings = new FeeSettings();
-            _context.FeeSettings.Add(settings);
+            actual = new FeeSettings
+            {
+                BaseFeeAmount = 0m,
+                LateFeePercentage = 10m,
+                DueDayOfMonth = 10,
+                EffectiveFromDate = null,
+                IsCurrent = true
+            };
+            _context.FeeSettings.Add(actual);
         }
 
-        settings.BaseFeeAmount = dto.BaseFeeAmount;
-        settings.LateFeePercentage = dto.LateFeePercentage;
-        settings.DueDayOfMonth = dto.DueDayOfMonth;
+        // 1) Archivar SIEMPRE la tarifa anterior en el historial (no se pierde ni se sobrescribe).
+        _context.FeeSettingsHistory.Add(new FeeSettingsHistory
+        {
+            PreviousBaseFeeAmount = actual.BaseFeeAmount,
+            PreviousLateFeePercentage = actual.LateFeePercentage,
+            PreviousDueDayOfMonth = actual.DueDayOfMonth,
+            NewBaseFeeAmount = dto.BaseFeeAmount,
+            NewLateFeePercentage = dto.LateFeePercentage,
+            NewDueDayOfMonth = dto.DueDayOfMonth,
+            EffectiveFromDate = vigencia,
+            ChangedAt = DateTime.UtcNow,
+            ChangedByUserId = changedByUserId,
+            Notes = $"Nueva tarifa vigente desde {vigencia:yyyy-MM-dd}."
+        });
+
+        // 2) La fila actual deja de ser la vigente y se crea una nueva con EffectiveFromDate.
+        actual.IsCurrent = false;
+
+        var nueva = new FeeSettings
+        {
+            BaseFeeAmount = dto.BaseFeeAmount,
+            LateFeePercentage = dto.LateFeePercentage,
+            DueDayOfMonth = dto.DueDayOfMonth,
+            EffectiveFromDate = vigencia,
+            IsCurrent = true
+        };
+        _context.FeeSettings.Add(nueva);
 
         await _context.SaveChangesAsync();
 
         return new FeeSettingsDto
         {
-            BaseFeeAmount = settings.BaseFeeAmount,
-            LateFeePercentage = settings.LateFeePercentage,
-            DueDayOfMonth = settings.DueDayOfMonth
+            BaseFeeAmount = nueva.BaseFeeAmount,
+            LateFeePercentage = nueva.LateFeePercentage,
+            DueDayOfMonth = nueva.DueDayOfMonth,
+            EffectiveFromDate = nueva.EffectiveFromDate,
+            PendingEffectiveFromDate = vigencia
         };
+    }
+
+    public async Task<List<FeeSettingsHistoryDto>> GetFeeSettingsHistoryAsync()
+    {
+        return await _context.FeeSettingsHistory
+            .OrderByDescending(h => h.EffectiveFromDate)
+            .ThenByDescending(h => h.Id)
+            .Select(h => new FeeSettingsHistoryDto
+            {
+                Id = h.Id,
+                PreviousBaseFeeAmount = h.PreviousBaseFeeAmount,
+                PreviousLateFeePercentage = h.PreviousLateFeePercentage,
+                PreviousDueDayOfMonth = h.PreviousDueDayOfMonth,
+                NewBaseFeeAmount = h.NewBaseFeeAmount,
+                NewLateFeePercentage = h.NewLateFeePercentage,
+                NewDueDayOfMonth = h.NewDueDayOfMonth,
+                EffectiveFromDate = h.EffectiveFromDate,
+                ChangedAt = h.ChangedAt,
+                ChangedByUserId = h.ChangedByUserId,
+                Notes = h.Notes
+            })
+            .ToListAsync();
     }
     // ========== Exenciones ==========
 
@@ -424,6 +525,65 @@ public class PaymentService : IPaymentService
 
         await _context.SaveChangesAsync();
         return "OK";
+    }
+
+    /// <summary>
+    /// Cobro parcial: registra el pago únicamente de las cuotas indicadas,
+    /// dejando el resto en estado impago. Devuelve el resumen del cobro.
+    /// </summary>
+    public async Task<RegistrarPagoParcialResult> RegistrarPagoParcialAsync(IEnumerable<int> cuotaIds)
+    {
+        var ids = cuotaIds?.Distinct().ToList() ?? new List<int>();
+        var resultado = new RegistrarPagoParcialResult();
+
+        if (ids.Count == 0) return resultado;
+
+        var payments = await _context.Payments
+            .Where(p => ids.Contains(p.Id))
+            .ToListAsync();
+
+        var now = DateTime.UtcNow;
+        var userIdsAfectados = new HashSet<int>();
+
+        foreach (var payment in payments)
+        {
+            if (payment.Status == PaymentStatus.Paid)
+            {
+                resultado.CuotasOmitidas++;
+                continue;
+            }
+
+            payment.Status = PaymentStatus.Paid;
+            payment.PaymentDate = now;
+
+            resultado.CuotasPagadas++;
+            resultado.MontoTotal += payment.Amount;
+            userIdsAfectados.Add(payment.UserId);
+        }
+
+        if (resultado.CuotasPagadas > 0)
+        {
+            // Reactivar la membresía de los socios que regularizaron al menos una cuota.
+            var memberships = await _context.Memberships
+                .Where(m => userIdsAfectados.Contains(m.UserId))
+                .ToListAsync();
+            foreach (var membership in memberships)
+            {
+                membership.Status = MembershipStatus.ACTIVE;
+            }
+
+            var users = await _context.Users
+                .Where(u => userIdsAfectados.Contains(u.Id))
+                .ToListAsync();
+            foreach (var user in users)
+            {
+                user.LastPaymentDate = now;
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
+        return resultado;
     }
 
     // Ej: "Julio 2026"

@@ -116,8 +116,22 @@ public class PaymentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> UpdateFeeSettings([FromBody] UpdateFeeSettingsDto dto)
     {
-        var updated = await _paymentService.UpdateFeeSettingsAsync(dto);
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        int? changedByUserId = int.TryParse(userIdClaim, out var uid) ? uid : null;
+
+        var updated = await _paymentService.UpdateFeeSettingsAsync(dto, changedByUserId);
         return Ok(updated);
+    }
+
+    /// <summary>
+    /// Obtener el historial de cambios de precios de cuotas.
+    /// </summary>
+    [HttpGet("settings/history")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetFeeSettingsHistory()
+    {
+        return Ok(await _paymentService.GetFeeSettingsHistoryAsync());
     }
 
     // ========== Exenciones ==========

@@ -1,0 +1,26 @@
+﻿1| using Microsoft.EntityFrameworkCore;
+2| using ClubApp.Application.Interfaces;
+3| using ClubApp.Application.Dtos;
+4| using ClubApp.Domain.Entities;
+5| using ClubApp.Domain.Exceptions;
+6| using ClubApp.Infrastructure.Data;
+7| using System.Globalization;
+8| 
+9| namespace ClubApp.Infrastructure.Services;
+10| 
+11| public class PaymentService : IPaymentService
+12| {
+13|     private readonly ApplicationContext _context;
+14| 
+15|     public PaymentService(ApplicationContext context)
+16|     {
+17|         _context = context;
+18|     }
+19| 
+20|     public async Task<IEnumerable<Payment>> GetAllPaymentsAsync()
+21|     {
+22|         var payments = await _context.Payments
+23|             .Include(p => p.User)
+24|             .ToListAsync();
+25| 
+26|         CheckAndUpdateOverdueStatus(payments);

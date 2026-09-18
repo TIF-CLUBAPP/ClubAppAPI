@@ -5,6 +5,7 @@ import {
   AlertCircle,
   AlertTriangle,
   ArrowUpDown,
+  Check,
   CheckCircle2,
   Clock,
   CreditCard,
@@ -26,15 +27,28 @@ import Header from '../components/layout/Header';
 import Sidebar from '../components/layout/Sidebar';
 import { useAuth } from '../context/AuthContext';
 import { cuotasService } from '../services/cuotasService';
+import { paymentsService } from '../services/paymentsService';
 import type { CuotaVencida, CuotasVencidasStats } from '../types/deudores';
+import type { FeeSettings } from '../types/cuotas';
 
 const formatNumber = (value: number) => value.toLocaleString('es-AR');
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(value);
 
-const getInitials = (nombre: string, apellido: string) =>
-  `${nombre[0] ?? ''}${apellido[0] ?? ''}`.toUpperCase() || '?';
+/** Configuración por defecto hasta que responda GET /payments/settings. */
+const DEFAULT_FEE_SETTINGS: FeeSettings = {
+  baseFeeAmount: 150000,
+  lateFeePercentage: 10,
+  lateFeeType: 'percentage',
+  dueDayOfMonth: 10,
+};
+
+const getInitials = (nombre?: string | null, apellido?: string | null) => {
+  const a = typeof nombre === 'string' ? nombre.trim() : '';
+  const b = typeof apellido === 'string' ? apellido.trim() : '';
+  return `${a[0] ?? ''}${b[0] ?? ''}`.toUpperCase() || '?';
+};
 
 /**
  * Mapeo de nombres de meses en español a número (0-11 para Date)
@@ -53,8 +67,8 @@ const MESES_MAP: Record<string, number> = {
  * representando la fecha de vencimiento (día 10 del mes).
  * Retorna null si no se puede parsear.
  */
-const parsePeriodoToDate = (periodo: string): Date | null => {
-  if (!periodo) return null;
+const parsePeriodoToDate = (periodo?: string | null): Date | null => {
+  if (!periodo || typeof periodo !== 'string') return null;
   
   // Formato MM/YYYY
   const matchMMYYYY = periodo.match(/^(\d{2})\/(\d{4})$/);
@@ -119,8 +133,8 @@ const calcularDiasMora = (periodosVencidos: string[]): number => {
  * Formatea un período de "Mes Año" (ej. "Julio 2026") a "MM/YYYY" (ej. "07/2026")
  * También maneja formatos como "MM/YYYY" directamente.
  */
-const formatPeriodo = (periodo: string): string => {
-  if (!periodo) return '—';
+const formatPeriodo = (periodo?: string | null): string => {
+  if (!periodo || typeof periodo !== 'string') return '—';
   
   // Si ya está en formato MM/YYYY, devolverlo tal cual
   if (/^\d{2}\/\d{4}$/.test(periodo)) return periodo;
@@ -139,6 +153,64 @@ const formatPeriodo = (periodo: string): string => {
   
   // Fallback: devolver el original si no se puede parsear
   return periodo;
+};
+
+/**
+ * Devuelve el nombre del mes capitalizado (ej. "Mayo") a partir de un período
+ * en formato "Mes Año" o "MM/YYYY".
+ */
+const NOMBRES_MESES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
+
+const getNombreMes = (periodo?: string | null): string => {
+  if (!periodo || typeof periodo !== 'string') return '';
+
+  // Formato "MM/YYYY"
+  const matchMM = periodo.match(/^(\d{2})\/(\d{4})$/);
+  if (matchMM) {
+    const mes = parseInt(matchMM[1], 10) - 1;
+    return NOMBRES_MESES[mes] ?? '';
+  }
+
+  // Formato "Mes Año"
+  const matchMes = periodo.match(/^(\w+)\s+(\d{4})$/i);
+  if (matchMes) {
+    const mesLower = matchMes[1].toLowerCase();
+    const mesNum = MESES_MAP[mesLower] ?? MESES_MAP[mesLower.substring(0, 3)];
+    return mesNum !== undefined ? NOMBRES_MESES[mesNum] ?? '' : '';
+  }
+
+  return '';
+};
+
+/**
+ * Formatea cada cuota como "[Mes] (MM/YYYY) $[Monto]" (ej. "Mayo (05/2026) $18.000").
+ */
+const formatCuotaDetalle = (periodo?: string | null, monto?: number | null): string => {
+  const mesNombre = getNombreMes(periodo);
+  const mesAnio = formatPeriodo(periodo);
+  const prefijo = mesNombre ? `${mesNombre} (${mesAnio})` : mesAnio;
+  const montoSeguro = Number.isFinite(monto as number) ? (monto as number) : 0;
+  return `${prefijo} ${formatCurrency(montoSeguro)}`;
+};
+
+/**
+ * Determina si una cuota está vencida comparando su período con el mes actual.
+ * Una cuota es vencida cuando su mes/año es anterior al mes/año de hoy.
+ */
+const estaVencida = (periodo?: string | null, dueDayOfMonth = 10): boolean => {
+  const fechaVenc = parsePeriodoToDate(periodo);
+  if (!fechaVenc) return false;
+
+  const hoy = new Date();
+  // El período se resuelve al día de vencimiento configurado globalmente
+  // (FeeSettings.dueDayOfMonth). Una cuota es "VENCIDA" cuando esa fecha
+  // (día de vencimiento del mes de la cuota) ya pasó respecto de hoy.
+  const dia = Math.min(31, Math.max(1, dueDayOfMonth || 10));
+  const vencimiento = new Date(fechaVenc.getFullYear(), fechaVenc.getMonth(), dia);
+  return vencimiento < hoy;
 };
 
 /**
@@ -295,6 +367,13 @@ export default function Deudores() {
   const [modalError, setModalError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
+  // IDs de las cuotas seleccionadas para el cobro (permite cobros parciales).
+  const [selectedCuotaIds, setSelectedCuotaIds] = useState<number[]>([]);
+  // Configuración global de cuotas (precio base, recargo por mora, día de vencimiento).
+  const [feeSettings, setFeeSettings] = useState<FeeSettings>(DEFAULT_FEE_SETTINGS);
+  // Resumen del último cobro registrado (para el estado de éxito del modal).
+  const [lastPayment, setLastPayment] = useState<{ cantidad: number; monto: number } | null>(null);
+
   const toastTimer = useRef<number | null>(null);
 
   const loadData = useCallback(async () => {
@@ -369,25 +448,98 @@ export default function Deudores() {
 
   const openPaymentModal = (debtor: CuotaVencida) => {
     setPaymentTarget(debtor);
+    // Por defecto se seleccionan todas las cuotas impagas del socio.
+    setSelectedCuotaIds([...(debtor.paymentIds ?? [])]);
+    // Aseguramos la configuración vigente al abrir el modal de cobro.
+    void loadFeeSettings();
+    setLastPayment(null);
     setModalStatus('idle');
     setModalError(null);
   };
 
   const closePaymentModal = () => {
     setPaymentTarget(null);
+    setSelectedCuotaIds([]);
     setModalStatus('idle');
     setModalError(null);
   };
 
-  // Registra el pago de todas las cuotas impagas del socio (una por una)
+  // Carga la configuración global de cuotas (FeeSettings) para calcular
+  // el valor dinámico de cada cuota y el recargo por mora.
+  const loadFeeSettings = useCallback(async () => {
+    try {
+      const data = await paymentsService.getSettings();
+      setFeeSettings({
+        baseFeeAmount: data.baseFeeAmount ?? DEFAULT_FEE_SETTINGS.baseFeeAmount,
+        lateFeePercentage: data.lateFeePercentage ?? DEFAULT_FEE_SETTINGS.lateFeePercentage,
+        lateFeeType: data.lateFeeType ?? DEFAULT_FEE_SETTINGS.lateFeeType,
+        dueDayOfMonth: data.dueDayOfMonth ?? DEFAULT_FEE_SETTINGS.dueDayOfMonth,
+      });
+    } catch (err) {
+      console.warn('No se pudo obtener FeeSettings; se usan valores por defecto.', err);
+    }
+  }, []);
+
+  // Alterna la selección de una cuota individual.
+  const toggleCuota = (cuotaId: number) => {
+    setSelectedCuotaIds(prev =>
+      prev.includes(cuotaId) ? prev.filter(id => id !== cuotaId) : [...prev, cuotaId]
+    );
+  };
+
+  // Selecciona o deselecciona todas las cuotas del socio.
+  const toggleAllCuotas = () => {
+    if (!paymentTarget) return;
+    const all = paymentTarget.paymentIds ?? [];
+    setSelectedCuotaIds(prev => (prev.length === all.length ? [] : [...all]));
+  };
+
+  // Valor dinámico de una cuota según la configuración global (FeeSettings).
+  // Aplica el recargo por mora cuando la fecha de vencimiento ya pasó.
+  const getMontoCuota = useCallback(
+    (cuotaId: number, periodo: string): number => {
+      const base = feeSettings.baseFeeAmount ?? 0;
+      const exencion = paymentTarget?.exencionPorcentaje ?? 0;
+      const montoBase = Math.max(0, base * (1 - exencion / 100));
+      if (!estaVencida(periodo, feeSettings.dueDayOfMonth)) return montoBase;
+      const recargo =
+        feeSettings.lateFeeType === 'percentage'
+          ? (montoBase * (feeSettings.lateFeePercentage ?? 0)) / 100
+          : feeSettings.lateFeePercentage ?? 0;
+      void cuotaId;
+      return Math.round(montoBase + recargo);
+    },
+    [feeSettings, paymentTarget]
+  );
+
+  // Monto correspondiente a las cuotas seleccionadas. Se recalcula con el valor
+  // dinámico de cada cuota (FeeSettings + mora) en lugar del promedio proporcional.
+  const montoSeleccionado = useMemo(() => {
+    if (!paymentTarget || !paymentTarget.paymentIds?.length) return 0;
+    return paymentTarget.paymentIds.reduce((total, cuotaId, idx) => {
+      if (!selectedCuotaIds.includes(cuotaId)) return total;
+      const periodo =
+        paymentTarget.periodosVencidos?.[idx] ??
+        paymentTarget.periodosVencidos?.[0] ??
+        'Cuota';
+      return total + getMontoCuota(cuotaId, periodo);
+    }, 0);
+  }, [paymentTarget, selectedCuotaIds, getMontoCuota]);
+
+  // Registra el pago únicamente de las cuotas seleccionadas (cobro parcial).
   const confirmPayment = async () => {
     if (!paymentTarget) return;
+    if (selectedCuotaIds.length === 0) {
+      setModalError('Seleccioná al menos una cuota para registrar el cobro.');
+      setModalStatus('error');
+      return;
+    }
     setModalStatus('processing');
     setModalError(null);
     try {
-      for (const id of paymentTarget.paymentIds) {
-        await cuotasService.registrarPago(id);
-      }
+      const idsToPay = [...selectedCuotaIds];
+      await cuotasService.registrarPagoParcial(idsToPay);
+      setLastPayment({ cantidad: idsToPay.length, monto: montoSeleccionado });
       setModalStatus('success');
     } catch (err) {
       console.error('Error registrando pago:', err);
@@ -420,11 +572,15 @@ export default function Deudores() {
 
   const finishPayment = () => {
     const debtor = paymentTarget;
+    const pagado = lastPayment;
     closePaymentModal();
+    setLastPayment(null);
     loadData();
     if (debtor) {
       showToast(
-        `Cobro registrado: ${debtor.nombre} ${debtor.apellido} · ${formatCurrency(debtor.montoTotalAdeudado)}`
+        `Cobro registrado: ${debtor.nombre} ${debtor.apellido} · ${formatCurrency(
+          pagado?.monto ?? debtor.montoTotalAdeudado
+        )}`
       );
     }
   };
@@ -736,9 +892,9 @@ export default function Deudores() {
                   </div>
                   <h3 className="mt-4 text-lg font-black text-white">¡Cobro registrado!</h3>
                   <p className="mt-1 text-xs text-slate-400 leading-5">
-                    Se registraron {paymentTarget.paymentIds.length} pago(s) por{' '}
-                    {formatCurrency(paymentTarget.montoTotalAdeudado)} a favor de {paymentTarget.nombre}{' '}
-                    {paymentTarget.apellido}.
+                    Se registraron {lastPayment?.cantidad ?? selectedCuotaIds.length} pago(s) por{' '}
+                    {formatCurrency(lastPayment?.monto ?? montoSeleccionado)} a favor de{' '}
+                    {paymentTarget.nombre || 'el socio'} {paymentTarget.apellido || ''}.
                   </p>
                   <button
                     onClick={finishPayment}
@@ -777,27 +933,109 @@ export default function Deudores() {
                       </div>
                       <div>
                         <p className="font-bold text-white text-sm">
-                          {paymentTarget.nombre} {paymentTarget.apellido}
+                          {paymentTarget.nombre || 'Socio'} {paymentTarget.apellido || ''}
                         </p>
-                        <p className="text-xs text-slate-400">{paymentTarget.dni || paymentTarget.email}</p>
+                        <p className="text-xs text-slate-400">
+                          {paymentTarget.dni || paymentTarget.email || 'Sin datos de contacto'}
+                        </p>
                       </div>
                     </div>
 
                     <div className="mt-4">
-                      <div className="flex flex-wrap gap-1">
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                          {getTextoPeriodos(paymentTarget)}
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          Cuotas a cobrar
                         </span>
+                        <button
+                          type="button"
+                          onClick={toggleAllCuotas}
+                          className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 transition-all"
+                        >
+                          {selectedCuotaIds.length === (paymentTarget.paymentIds?.length ?? 0)
+                            ? 'Quitar todas'
+                            : 'Seleccionar todas'}
+                        </button>
+                      </div>
+
+                      <div className="max-h-52 overflow-y-auto scrollbar-minimal overscroll-contain rounded-xl border border-slate-800 bg-slate-950/40 divide-y divide-slate-800/80 p-1">
+                        {(paymentTarget.paymentIds ?? []).map((cuotaId, idx) => {
+                          const periodo =
+                            paymentTarget.periodosVencidos?.[idx] ??
+                            paymentTarget.periodosVencidos?.[0] ??
+                            'Cuota';
+                          const checked = selectedCuotaIds.includes(cuotaId);
+                          // Una cuota está VENCIDA cuando su fecha de vencimiento (día
+                          // configurado en FeeSettings) ya pasó respecto de hoy.
+                          const esVencida = estaVencida(periodo, feeSettings.dueDayOfMonth);
+                          // La insignia "MÁS ANTIGUA" se reserva para la cuota más vieja.
+                          const esMasAntigua = idx === 0;
+                          // Monto dinámico de la cuota (precio base + recargo por mora).
+                          const montoCuota = getMontoCuota(cuotaId, periodo);
+                          return (
+                            <label
+                              key={cuotaId}
+                              className={`group flex items-center gap-3 px-4 py-4 rounded-lg cursor-pointer select-none transition-all duration-200 focus-within:ring-2 focus-within:ring-emerald-500/40 ${
+                                esVencida
+                                  ? 'hover:bg-rose-500/5 focus-within:bg-rose-500/5'
+                                  : 'hover:bg-slate-800/40 focus-within:bg-slate-800/40'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleCuota(cuotaId)}
+                                aria-label={`Cuota ${periodo}`}
+                                className="peer sr-only"
+                              />
+                              {/* Switch circular personalizado (reemplaza el checkbox nativo) */}
+                              <span
+                                aria-hidden="true"
+                                className={`relative inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200 ease-out ${
+                                  checked
+                                    ? 'border-emerald-500 bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.15)]'
+                                    : 'border-slate-600 bg-slate-900 group-hover:border-slate-500'
+                                }`}
+                              >
+                                <Check
+                                  size={12}
+                                  strokeWidth={4}
+                                  className={`text-slate-950 transition-all duration-200 ${
+                                    checked ? 'scale-100 opacity-100' : 'scale-50 opacity-0'
+                                  }`}
+                                />
+                              </span>
+                              <span
+                                className={`flex-1 text-sm font-semibold leading-6 ${
+                                  esVencida ? 'text-rose-400' : 'text-white'
+                                }`}
+                              >
+                                {formatCuotaDetalle(periodo, montoCuota)}
+                              </span>
+                              {esVencida && (
+                                <span className="shrink-0 px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-wider bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                                  VENCIDA
+                                </span>
+                              )}
+                              {esMasAntigua && (
+                                <span className="shrink-0 px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-wider bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                                  MÁS ANTIGUA
+                                </span>
+                              )}
+                            </label>
+                          );
+                        })}
                       </div>
                     </div>
 
                     <div className="mt-4 pt-4 border-t border-slate-800 flex items-center justify-between">
                       <span className="text-xs text-slate-400">
-                        Total ({paymentTarget.cantidadCuotasImpagas} cuota
-                        {paymentTarget.cantidadCuotasImpagas !== 1 ? 's' : ''})
+                        Total ({selectedCuotaIds.length} de{' '}
+                        {paymentTarget.cantidadCuotasImpagas ?? paymentTarget.paymentIds?.length ?? 0}{' '}
+                        cuota
+                        {(paymentTarget.cantidadCuotasImpagas ?? 1) !== 1 ? 's' : ''})
                       </span>
                       <span className="text-xl font-black text-rose-400">
-                        {formatCurrency(paymentTarget.montoTotalAdeudado)}
+                        {formatCurrency(montoSeleccionado)}
                       </span>
                     </div>
                   </div>
@@ -817,7 +1055,8 @@ export default function Deudores() {
                     </button>
                     <button
                       onClick={confirmPayment}
-                      className="py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-sm font-bold transition-all flex items-center justify-center gap-2"
+                      disabled={selectedCuotaIds.length === 0}
+                      className="py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-sm font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <CreditCard size={15} /> Confirmar Cobro
                     </button>

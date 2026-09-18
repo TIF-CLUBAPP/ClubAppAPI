@@ -1,0 +1,66 @@
+﻿1: import { useState, useEffect, useMemo, useCallback, useRef, type ReactNode } from 'react';
+30: import type { CuotaVencida, CuotasVencidasStats } from '../types/deudores';
+31: import type { FeeSettings } from '../types/cuotas';
+39: const DEFAULT_FEE_SETTINGS: FeeSettings = {
+195: * Determina si una cuota está vencida comparando su período con el mes actual.
+196: * Una cuota es vencida cuando su mes/año es anterior al mes/año de hoy.
+198: const estaVencida = (periodo: string, dueDayOfMonth = 10): boolean => {
+204: // (FeeSettings.dueDayOfMonth). Una cuota es "VENCIDA" cuando esa fecha
+215: function getTextoPeriodos(deudor: CuotaVencida): string {
+261: debtor: CuotaVencida;
+262: onPay: (d: CuotaVencida) => void;
+263: onNotifyWhatsApp: (d: CuotaVencida) => void;
+264: onNotifyEmail: (d: CuotaVencida) => void;
+351: const [debtors, setDebtors] = useState<CuotaVencida[]>([]);
+352: const [stats, setStats] = useState<CuotasVencidasStats | null>(null);
+353: const [loading, setLoading] = useState(true);
+354: const [error, setError] = useState<string | null>(null);
+356: const [search, setSearch] = useState('');
+357: const [sort, setSort] = useState<SortKey>('deuda-desc');
+359: const [paymentTarget, setPaymentTarget] = useState<CuotaVencida | null>(null);
+360: const [blockTarget, setBlockTarget] = useState<{ debtor: CuotaVencida; status: boolean } | null>(null);
+361: const [modalStatus, setModalStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
+362: const [modalError, setModalError] = useState<string | null>(null);
+363: const [toast, setToast] = useState<string | null>(null);
+366: const [selectedCuotaIds, setSelectedCuotaIds] = useState<number[]>([]);
+368: const [lastPayment, setLastPayment] = useState<{ cantidad: number; monto: number } | null>(null);
+372: const loadData = useCallback(async () => {
+398: loadData();
+402: }, [loadData]);
+442: const openPaymentModal = (debtor: CuotaVencida) => {
+445: setSelectedCuotaIds([...(debtor.paymentIds ?? [])]);
+453: setSelectedCuotaIds([]);
+460: setSelectedCuotaIds(prev =>
+469: setSelectedCuotaIds(prev => (prev.length === all.length ? [] : [...all]));
+478: selectedCuotaIds.length
+482: // Valor dinámico de una cuota según la configuración global (FeeSettings).
+484: const getMontoCuota = useCallback(
+486: const base = feeSettings.baseFeeAmount ?? 0;
+489: if (!estaVencida(periodo, feeSettings.dueDayOfMonth)) return montoBase;
+491: feeSettings.lateFeeType === 'percentage'
+492: ? (montoBase * (feeSettings.lateFeePercentage ?? 0)) / 100
+493: : feeSettings.lateFeePercentage ?? 0;
+497: [feeSettings, paymentTarget]
+503: if (selectedCuotaIds.length === 0) {
+511: const idsToPay = [...selectedCuotaIds];
+524: const initiateToggleUserStatus = (debtor: CuotaVencida, currentStatus: boolean) => {
+536: loadData(); // Recargar datos
+549: loadData();
+559: const notifyByWhatsApp = (d: CuotaVencida) => {
+569: const notifyByEmail = (d: CuotaVencida) => {
+576: `mailto:${d.email}?subject=${encodeURIComponent('Recordatorio de cuota vencida')}&body=${encodeURIComponent(message)}`,
+618: onClick={loadData}
+638: value={loading && !stats ? '—' : formatNumber(stats?.totalCuotasVencidas ?? 0)}
+639: sub="Cuotas vencidas sin cobrar"
+699: onClick={loadData}
+866: Se registraron {lastPayment?.cantidad ?? selectedCuotaIds.length} pago(s) por{' '}
+923: {selectedCuotaIds.length === (paymentTarget.paymentIds?.length ?? 0)
+935: const checked = selectedCuotaIds.includes(cuotaId);
+936: // Una cuota está vencida si su período es anterior al mes actual.
+937: const esVencida = estaVencida(periodo);
+939: const esMasAntigua = idx === 0;
+948: esVencida ? 'hover:bg-rose-500/5' : 'hover:bg-slate-800/40'
+959: esVencida ? 'text-rose-400' : 'text-white'
+964: {esMasAntigua && (
+977: Total ({selectedCuotaIds.length} de {paymentTarget.cantidadCuotasImpagas} cuota
+1001: disabled={selectedCuotaIds.length === 0}

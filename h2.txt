@@ -1,0 +1,117 @@
+﻿716|       <AnimatePresence>
+717|         {paymentTarget && (
+718|           <motion.div
+719|             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
+720|             initial={{ opacity: 0 }}
+721|             animate={{ opacity: 1 }}
+722|             exit={{ opacity: 0 }}
+723|             onClick={modalStatus === 'processing' ? undefined : closePaymentModal}
+724|           >
+725|             <motion.div
+726|               className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"
+727|               initial={{ opacity: 0, scale: 0.95, y: 12 }}
+728|               animate={{ opacity: 1, scale: 1, y: 0 }}
+729|               exit={{ opacity: 0, scale: 0.95, y: 12 }}
+730|               onClick={(e) => e.stopPropagation()}
+731|             >
+732|               {modalStatus === 'success' ? (
+733|                 <div className="text-center py-4">
+734|                   <div className="mx-auto w-14 h-14 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+735|                     <CheckCircle2 size={28} className="text-emerald-400" />
+736|                   </div>
+737|                   <h3 className="mt-4 text-lg font-black text-white">¡Cobro registrado!</h3>
+738|                   <p className="mt-1 text-xs text-slate-400 leading-5">
+739|                     Se registraron {paymentTarget.paymentIds.length} pago(s) por{' '}
+740|                     {formatCurrency(paymentTarget.montoTotalAdeudado)} a favor de {paymentTarget.nombre}{' '}
+741|                     {paymentTarget.apellido}.
+742|                   </p>
+743|                   <button
+744|                     onClick={finishPayment}
+745|                     className="mt-6 w-full py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm transition-all"
+746|                   >
+747|                     Cerrar
+748|                   </button>
+749|                 </div>
+750|               ) : modalStatus === 'processing' ? (
+751|                 <div className="text-center py-8">
+752|                   <Loader2 size={32} className="mx-auto animate-spin text-emerald-400" />
+753|                   <p className="mt-4 text-sm font-bold text-white">Registrando pago...</p>
+754|                   <p className="text-xs text-slate-400">Liquidando cuota(s) en caja.</p>
+755|                 </div>
+756|               ) : (
+757|                 <>
+758|                   <div className="flex items-start justify-between gap-3">
+759|                     <div>
+760|                       <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider">
+761|                         Confirmación de cobro
+762|                       </span>
+763|                       <h3 className="mt-1 text-lg font-black text-white">Registrar Pago</h3>
+764|                     </div>
+765|                     <button
+766|                       onClick={closePaymentModal}
+767|                       className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-all"
+768|                     >
+769|                       <X size={16} />
+770|                     </button>
+771|                   </div>
+772| 
+773|                   <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-950 p-4">
+774|                     <div className="flex items-center gap-3">
+775|                       <div className="w-10 h-10 rounded-full bg-linear-to-tr from-slate-800 to-slate-700 border border-slate-700 flex items-center justify-center text-emerald-400 font-bold text-xs shrink-0">
+776|                         {getInitials(paymentTarget.nombre, paymentTarget.apellido)}
+777|                       </div>
+778|                       <div>
+779|                         <p className="font-bold text-white text-sm">
+780|                           {paymentTarget.nombre} {paymentTarget.apellido}
+781|                         </p>
+782|                         <p className="text-xs text-slate-400">{paymentTarget.dni || paymentTarget.email}</p>
+783|                       </div>
+784|                     </div>
+785| 
+786|                     <div className="mt-4">
+787|                       <div className="flex flex-wrap gap-1">
+788|                         <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+789|                           {getTextoPeriodos(paymentTarget)}
+790|                         </span>
+791|                       </div>
+792|                     </div>
+793| 
+794|                     <div className="mt-4 pt-4 border-t border-slate-800 flex items-center justify-between">
+795|                       <span className="text-xs text-slate-400">
+796|                         Total ({paymentTarget.cantidadCuotasImpagas} cuota
+797|                         {paymentTarget.cantidadCuotasImpagas !== 1 ? 's' : ''})
+798|                       </span>
+799|                       <span className="text-xl font-black text-rose-400">
+800|                         {formatCurrency(paymentTarget.montoTotalAdeudado)}
+801|                       </span>
+802|                     </div>
+803|                   </div>
+804| 
+805|                   {modalStatus === 'error' && (
+806|                     <div className="mt-4 flex items-center gap-2 px-4 py-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300">
+807|                       <AlertCircle size={15} className="shrink-0" /> {modalError}
+808|                     </div>
+809|                   )}
+810| 
+811|                   <div className="mt-6 grid grid-cols-2 gap-3">
+812|                     <button
+813|                       onClick={closePaymentModal}
+814|                       className="py-3 rounded-2xl border border-slate-700 text-slate-300 hover:text-white text-sm font-bold transition-all"
+815|                     >
+816|                       Cancelar
+817|                     </button>
+818|                     <button
+819|                       onClick={confirmPayment}
+820|                       className="py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-sm font-bold transition-all flex items-center justify-center gap-2"
+821|                     >
+822|                       <CreditCard size={15} /> Confirmar Cobro
+823|                     </button>
+824|                   </div>
+825|                 </>
+826|               )}
+827|             </motion.div>
+828|           </motion.div>
+829|         )}
+830|       </AnimatePresence>
+831| 
+832|       {/* Modal de confirmación de Bloqueo/Desbloqueo */}

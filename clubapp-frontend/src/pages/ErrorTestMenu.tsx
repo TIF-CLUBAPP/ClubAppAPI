@@ -36,7 +36,8 @@ export default function ErrorTestMenu() {
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 z-50 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-xl backdrop-blur-md transition-all hover:bg-emerald-500/20"
+        data-print-hide
+        className="fixed bottom-6 right-6 z-50 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-xl backdrop-blur-md transition-all hover:bg-emerald-500/20 print:hidden"
         aria-label="Menú de pruebas de errores"
       >
         <Bug size={22} className={isOpen ? 'animate-spin' : ''} />
@@ -50,7 +51,8 @@ export default function ErrorTestMenu() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="fixed bottom-16 right-6 z-50 w-72 bg-slate-900/95 backdrop-blur-xl border border-slate-800 rounded-3xl shadow-2xl shadow-black/50 overflow-hidden"
+            data-print-hide
+            className="fixed bottom-16 right-6 z-50 w-72 bg-slate-900/95 backdrop-blur-xl border border-slate-800 rounded-3xl shadow-2xl shadow-black/50 overflow-hidden print:hidden"
           >
             {/* Header del panel */}
             <div className="p-4 border-b border-slate-800 flex items-center justify-between">
@@ -121,7 +123,8 @@ export default function ErrorTestMenu() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
+            data-print-hide
+            className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm print-hidden"
             onClick={() => setIsOpen(false)}
             aria-hidden="true"
           />

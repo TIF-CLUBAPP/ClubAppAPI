@@ -299,6 +299,205 @@ namespace ClubApp.Infrastructure.Data
                 context.SaveChanges();
             }
 
+            // ==========================================
+            // 6. SEEDING INCREMENTAL DE SOCIOS DE PRUEBA
+            // ==========================================
+            // No destructivo: solo agrega los socios que falten (chequeo por Email/DNI).
+            // No toca ni borra los usuarios existentes (SuperAdmin, Profesores, Usuario1-8, etc.).
+            SeedTestSocios(context);
+
         }
+
+        /// <summary>
+        /// Inserta (si no existen) los 5 socios de prueba usados por las pantallas
+        /// de Deudores y Pagos, junto con su Membership y sus cuotas.
+        /// Es idempotente: se puede ejecutar en cada arranque de la API.
+        /// </summary>
+        private static void SeedTestSocios(ApplicationContext context)
+        {
+            string hashedPassword = BCrypt.Net.BCrypt.HashPassword("1234");
+            decimal cuotaBase = 15000m;
+
+            // ----------------------------------------------------------
+            // 6.1 Alta de usuarios (uno por uno, chequeando Email y DNI)
+            // ----------------------------------------------------------
+            var socios = new List<User>
+            {
+                // Deudor critico: 6 cuotas impagas con 25% de mora
+                new User
+                {
+                    BadgeNum = "M-100",
+                    FirstName = "Roberto",
+                    LastName = "Gomez",
+                    Email = "roberto.gomez@gmail.com",
+                    PasswordHash = hashedPassword,
+                    Role = UserRole.MEMBER,
+                    Dni = "41000001",
+                    Phone = "+5491141000001",
+                    BirthDate = new DateTime(1978, 3, 12),
+                    IsActive = true,
+                    IsExemptFromFees = false,
+                    CreatedAt = new DateTime(2026, 1, 10, 0, 0, 0, DateTimeKind.Utc)
+                },
+                // Jubilada: 3 cuotas impagas con 50% de exencion
+                new User
+                {
+                    BadgeNum = "M-101",
+                    FirstName = "Beatriz",
+                    LastName = "Fernandez",
+                    Email = "b.fernandez@hotmail.com",
+                    PasswordHash = hashedPassword,
+                    Role = UserRole.MEMBER,
+                    Dni = "41000002",
+                    Phone = "+5491141000002",
+                    BirthDate = new DateTime(1955, 8, 22),
+                    IsActive = true,
+                    IsExemptFromFees = false, // exencion parcial 50% (no total)
+                    CreatedAt = new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc)
+                },
+                // Reciente: 1 cuota del mes actual, sin mora
+                new User
+                {
+                    BadgeNum = "M-102",
+                    FirstName = "Lucas",
+                    LastName = "Martinez",
+                    Email = "lucas.m@gmail.com",
+                    PasswordHash = hashedPassword,
+                    Role = UserRole.MEMBER,
+                    Dni = "41000003",
+                    Phone = "+5491141000003",
+                    BirthDate = new DateTime(2001, 11, 5),
+                    IsActive = true,
+                    IsExemptFromFees = false,
+                    CreatedAt = DateTime.UtcNow.AddDays(-20)
+                },
+                // Staff: exencion total, sin deuda
+                new User
+                {
+                    BadgeNum = "M-103",
+                    FirstName = "Mariana",
+                    LastName = "Lopez",
+                    Email = "marian.lopez@clubapp.com",
+                    PasswordHash = hashedPassword,
+                    Role = UserRole.MEMBER,
+                    Dni = "41000004",
+                    Phone = "+5491141000004",
+                    BirthDate = new DateTime(1992, 6, 30),
+                    IsActive = true,
+                    IsExemptFromFees = true, // exencion 100%
+                    CreatedAt = new DateTime(2025, 9, 15, 0, 0, 0, DateTimeKind.Utc)
+                },
+                // Al dia: sin cuotas pendientes
+                new User
+                {
+                    BadgeNum = "M-104",
+                    FirstName = "Gonzalo",
+                    LastName = "Perez",
+                    Email = "gonzalo.perez@gmail.com",
+                    PasswordHash = hashedPassword,
+                    Role = UserRole.MEMBER,
+                    Dni = "41000005",
+                    Phone = "+5491141000005",
+                    BirthDate = new DateTime(1988, 1, 18),
+                    IsActive = true,
+                    IsExemptFromFees = false,
+                    CreatedAt = new DateTime(2025, 5, 2, 0, 0, 0, DateTimeKind.Utc)
+                }
+            };
+
+            foreach (var socio in socios)
+            {
+                bool existsByEmail = context.Users.Any(u => u.Email == socio.Email);
+                bool existsByDni = context.Users.Any(u => u.Dni == socio.Dni);
+
+                if (!existsByEmail && !existsByDni)
+                {
+                    context.Users.Add(socio);
+                }
+            }
+
+            context.SaveChanges();
+
+            // ----------------------------------------------------------
+            // 6.2 Membership para cada socio de prueba (si no la tiene)
+            // ----------------------------------------------------------
+            foreach (var seed in socios)
+            {
+                var user = context.Users.FirstOrDefault(u => u.Email == seed.Email);
+                if (user == null) continue;
+
+                bool hasMembership = context.Memberships.Any(m => m.UserId == user.Id);
+                if (!hasMembership)
+                {
+                    context.Memberships.Add(new Membership
+                    {
+                        UserId = user.Id,
+                        MonthlyPrice = cuotaBase,
+                        Status = MembershipStatus.ACTIVE,
+                        StartDate = user.CreatedAt,
+                        EndDate = user.CreatedAt.AddYears(1),
+                        CreatedAt = user.CreatedAt
+                    });
+                }
+            }
+
+            context.SaveChanges();
+
+            // ----------------------------------------------------------
+            // 6.3 Cuotas / deudas por socio (idempotente por UserId+Period)
+            // ----------------------------------------------------------
+            // Helper local: agrega una cuota si no existe para ese periodo.
+            void AddCuota(string email, string period, decimal amount, decimal lateFee, PaymentStatus status, DateTime? paidAt = null)
+            {
+                var user = context.Users.FirstOrDefault(u => u.Email == email);
+                if (user == null) return;
+
+                bool exists = context.Payments.Any(p => p.UserId == user.Id && p.Period == period);
+                if (exists) return;
+
+                context.Payments.Add(new Payment
+                {
+                    UserId = user.Id,
+                    Period = period,
+                    Amount = amount,
+                    LateFeeApplied = lateFee,
+                    PaymentMethod = "CASH",
+                    Status = status,
+                    PaymentDate = paidAt,
+                    CreatedAt = paidAt ?? DateTime.UtcNow
+                });
+            }
+
+            // -- Roberto Gomez: 6 cuotas impagas (meses -6 a -1) con mora 25% --
+            // Mora sobre el subtotal: 15000 * 0.25 = 3750
+            for (int i = 6; i >= 1; i--)
+            {
+                string period = $"{DateTime.UtcNow.AddMonths(-i):yyyy-MM}";
+                AddCuota("roberto.gomez@gmail.com", period, cuotaBase, cuotaBase * 0.25m, PaymentStatus.Overdue);
+            }
+
+            // -- Beatriz Fernandez: 3 cuotas impagas (meses -3 a -1), exencion 50% --
+            // Subtotal con 50% de exencion: 7500. Mora 25% sobre subtotal = 1875
+            for (int i = 3; i >= 1; i--)
+            {
+                string period = $"{DateTime.UtcNow.AddMonths(-i):yyyy-MM}";
+                AddCuota("b.fernandez@hotmail.com", period, cuotaBase * 0.50m, cuotaBase * 0.50m * 0.25m, PaymentStatus.Overdue);
+            }
+
+            // -- Lucas Martinez: 1 cuota del mes actual, sin mora --
+            {
+                string period = $"{DateTime.UtcNow:yyyy-MM}";
+                AddCuota("lucas.m@gmail.com", period, cuotaBase, 0m, PaymentStatus.Pending);
+            }
+
+            // -- Mariana Lopez: 100% exenta, sin cuotas --
+            // -- Gonzalo Perez: al dia, sin cuotas pendientes --
+            // (Ambos ya quedan creados como usuarios + membership sin Payments)
+
+            context.SaveChanges();
+
+
+        }
+
     }
 }

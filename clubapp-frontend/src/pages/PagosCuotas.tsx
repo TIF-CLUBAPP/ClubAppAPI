@@ -21,7 +21,8 @@ import {
   FileText,
   CheckCircle2,
   Receipt,
-  Clock
+  Clock,
+  AlertTriangle
 } from 'lucide-react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
@@ -106,6 +107,9 @@ export const PagosCuotas: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  // Modal de confirmación de cambio de tarifa (la nueva tarifa rige desde el 1° del mes siguiente)
+  const [isSettingsConfirmOpen, setIsSettingsConfirmOpen] = useState(false);
+  const [pendingSettings, setPendingSettings] = useState<FeeSettings | null>(null);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -234,9 +238,23 @@ export const PagosCuotas: React.FC = () => {
     }
   };
 
-  const handleSaveSettings = async (e: React.FormEvent) => {
+  /**
+   * Primer día del mes siguiente, en formato legible (ej. "01/10/2026").
+   * Es la fecha en la que entrará en vigencia la nueva tarifa.
+   */
+  const getProximoMesLabel = () => {
+    const hoy = new Date();
+    const proximo = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 1);
+    return proximo.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
+  /**
+   * El submit del formulario ya no impacta el backend directamente:
+   * valida los valores y abre el modal de confirmación.
+   */
+  const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const base = Math.max(0, parseFloat(baseFeeInput) || 0);
     const late = Math.max(0, parseFloat(lateFeeInput) || 0);
     const due = Math.min(31, Math.max(1, parseInt(dueDayInput, 10) || 1));
@@ -248,20 +266,42 @@ export const PagosCuotas: React.FC = () => {
       dueDayOfMonth: due,
     };
 
+    setPendingSettings(updatedSettings);
+    setIsSettingsConfirmOpen(true);
+  };
+
+  /** Confirmación explícita del modal: recién acá se impacta el backend. */
+  const confirmSaveSettings = async () => {
+    if (!pendingSettings) return;
+
+    const updatedSettings = pendingSettings;
+
     setSettings(updatedSettings);
-    setBaseFeeInput(String(base));
-    setLateFeeInput(String(late));
-    setDueDayInput(String(due));
+    setBaseFeeInput(String(updatedSettings.baseFeeAmount));
+    setLateFeeInput(String(updatedSettings.lateFeePercentage));
+    setDueDayInput(String(updatedSettings.dueDayOfMonth));
+    setIsSettingsConfirmOpen(false);
+    setPendingSettings(null);
 
     try {
       setSavingSettings(true);
-      await paymentsService.updateSettings(updatedSettings);
-      setMessage({ text: 'Configuración guardada correctamente.', type: 'success' });
+      const saved = await paymentsService.updateSettings(updatedSettings);
+      // El backend devuelve la fecha de vigencia; se refleja en el estado local.
+      setSettings(prev => ({ ...prev, ...saved }));
+      setMessage({
+        text: `Tarifa registrada en el historial. Se aplicará desde el ${getProximoMesLabel()}.`,
+        type: 'success'
+      });
     } catch (err) {
       setMessage({ text: 'No se pudo guardar la configuración.', type: 'error' });
     } finally {
       setSavingSettings(false);
     }
+  };
+
+  const cancelSaveSettings = () => {
+    setIsSettingsConfirmOpen(false);
+    setPendingSettings(null);
   };
 
   const handleRolePercentageChange = async (roleName: string, newPercentage: number) => {
@@ -650,11 +690,32 @@ export const PagosCuotas: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* AVISO: los cambios de tarifa no afectan deudas ya emitidas */}
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-amber-200 leading-relaxed">
+                      <p className="font-semibold text-amber-300">
+                        ⚠️ Atención: Los cambios en el valor de la cuota se registrarán en el historial y comenzarán a aplicarse automáticamente a partir del próximo mes. Las cuotas y deudas vigentes hasta la fecha no sufrirán modificaciones.
+                      </p>
+                      <p className="text-xs text-amber-300/80 mt-2">
+                        Nueva tarifa vigente desde el <span className="font-bold">{getProximoMesLabel()}</span>.
+                        {settings.pendingEffectiveFromDate && (
+                          <>
+                            {' '}Ya hay un cambio pendiente con vigencia{' '}
+                            <span className="font-bold">
+                              {new Date(settings.pendingEffectiveFromDate).toLocaleDateString('es-AR')}
+                            </span>.
+                          </>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
                   <div className="flex justify-end">
                     <button
                       type="submit"
                       disabled={savingSettings}
-                      className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-5 py-2.5 rounded-xl transition shadow-lg shadow-emerald-950/40"
+                      className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-5 py-2.5 rounded-xl transition shadow-lg shadow-emerald-950/40 disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       <Save className="w-4 h-4" />
                       {savingSettings ? 'Guardando...' : 'Guardar Cambios'}
@@ -1154,6 +1215,96 @@ export const PagosCuotas: React.FC = () => {
           )}
         </AnimatePresence>
       </div>
+
+      {/* MODAL DE CONFIRMACIÓN: LA NUEVA TARIFA RIGE DESDE EL PRÓXIMO MES */}
+      <AnimatePresence>
+        {isSettingsConfirmOpen && pendingSettings && (
+          <motion.div
+            key="settings-confirm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm"
+            onClick={cancelSaveSettings}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden"
+            >
+              <div className="flex items-start gap-3 p-6 border-b border-slate-800">
+                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                  <AlertTriangle className="w-5 h-5 text-amber-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-white">Confirmar cambio de tarifa</h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    La nueva tarifa se registrará en el historial de precios y comenzará a aplicarse
+                    a partir del <span className="font-semibold text-amber-300">{getProximoMesLabel()}</span>.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={cancelSaveSettings}
+                  className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="bg-slate-950 border border-slate-800 rounded-xl p-4">
+                    <p className="text-xs text-slate-400 mb-1">Precio base cuota</p>
+                    <p className="text-sm font-semibold text-slate-200">
+                      {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(settings.baseFeeAmount || 0)}
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-1">Actual</p>
+                  </div>
+                  <div className="bg-slate-950 border border-emerald-500/30 rounded-xl p-4">
+                    <p className="text-xs text-slate-400 mb-1">Precio base cuota</p>
+                    <p className="text-sm font-semibold text-emerald-400">
+                      {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(pendingSettings.baseFeeAmount || 0)}
+                    </p>
+                    <p className="text-[11px] text-emerald-500/80 mt-1">Desde el {getProximoMesLabel()}</p>
+                  </div>
+                </div>
+
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
+                  <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-200 leading-relaxed">
+                    Las cuotas y deudas ya emitidas hasta la fecha <span className="font-semibold">no sufrirán modificaciones</span>.
+                    El cambio queda guardado en el historial y se aplicará automáticamente el mes que viene.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 px-6 py-4 bg-slate-950/60 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={cancelSaveSettings}
+                  className="px-4 py-2 rounded-xl text-sm font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmSaveSettings}
+                  disabled={savingSettings}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-500 transition shadow-lg shadow-emerald-950/40 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <Save className="w-4 h-4" />
+                  {savingSettings ? 'Guardando...' : 'Confirmar y guardar'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

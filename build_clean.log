@@ -1,0 +1,11 @@
+C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\ClubAppAPI\src\Web\Web.csproj : warning NU1903: El paquete "Microsoft.OpenApi" 2.4.1 tiene una vulnerabilidad de gravedad alta conocida, https://github.com/advisories/GHSA-v5pm-xwqc-g5wc [C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\ClubAppAPI\ClubApp.slnx]
+C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\ClubAppAPI\src\Web\Web.csproj : warning NU1903: El paquete "Microsoft.OpenApi" 2.4.1 tiene una vulnerabilidad de gravedad alta conocida, https://github.com/advisories/GHSA-v5pm-xwqc-g5wc
+
+Compilación correcta.
+
+C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\ClubAppAPI\src\Web\Web.csproj : warning NU1903: El paquete "Microsoft.OpenApi" 2.4.1 tiene una vulnerabilidad de gravedad alta conocida, https://github.com/advisories/GHSA-v5pm-xwqc-g5wc [C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\ClubAppAPI\ClubApp.slnx]
+C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\ClubAppAPI\src\Web\Web.csproj : warning NU1903: El paquete "Microsoft.OpenApi" 2.4.1 tiene una vulnerabilidad de gravedad alta conocida, https://github.com/advisories/GHSA-v5pm-xwqc-g5wc
+    2 Advertencia(s)
+    0 Errores
+
+Tiempo transcurrido 00:00:01.41

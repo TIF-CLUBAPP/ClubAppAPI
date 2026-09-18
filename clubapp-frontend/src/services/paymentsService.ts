@@ -1,6 +1,7 @@
 import { api } from './api';
 import type { 
   FeeSettings, 
+  FeeSettingsHistoryEntry,
   ExemptionsResponse, 
   UserExemption, 
   RoleExemption, 
@@ -21,6 +22,12 @@ export const paymentsService = {
   /** Actualizar configuración de cuotas (PUT /api/payments/settings) */
   updateSettings: async (data: FeeSettings): Promise<FeeSettings> => {
     const response = await api.put<FeeSettings>('/payments/settings', data);
+    return response.data;
+  },
+
+  /** Obtener historial de cambios de precios (GET /api/payments/settings/history) */
+  getSettingsHistory: async (): Promise<FeeSettingsHistoryEntry[]> => {
+    const response = await api.get<FeeSettingsHistoryEntry[]>('/payments/settings/history');
     return response.data;
   },
 

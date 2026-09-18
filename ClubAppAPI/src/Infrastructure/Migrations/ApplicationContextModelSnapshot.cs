@@ -49,6 +49,35 @@ namespace Infrastructure.Migrations
                     b.ToTable("Activities");
                 });
 
+            modelBuilder.Entity("ClubApp.Domain.Entities.ClubConfig", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("ApplicationFeePercentage")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("MercadoPagoAccessToken")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("MercadoPagoPublicKey")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("MonthlySubscriptionFee")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("TrialEndsAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ClubConfigs");
+                });
+
             modelBuilder.Entity("ClubApp.Domain.Entities.Enrollment", b =>
                 {
                     b.Property<int>("Id")
@@ -94,6 +123,12 @@ namespace Infrastructure.Migrations
                     b.Property<int>("DueDayOfMonth")
                         .HasColumnType("INTEGER");
 
+                    b.Property<DateTime?>("EffectiveFromDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsCurrent")
+                        .HasColumnType("INTEGER");
+
                     b.Property<decimal>("LateFeePercentage")
                         .HasColumnType("decimal(5,2)");
 
@@ -102,6 +137,53 @@ namespace Infrastructure.Migrations
                     b.HasIndex("Id");
 
                     b.ToTable("FeeSettings");
+                });
+
+            modelBuilder.Entity("ClubApp.Domain.Entities.FeeSettingsHistory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("ChangedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("ChangedByUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("EffectiveFromDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("NewBaseFeeAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("NewDueDayOfMonth")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("NewLateFeePercentage")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("PreviousBaseFeeAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("PreviousDueDayOfMonth")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("PreviousLateFeePercentage")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EffectiveFromDate");
+
+                    b.ToTable("FeeSettingsHistory");
                 });
 
             modelBuilder.Entity("ClubApp.Domain.Entities.Membership", b =>
@@ -194,7 +276,7 @@ namespace Infrastructure.Migrations
 
                     b.Property<string>("Period")
                         .IsRequired()
-                        .HasMaxLength(7)
+                        .HasMaxLength(20)
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Status")

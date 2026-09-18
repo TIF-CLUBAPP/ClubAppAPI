@@ -1,0 +1,3 @@
+﻿C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\clubapp-frontend\src\pages\ErrorTestMenu.tsx:9: Bug,
+C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\clubapp-frontend\src\pages\ErrorTestMenu.tsx:42: <Bug size={22} className={isOpen ? 'animate-spin' : ''} />
+C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\clubapp-frontend\src\pages\ErrorTestMenu.tsx:58: <Bug size={20} className="text-emerald-400" />

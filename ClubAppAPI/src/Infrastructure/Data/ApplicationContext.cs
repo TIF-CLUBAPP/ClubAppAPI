@@ -16,7 +16,10 @@ namespace ClubApp.Infrastructure.Data
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<Payment> Payments { get; set; }
         public DbSet<FeeSettings> FeeSettings { get; set; }
+        public DbSet<FeeSettingsHistory> FeeSettingsHistory { get; set; }
         public DbSet<RoleConfiguration> RoleConfigurations { get; set; }
+        public DbSet<ClubConfig> ClubConfigs { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -36,6 +39,10 @@ namespace ClubApp.Infrastructure.Data
             // Configuración de FeeSettings - solo debe haber una configuración activa
             modelBuilder.Entity<FeeSettings>()
                 .HasIndex(f => f.Id); // Ya es PK
+
+            // Historial de precios: se consulta ordenado por fecha de vigencia.
+            modelBuilder.Entity<FeeSettingsHistory>()
+                .HasIndex(h => h.EffectiveFromDate);
 
             // Configuración de RoleConfiguration - único por Role
             modelBuilder.Entity<RoleConfiguration>()

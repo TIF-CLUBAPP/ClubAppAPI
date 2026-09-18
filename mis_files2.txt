@@ -1,0 +1,7 @@
+﻿C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\clubapp-frontend\src\components\cuotas\CuotasList.tsx
+C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\clubapp-frontend\src\components\cuotas\ReceiptModal.tsx
+C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\clubapp-frontend\src\hooks\useMisCuotas.ts
+C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\clubapp-frontend\src\pages\MisCuotas.tsx
+C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\clubapp-frontend\src\pages\PagosCuotas.tsx
+C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\clubapp-frontend\src\services\cuotasService.ts
+C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\clubapp-frontend\src\types\cuotas.ts

@@ -1,0 +1,1 @@
+﻿C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\ClubAppAPI\src\Infrastructure\Migrations\ApplicationContextModelSnapshot.cs

@@ -1,0 +1,26 @@
+﻿376|   const closePaymentModal = () => {
+377|     setPaymentTarget(null);
+378|     setModalStatus('idle');
+379|     setModalError(null);
+380|   };
+381| 
+382|   // Registra el pago de todas las cuotas impagas del socio (una por una)
+383|   const confirmPayment = async () => {
+384|     if (!paymentTarget) return;
+385|     setModalStatus('processing');
+386|     setModalError(null);
+387|     try {
+388|       for (const id of paymentTarget.paymentIds) {
+389|         await cuotasService.registrarPago(id);
+390|       }
+391|       setModalStatus('success');
+392|     } catch (err) {
+393|       console.error('Error registrando pago:', err);
+394|       const apiMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+395|       setModalError(apiMessage ?? 'No se pudo registrar el pago. Intentá nuevamente.');
+396|       setModalStatus('error');
+397|     }
+398|   };
+399| 
+400|   // Alternar bloqueo manual
+401|   const initiateToggleUserStatus = (debtor: CuotaVencida, currentStatus: boolean) => {

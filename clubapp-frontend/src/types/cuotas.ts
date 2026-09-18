@@ -4,6 +4,25 @@ export interface FeeSettings {
   lateFeePercentage: number;
   lateFeeType: 'percentage' | 'fixed';
   dueDayOfMonth: number;
+  /** Fecha ISO desde la que rige la tarifa actual. null = vigente desde siempre. */
+  effectiveFromDate?: string | null;
+  /** Fecha ISO (1° del mes siguiente) en la que entrará en vigencia el último cambio guardado. */
+  pendingEffectiveFromDate?: string | null;
+}
+
+// Entrada del historial de precios (GET /api/payments/settings/history)
+export interface FeeSettingsHistoryEntry {
+  id: number;
+  previousBaseFeeAmount: number;
+  previousLateFeePercentage: number;
+  previousDueDayOfMonth: number;
+  newBaseFeeAmount: number;
+  newLateFeePercentage: number;
+  newDueDayOfMonth: number;
+  effectiveFromDate: string;
+  changedAt: string;
+  changedByUserId?: number | null;
+  notes?: string | null;
 }
 
 // Exención de usuario (GET /api/payments/exemptions)
@@ -79,6 +98,9 @@ export interface CuotasVencidasStats {
   montoTotalDeuda: number;
 }
 
+// Estado de la cuota / situación del socio en el padrón de deudores
+export type EstadoCuota = 'EN_MORA' | 'PENDIENTE' | 'AL_DIA' | 'EXENTO';
+
 export interface CuotaVencida {
   socioId: number;
   nombre: string;
@@ -94,6 +116,14 @@ export interface CuotaVencida {
   esAutoBloqueado: boolean;
   esBloqueadoManual: boolean;
   estaBloqueado: boolean;
+  /** Porcentaje de exención aplicado al socio (0-100). 100 = no genera deuda. */
+  exencionPorcentaje?: number;
+  /** Porcentaje de mora aplicado sobre el subtotal bonificado (0-100). */
+  moraPorcentaje?: number;
+  /** Situación consolidada del socio para filtros y badges. */
+  estadoCuota?: EstadoCuota;
+  /** Motivo de la exención (ej. "Jubilado", "Staff"). */
+  motivoExencion?: string;
 }
 
 

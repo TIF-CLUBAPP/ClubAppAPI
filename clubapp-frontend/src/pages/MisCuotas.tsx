@@ -18,14 +18,19 @@ export const MisCuotas: React.FC = () => {
   const [selectedReceipt, setSelectedReceipt] = useState<MemberCuota | null>(null);
 
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-100 overflow-hidden font-sans">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Header />
+    <div className="app-shell flex h-screen bg-slate-950 text-slate-100 overflow-hidden font-sans">
+      {/* Sidebar y Header: interfaz de la app, se ocultan al imprimir */}
+      <div data-print-hide className="print-hidden">
+        <Sidebar />
+      </div>
+      <div className="app-main flex-1 flex flex-col min-w-0 overflow-hidden">
+        <div data-print-hide className="print-hidden">
+          <Header />
+        </div>
         <main className="flex-1 p-6 md:p-8 overflow-y-auto scrollbar-thin space-y-8">
           <div className="max-w-6xl mx-auto space-y-8">
             {/* Encabezado */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div data-print-hide className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
                   <CreditCard className="w-8 h-8 text-emerald-400" />

@@ -23,3 +23,225 @@
 .scrollbar-thin::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+/* ============================================================================
+   ESTILOS DE IMPRESIÓN (@media print)
+   ----------------------------------------------------------------------------
+   Objetivo: al imprimir un comprobante, la hoja debe contener ÚNICAMENTE el
+   ticket/recibo, centrado, sobre fondo blanco y con texto negro de alta
+   resolución (aspecto de recibo oficial de caja, no de captura del modal).
+
+   Mecánica:
+   - Todo elemento marcado con [data-print-hide] desaparece al imprimir.
+     (header, sidebar, botón flotante de debug, fondos de modal, botones, X)
+   - El contenedor marcado con [data-print-root] se convierte en la raíz
+     visible: se neutralizan posicionamiento fijo, fondos y sombras.
+   - El bloque del ticket marcado con [data-print-ticket] se centra, se le
+     quitan bordes/redondeos/sombras y se fuerza paleta blanco/negro.
+   ========================================================================== */
+@media print {
+  /* --- 0. Garantía explícita: la tarjeta del comprobante SIEMPRE visible ---
+     (resuelve el caso de pantalla en blanco por reglas de ocultado previas) */
+  #receipt-card,
+  .printable-receipt {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    color: #000000 !important;
+    background: #ffffff !important;
+  }
+
+  /* --- 1. Ocultar ÚNICAMENTE la interfaz: sidebar, header, botones,
+         cruz de cierre, overlay del modal y botón flotante de debug. --- */
+  [data-print-hide],
+  nav,
+  aside,
+  .print\:hidden {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* --- 1b. Ocultar el contenido de la app (sidebar + header + main).
+     El modal del comprobante es hermano de .app-main, por lo que NO se
+     oculta y sigue siendo imprimible. --- */
+  .app-main,
+  .app-shell > .print-hidden,
+  nav,
+  aside {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* --- 2. Reset global de la página impresa --- */
+  html,
+  body,
+  #root {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* La app en pantalla usa h-screen + overflow-hidden: al imprimir hay que
+     liberar esos recortes para que el ticket no se corte. */
+  body * {
+    overflow: visible !important;
+  }
+
+  /* --- 3. El contenedor raíz de impresión (backdrop del modal) deja de ser
+         un overlay fijo: pasa a ser un bloque normal en el flujo, sin fondo
+         ni desenfoque, permitiendo que el ticket fluya en la hoja. --- */
+  [data-print-root] {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    transform: none !important;
+    opacity: 1 !important;
+    overflow: visible !important;
+  }
+
+  /* --- 4. El ticket: único contenido visible, limpio y centrado --- */
+  [data-print-ticket] {
+    display: block !important;
+    position: static !important;
+    width: 80mm !important;          /* ancho típico de ticket de caja */
+    max-width: 100% !important;
+    margin: 0 auto !important;       /* centrado horizontal */
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+    overflow: visible !important;
+    font-family: 'Courier New', ui-monospace, SFMono-Regular, Menlo, monospace !important;
+    font-size: 12px !important;
+    line-height: 1.45 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Dentro del ticket, TODO en negro sobre blanco (alta legibilidad).
+     Se cubre el ticket y la tarjeta contenedora, con y sin data-attribute. */
+  [data-print-ticket],
+  [data-print-ticket] *,
+  [data-print-ticket] *::before,
+  [data-print-ticket] *::after,
+  #receipt-card,
+  #receipt-card *,
+  .printable-receipt,
+  .printable-receipt * {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    color: #000000 !important;
+    border-color: #000000 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    border-radius: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* El ticket en sí conserva fondo blanco (no transparente). */
+  [data-print-ticket],
+  #receipt-card,
+  .printable-receipt {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+  }
+
+  /* Refuerzo explícito sobre los utilitarios de Tailwind que pintan texto
+     claro en pantalla (text-white / text-slate-* / text-emerald-*):
+     en papel deben ser SIEMPRE negro. */
+  [data-print-ticket] [class*="text-"],
+  [data-print-ticket] h1,
+  [data-print-ticket] h2,
+  [data-print-ticket] h3,
+  [data-print-ticket] h4,
+  [data-print-ticket] p,
+  [data-print-ticket] span,
+  [data-print-ticket] div,
+  [data-print-ticket] strong,
+  [data-print-ticket] small {
+    color: #000000 !important;
+  }
+
+  /* Los separadores punteados del recibo se mantienen, en negro. */
+  [data-print-ticket] .print-dashed {
+    border-top: 1px dashed #000000 !important;
+    border-bottom: 1px dashed #000000 !important;
+  }
+
+  /* El recuadro interior del comprobante pierde su borde/sombra. */
+  [data-print-ticket] .print-box {
+    border: 1px solid #000000 !important;
+    padding: 8px !important;
+  }
+
+  /* Evitar saltos de página dentro del ticket. */
+  [data-print-ticket] {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* --- 5. Neutralizar animaciones de framer-motion en impresión --- */
+  [data-print-root] *,
+  [data-print-ticket] * {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  @page {
+    margin: 10mm;
+    size: auto;
+  }
+}
+
+/* Scrollbar "minimal": invisible en reposo, se revela sutilmente al hacer hover.
+   Ideal para listas dentro de modales donde la barra nativa gris rompe el diseño. */
+.scrollbar-minimal {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.25s ease;
+}
+.scrollbar-minimal:hover {
+  scrollbar-color: rgb(71 85 105 / 0.7) transparent;
+}
+.scrollbar-minimal::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scrollbar-minimal::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-minimal::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 9999px;
+  transition: background-color 0.25s ease;
+}
+.scrollbar-minimal:hover::-webkit-scrollbar-thumb {
+  background-color: rgb(71 85 105 / 0.7);
+}
+.scrollbar-minimal::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(100 116 139 / 0.9);
+}
+.scrollbar-minimal::-webkit-scrollbar-corner {
+  background: transparent;
+}

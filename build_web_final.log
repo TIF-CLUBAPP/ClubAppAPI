@@ -1,0 +1,13 @@
+C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\ClubAppAPI\src\Web\Web.csproj : warning NU1903: El paquete "Microsoft.OpenApi" 2.4.1 tiene una vulnerabilidad de gravedad alta conocida, https://github.com/advisories/GHSA-v5pm-xwqc-g5wc
+C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\ClubAppAPI\src\Web\Web.csproj : warning NU1903: El paquete "Microsoft.OpenApi" 2.4.1 tiene una vulnerabilidad de gravedad alta conocida, https://github.com/advisories/GHSA-v5pm-xwqc-g5wc
+CSC : error CS2012: No se puede abrir "C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\ClubAppAPI\src\Application\obj\Debug\net10.0\Application.dll" para escribir -- The process cannot access the file 'C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\ClubAppAPI\src\Application\obj\Debug\net10.0\Application.dll' because it is being used by another process.; archivo puede estar bloqueado por 'VBCSCompiler' (40696) [C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\ClubAppAPI\src\Application\Application.csproj]
+
+ERROR al compilar.
+
+C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\ClubAppAPI\src\Web\Web.csproj : warning NU1903: El paquete "Microsoft.OpenApi" 2.4.1 tiene una vulnerabilidad de gravedad alta conocida, https://github.com/advisories/GHSA-v5pm-xwqc-g5wc
+C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\ClubAppAPI\src\Web\Web.csproj : warning NU1903: El paquete "Microsoft.OpenApi" 2.4.1 tiene una vulnerabilidad de gravedad alta conocida, https://github.com/advisories/GHSA-v5pm-xwqc-g5wc
+CSC : error CS2012: No se puede abrir "C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\ClubAppAPI\src\Application\obj\Debug\net10.0\Application.dll" para escribir -- The process cannot access the file 'C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\ClubAppAPI\src\Application\obj\Debug\net10.0\Application.dll' because it is being used by another process.; archivo puede estar bloqueado por 'VBCSCompiler' (40696) [C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\ClubAppAPI\src\Application\Application.csproj]
+    2 Advertencia(s)
+    1 Errores
+
+Tiempo transcurrido 00:00:04.18
