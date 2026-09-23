@@ -17,6 +17,10 @@ import Unauthorized401 from './pages/errors/Unauthorized401';
 import ServerError500 from './pages/errors/ServerError500';
 import Maintenance503 from './pages/errors/Maintenance503';
 import NotFound404 from './pages/errors/NotFound404';
+// Payment result pages (Mercado Pago redirect)
+import PagoExitoso from './pages/PagoExitoso';
+import PagoFallido from './pages/PagoFallido';
+import PagoPendiente from './pages/PagoPendiente';
 // Dev test menu
 import ErrorTestMenu from './pages/ErrorTestMenu';
 
@@ -41,6 +45,11 @@ export default function App() {
           <Route path="/401" element={<Unauthorized401 />} />
           <Route path="/500" element={<ServerError500 />} />
           <Route path="/503" element={<Maintenance503 />} />
+
+          {/* Rutas de resultado de pago (redirección Mercado Pago) */}
+          <Route path="/pago-exitoso" element={<PagoExitoso />} />
+          <Route path="/pago-fallido" element={<PagoFallido />} />
+          <Route path="/pago-pendiente" element={<PagoPendiente />} />
 
           {/* Página de pruebas de errores (solo desarrollo) */}
           <Route path="/test-errors" element={<ErrorTestMenu />} />

@@ -1,20 +1,92 @@
 using Microsoft.EntityFrameworkCore;
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Dtos;
+using ClubApp.Application.Models;
 using ClubApp.Domain.Entities;
+using ClubApp.Domain.Constants;
 using ClubApp.Domain.Exceptions;
 using ClubApp.Infrastructure.Data;
 using System.Globalization;
+using System.Linq;
+using MercadoPago.Config;
+using MercadoPago.Client.Preference;
+using MercadoPago.Client.Payment;
+using MercadoPago.Resource.Preference;
+using MercadoPago.Error;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace ClubApp.Infrastructure.Services;
 
 public class PaymentService : IPaymentService
 {
     private readonly ApplicationContext _context;
-
-    public PaymentService(ApplicationContext context)
+    private readonly IConfiguration _configuration;
+    public PaymentService(ApplicationContext context, IConfiguration configuration)
     {
         _context = context;
+        _configuration = configuration;
+    }
+
+    public async Task<string> ProcessMercadoPagoWebhookAsync(string payloadJson)
+    {
+        if (string.IsNullOrWhiteSpace(payloadJson))
+            return "BAD_REQUEST";
+
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(payloadJson);
+            var root = doc.RootElement;
+
+            // Formato típico: { resource: { status, external_reference, ... } }
+            if (root.TryGetProperty("resource", out var resource))
+                root = resource;
+
+            if (!root.TryGetProperty("status", out var statusElement))
+                return "NO_STATUS";
+
+            var status = statusElement.GetString();
+            // Extraer paymentId desde el payload (Mercado Pago suele enviarlo como data.id o id).
+            string? paymentId = null;
+            if (root.TryGetProperty("data", out var dataElement))
+            {
+                if (dataElement.TryGetProperty("id", out var dataId))
+                    paymentId = dataId.GetString();
+            }
+            
+            if (string.IsNullOrWhiteSpace(paymentId) && root.TryGetProperty("id", out var idElement))
+                paymentId = idElement.GetString();
+
+            if (string.IsNullOrWhiteSpace(paymentId))
+                return "NO_PAYMENT_ID";
+
+            // Consultar el pago con la SDK.
+            var client = new PaymentClient();
+            MercadoPago.Resource.Payment.Payment mpPayment = await client.GetAsync(long.Parse(paymentId));
+
+            if (mpPayment == null)
+                return "PAYMENT_NOT_FOUND";
+
+            if (mpPayment.Status != "approved" && mpPayment.Status != "aprobado")
+            {
+                return "IGNORED";
+            }
+
+            // ExternalReference: "cuota:{cuotaId}"
+            var externalRef = mpPayment.ExternalReference;
+            if (string.IsNullOrWhiteSpace(externalRef))
+                return "NO_EXTERNAL_REFERENCE";
+
+            var parts = externalRef.Split(':', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length != 2 || !int.TryParse(parts[1], out var cuotaId))
+                return "BAD_EXTERNAL_REFERENCE";
+
+            return await RegistrarPagoAsync(cuotaId);
+        }
+        catch
+        {
+            return "INVALID_PAYLOAD";
+        }
     }
 
     public async Task<IEnumerable<Payment>> GetAllPaymentsAsync()
@@ -494,6 +566,294 @@ public class PaymentService : IPaymentService
             })
             .OrderByDescending(d => d.MontoTotalAdeudado)
             .ToList();
+    }
+
+    public async Task<List<UserCuotaDto>> GetUserCuotasAsync(int userId)
+    {
+        // 1) Asegura que exista la cuota del período vigente para poder pagarla con su ID real.
+        await EnsureCurrentPeriodCuotaAsync(userId);
+
+        // 2) Carga todas las cuotas del usuario ordenadas por período.
+        var payments = await _context.Payments
+            .Where(p => p.UserId == userId)
+            .OrderBy(p => p.Period)
+            .ToListAsync();
+
+        CheckAndUpdateOverdueStatus(payments);
+        await _context.SaveChangesAsync();
+
+        return payments
+            .Select(p => new UserCuotaDto
+            {
+                Id = p.Id,
+                Period = p.Period,
+                Amount = p.Amount,
+                LateFeeApplied = p.LateFeeApplied,
+                Status = p.Status.ToString().ToUpperInvariant(),
+                PaymentDate = p.PaymentDate,
+                PaymentMethod = p.PaymentMethod,
+                CreatedAt = p.CreatedAt
+            })
+            .ToList();
+    }
+
+    /// <summary>
+    /// Crea la cuota del período actual (yyyy-MM) si el usuario aún no la tiene,
+    /// salvo que esté exento. Así el frontend siempre dispone de un ID de BD real.
+    /// </summary>
+    private async Task EnsureCurrentPeriodCuotaAsync(int userId)
+    {
+        var now = DateTime.UtcNow;
+        var period = $"{now:yyyy-MM}";
+
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (user == null || user.IsExemptFromFees) return;
+
+        var exists = await _context.Payments
+            .AnyAsync(p => p.UserId == userId && p.Period == period);
+        if (exists) return;
+
+        var settings = await GetFeeSettingsAsync();
+        var baseFee = settings.BaseFeeAmount > 0 ? settings.BaseFeeAmount : 150000m;
+
+        _context.Payments.Add(new Payment
+        {
+            UserId = userId,
+            Period = period,
+            Amount = baseFee,
+            LateFeeApplied = 0m,
+            PaymentMethod = string.Empty,
+            Status = PaymentStatus.Pending,
+            PaymentDate = null,
+            CreatedAt = now
+        });
+
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<string> CreateOrderAsync(int cuotaId)
+    {
+        // NOTA: En este sistema actual, el "cuotaId" corresponde al Id de Payment.
+        var payment = await _context.Payments
+            .Include(p => p.User)
+            .FirstOrDefaultAsync(p => p.Id == cuotaId);
+
+        if (payment == null) return "NOT_FOUND";
+        if (payment.Status == PaymentStatus.Paid) return "ALREADY_PAID";
+
+        // GetOrCreateClubConfigAsync garantiza un token no vacío (config → fallback sandbox).
+        var clubConfig = await GetOrCreateClubConfigAsync();
+
+        // MercadoPago SDK (no usado en este paso; el proyecto ya tenía integración parcial)
+
+        // Monto principal (sin comisiones). En este proyecto, "Amount" ya representa lo adeudado.
+        var amount = payment.Amount + payment.LateFeeApplied;
+        if (amount <= 0) throw new InvalidOperationException("El monto de la cuota debe ser mayor a 0.");
+
+        var rawFee = amount * (clubConfig.ApplicationFeePercentage / 100m);
+        var applicationFee = Math.Min(rawFee, clubConfig.MaxApplicationFeeAmount);
+        applicationFee = Math.Round(applicationFee, 2, MidpointRounding.AwayFromZero);
+        if (applicationFee < 0) applicationFee = 0;
+
+        // Back URL / webhook
+        return await CreateMercadoPagoOrderAsync(cuotaId, amount, applicationFee, payment.User, clubConfig.MercadoPagoAccessToken ?? string.Empty);
+    }
+
+    /// <summary>
+    /// Devuelve la configuración global del club. Si no existe ningún registro en la
+    /// base de datos, crea uno por defecto con valores estándar. Si el registro ya
+    /// existe pero no tiene token de Mercado Pago, lo completa automáticamente con la
+    /// configuración (MercadoPago:AccessToken) o una clave sandbox por defecto.
+    /// </summary>
+    private async Task<ClubConfig> GetOrCreateClubConfigAsync()
+    {
+        var configToken = ClubConfigDefaults.ResolveAccessToken(_configuration["MercadoPago:AccessToken"]);
+        var configPublicKey = ClubConfigDefaults.ResolvePublicKey(_configuration["MercadoPago:PublicKey"]);
+
+        var clubConfig = await _context.ClubConfigs.FirstOrDefaultAsync();
+
+        if (clubConfig == null)
+        {
+            clubConfig = new ClubConfig
+            {
+                TrialEndsAt = DateTime.UtcNow.AddDays(ClubConfigDefaults.DefaultTrialDays),
+                MonthlySubscriptionFee = ClubConfigDefaults.DefaultMonthlySubscriptionFee,
+                ApplicationFeePercentage = ClubConfigDefaults.DefaultApplicationFeePercentage,
+                MaxApplicationFeeAmount = ClubConfigDefaults.DefaultMaxApplicationFeeAmount,
+                MercadoPagoAccessToken = configToken,
+                MercadoPagoPublicKey = configPublicKey
+            };
+
+            _context.ClubConfigs.Add(clubConfig);
+            await _context.SaveChangesAsync();
+            return clubConfig;
+        }
+
+        // Auto-reparación en runtime: si el registro ya existe pero su token está
+        // vacío, lo actualizamos con la configuración (o fallback sandbox).
+        var changed = false;
+
+        if (string.IsNullOrWhiteSpace(clubConfig.MercadoPagoAccessToken))
+        {
+            clubConfig.MercadoPagoAccessToken = configToken;
+            changed = true;
+        }
+
+        if (string.IsNullOrWhiteSpace(clubConfig.MercadoPagoPublicKey))
+        {
+            clubConfig.MercadoPagoPublicKey = configPublicKey;
+            changed = true;
+        }
+
+        if (clubConfig.MaxApplicationFeeAmount <= 0)
+        {
+            clubConfig.MaxApplicationFeeAmount = ClubConfigDefaults.DefaultMaxApplicationFeeAmount;
+            changed = true;
+        }
+
+        if (changed)
+        {
+            await _context.SaveChangesAsync();
+        }
+
+        return clubConfig;
+    }
+
+    private async Task<string> CreateMercadoPagoOrderAsync(
+        int cuotaId,
+        decimal amount,
+        decimal applicationFee,
+        User user,
+        string accessToken)
+    {
+        // 1) URL base del frontend a donde Mercado Pago redirige al finalizar el pago.
+        //    Se lee de la configuración; si no viene, es vacía o es una ruta relativa,
+        //    se fuerza el fallback local absoluto para evitar el error 400
+        //    "auto_return invalid. back_url.success must be defined".
+        var configuredBaseUrl = _configuration["FrontendUrl"];
+        var validBaseUrl = string.IsNullOrWhiteSpace(configuredBaseUrl)
+            ? "http://localhost:5173"
+            : configuredBaseUrl.Trim().TrimEnd('/');
+
+        if (!validBaseUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+            !validBaseUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            validBaseUrl = "http://localhost:5173";
+        }
+
+        // 2) Configura el Access Token (recibido desde la BD) y valida que no esté vacío antes de llamar a la API.
+        accessToken = accessToken.Trim();
+        if (string.IsNullOrWhiteSpace(accessToken))
+        {
+            throw new InvalidOperationException(
+                "El Access Token de Mercado Pago no está configurado en la base de datos (ClubConfigs.MercadoPagoAccessToken).");
+        }
+
+        MercadoPagoConfig.AccessToken = accessToken;
+
+        // 3) Email del pagador con fallback seguro para Sandbox.
+        var payerEmail = GetValidPayerEmail(user?.Email);
+
+        // 4) Construcción de la preferencia. UnitPrice redondeado a 2 decimales
+        //    (Mercado Pago rechaza importes con más de 2 cifras decimales) y
+        //    Quantity es un entero fijo >= 1.
+        var request = new PreferenceRequest
+        {
+            Items = new List<PreferenceItemRequest>
+            {
+                new PreferenceItemRequest
+                {
+                    Title = "Cuota Club",
+                    Quantity = 1,
+                    UnitPrice = Math.Round(amount, 2, MidpointRounding.AwayFromZero),
+                    CurrencyId = "ARS"
+                }
+            },
+            ExternalReference = $"cuota:{cuotaId}",
+            MarketplaceFee = applicationFee,
+            Payer = new PreferencePayerRequest
+            {
+                Email = payerEmail
+            },
+            BackUrls = new PreferenceBackUrlsRequest
+            {
+                Success = $"{validBaseUrl}/mis-cuotas?status=success",
+                Failure = $"{validBaseUrl}/mis-cuotas?status=failure",
+                Pending = $"{validBaseUrl}/mis-cuotas?status=pending"
+            }
+            // AutoReturn omitido intencionalmente: su serialización en el SDK de Mercado Pago
+            // provocaba el error 400 "auto_return invalid. back_url.success must be defined".
+        };
+
+        try
+        {
+            var client = new PreferenceClient();
+            Preference preference = await client.CreateAsync(request);
+            return preference.InitPoint;
+        }
+        catch (MercadoPagoApiException)
+        {
+            throw;
+        }
+
+        /*var request = new OrderRequest
+        {
+            ExternalReference = $"cuota:{cuotaId}",
+            Checkout = new CheckoutRequest
+            {
+                Type = "redirect",
+                RedirectUrl = backUrl
+            }
+        };
+
+        // Taxes/fees: MercadoPago Orders usa itemization; application_fee se define en request.
+        // Si el SDK/versión no expone application_fee como propiedad, se envía vía AdditionalProperties.
+        request.AdditionalProperties = new Dictionary<string, object?>
+        {
+            { "application_fee", (double)applicationFee }
+        };
+
+        // Item
+        request.Items = new List<OrderItemRequest>
+        {
+            new OrderItemRequest
+            {
+                Id = $"cuota-{cuotaId}",
+                Title = "Cuota vencida",
+                Quantity = 1,
+                UnitPrice = (double)amount
+            }
+        };
+
+        var response = await new OrderClient().CreateAsync(request);
+        if (response == null) throw new InvalidOperationException("No se recibió respuesta de Mercado Pago.");
+
+        // Retornamos init_point
+        return response.InitPoint ?? response.Id ?? string.Empty;
+        */
+    }
+
+    /// <summary>
+    /// Devuelve un email de pagador válido. Si el email del usuario es nulo, vacío o no
+    /// tiene un formato de email válido, se usa un fallback de test de Sandbox para que
+    /// Mercado Pago no rechace la preferencia.
+    /// </summary>
+    private static string GetValidPayerEmail(string? email)
+    {
+        const string fallbackEmail = "test_user_123456@testuser.com";
+
+        if (string.IsNullOrWhiteSpace(email))
+            return fallbackEmail;
+
+        var candidate = email.Trim();
+
+        // Validación básica de formato: usuario@dominio.tld
+        var isValid = System.Text.RegularExpressions.Regex.IsMatch(
+            candidate,
+            @"^[^@\s]+@[^@\s]+\.[^@\s]+$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        return isValid ? candidate : fallbackEmail;
     }
 
     public async Task<string> RegistrarPagoAsync(int cuotaId)

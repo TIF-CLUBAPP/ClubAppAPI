@@ -4,6 +4,8 @@ import { CreditCard, X, RefreshCw, Copy, Check, ShieldCheck, Building2 } from 'l
 import type { MemberCuota } from '../../types/cuotas';
 import { PaymentSuccessView } from './PaymentSuccessView';
 import { PaymentSummaryBox } from './PaymentSummaryBox';
+import { paymentsService } from '../../services/paymentsService';
+import { hasMercadoPagoPublicKey } from '../../config/mercadopago';
 
 interface CheckoutModalProps {
   cuota: MemberCuota | null;
@@ -12,6 +14,20 @@ interface CheckoutModalProps {
   onViewReceipt: (cuota: MemberCuota) => void;
   formatCurrency: (val: number) => string;
 }
+
+/** Resuelve el ID numérico primario de la cuota (Payment.Id) a partir del objeto cuota. */
+const resolveCuotaId = (cuota: MemberCuota): number | null => {
+  const cuotaObj = cuota as any;
+  const raw = cuotaObj.idReal ?? cuotaObj.cuotaId ?? cuotaObj.id;
+
+  if (typeof raw === 'number') {
+    return Number.isInteger(raw) && raw > 0 ? raw : null;
+  }
+
+  const digits = String(raw ?? '').replace(/\D/g, '');
+  const parsed = parseInt(digits, 10);
+  return Number.isNaN(parsed) || parsed <= 0 ? null : parsed;
+};
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   cuota,
@@ -27,23 +43,85 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   if (!cuota) return null;
 
-  const handleProcess = () => {
-    setIsProcessing(true);
-    setTimeout(() => {
+  const handleProcess = async () => {
+    console.log('--- INICIO HANDLE PAYMENT ---', cuota);
+
+    try {
+      // Mercado Pago: redirección a init_point
+      if (method === 'mercadopago') {
+        setIsProcessing(true);
+
+        // En este flujo, "cuota" representa el pago/Payment en backend.
+        // Se resuelve el ID numérico primario (Payment.Id) de forma robusta.
+        const cuotaId = resolveCuotaId(cuota);
+        if (cuotaId === null) {
+          console.error('[create-order] cuotaId inválido. No se enviará la petición.', {
+            cuota,
+            idReal: (cuota as any)?.idReal,
+            cuotaIdField: (cuota as any)?.cuotaId,
+            id: cuota?.id,
+          });
+          setIsProcessing(false);
+          alert('No se pudo iniciar el pago: no se pudo identificar la cuota.');
+          return;
+        }
+
+        console.info('[create-order] Iniciando pago con Mercado Pago.', {
+          cuotaId,
+          publicKeyConfigurada: hasMercadoPagoPublicKey(),
+        });
+
+        const order = await paymentsService.createOrder(cuotaId);
+
+        // El backend actual devuelve `init_point` (snake_case). Por robustez,
+        // también se aceptan las variantes camelCase / sandbox por si cambia la
+        // serialización o la versión de la API de Mercado Pago.
+        const initPoint = order?.init_point ?? order?.initPoint ?? order?.sandboxInitPoint;
+        if (!initPoint) {
+          console.error('[create-order] La respuesta no incluye init_point.', { order });
+          throw new Error('No se recibió init_point de Mercado Pago');
+        }
+
+        console.info('[create-order] Redirigiendo a init_point de Mercado Pago.', { initPoint });
+        window.location.href = initPoint;
+        return;
+      }
+
+      // Otros métodos: comportamiento simulado existente
+      setIsProcessing(true);
+      setTimeout(() => {
+        setIsProcessing(false);
+        setIsSuccess(true);
+        const now = new Date().toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const updated: MemberCuota = {
+          ...cuota,
+          status: 'PAGADA',
+          paidAt: now,
+          paymentMethod:
+            method === 'card' ? 'Tarjeta Débito/Crédito' : 'Transferencia CBU',
+          receiptNumber: `REC-2026-${Math.floor(10000 + Math.random() * 90000)}`,
+          isOverdue: false,
+          lateFeeAmount: 0,
+        };
+        onPaymentSuccess(updated);
+      }, 1500);
+    } catch (err: any) {
+      console.error('Error antes del POST:', err);
+      console.error('Error detallado:', err);
+      if (err?.response) {
+        console.error('Respuesta original del backend:', err.response);
+        console.error('Datos de la respuesta original:', err.response.data);
+      }
+      console.error('[create-order] No se pudo iniciar el pago con Mercado Pago.', {
+        message: err?.message,
+        status: err?.response?.status,
+        responseData: err?.response?.data,
+        cuota,
+        publicKeyConfigurada: hasMercadoPagoPublicKey(),
+      });
       setIsProcessing(false);
-      setIsSuccess(true);
-      const now = new Date().toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-      const updated: MemberCuota = {
-        ...cuota,
-        status: 'PAGADA',
-        paidAt: now,
-        paymentMethod: method === 'mercadopago' ? 'Mercado Pago' : method === 'card' ? 'Tarjeta Débito/Crédito' : 'Transferencia CBU',
-        receiptNumber: `REC-2026-${Math.floor(10000 + Math.random() * 90000)}`,
-        isOverdue: false,
-        lateFeeAmount: 0,
-      };
-      onPaymentSuccess(updated);
-    }, 1500);
+      alert(err?.response?.data?.message ?? 'No se pudo iniciar el pago con Mercado Pago.');
+    }
   };
 
   const copy = (text: string) => {

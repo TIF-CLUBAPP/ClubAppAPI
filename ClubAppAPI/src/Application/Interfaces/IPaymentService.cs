@@ -14,6 +14,26 @@ public interface IPaymentService
     Task<Payment> CreatePaymentAsync(int loggedInUserId, string userRole, CreatePaymentDto dto); 
     Task<string> UpdateStatusAsync(int paymentId, PaymentStatus status);
 
+    // ========== Mercado Pago - Órdenes ==========
+    /// <summary>
+    /// Crea una orden en Mercado Pago a partir del pago de una Cuota (deuda adeudada).
+    /// Retorna el init_point para que el frontend redirija al checkout seguro.
+    /// </summary>
+    Task<string> CreateOrderAsync(int cuotaId);
+
+    /// <summary>
+    /// Devuelve las cuotas del usuario autenticado con su ID numérico primario real.
+    /// Asegura que exista la cuota del período vigente en la base de datos (la crea si falta)
+    /// para que el flujo de pago siempre tenga un ID relacional válido.
+    /// </summary>
+    Task<List<UserCuotaDto>> GetUserCuotasAsync(int userId);
+
+    /// <summary>
+    /// Procesa el webhook de Mercado Pago. Si el pago está aprobado, registra el pago en el sistema.
+    /// </summary>
+    Task<string> ProcessMercadoPagoWebhookAsync(string payloadJson);
+
+
     // ========== Configuración de cuotas (FeeSettings) ==========
     Task<FeeSettingsDto> GetFeeSettingsAsync();
 

@@ -7,6 +7,14 @@
 
   <ItemGroup>
     <PackageReference Include="mercadopago-sdk" Version="3.7.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+
+    <!-- SDK oficial de Mercado Pago para .NET 8+ (dx-dotnet); gestiona sus propias dependencias HTTP. -->
+    
+    <!-- Referencias legacy de Mercado Pago eliminadas; se usa únicamente mercadopago-sdk 3.7.0. -->
+
+    
+
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.8" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.7">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

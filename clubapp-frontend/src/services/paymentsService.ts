@@ -8,10 +8,29 @@ import type {
   PagedPaymentsResponse,
   PaymentFilter,
   RegisterPaymentRequest,
-  Payment
+  Payment,
+  UserCuota
 } from '../types/cuotas';
 
+/** Respuesta del backend al crear una orden de pago en Mercado Pago. */
+export interface CreateOrderResponse {
+  /** `init_point` (snake_case) que devuelve el backend actual. */
+  init_point?: string;
+  /** Variantes camelCase / sandbox por si cambia la serialización o el SDK. */
+  initPoint?: string;
+  sandboxInitPoint?: string;
+  id?: string;
+  message?: string;
+}
+
 export const paymentsService = {
+  // ========== Creación de orden de pago (Mercado Pago) ==========
+  /** Crea una orden de pago en Mercado Pago (POST /api/payments/create-order). */
+  createOrder: async (cuotaId: number): Promise<CreateOrderResponse> => {
+    const response = await api.post<CreateOrderResponse>('/payments/create-order', { cuotaId });
+    return response.data;
+  },
+
   // ========== Configuración de cuotas ==========
   /** Obtener configuración actual de cuotas (GET /api/payments/settings) */
   getSettings: async (): Promise<FeeSettings> => {
@@ -63,6 +82,13 @@ export const paymentsService = {
     params.append('pageSize', (filter.pageSize ?? 20).toString());
     
     const response = await api.get<PagedPaymentsResponse>(`/payments?${params.toString()}`);
+    return response.data;
+  },
+
+  // ========== Mis cuotas (usuario autenticado) ==========
+  /** Obtener las cuotas del usuario autenticado con su ID real de BD (GET /api/payments/mine) */
+  getMyCuotas: async (): Promise<UserCuota[]> => {
+    const response = await api.get<UserCuota[]>('/payments/mine');
     return response.data;
   },
 

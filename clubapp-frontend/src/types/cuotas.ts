@@ -129,6 +129,8 @@ export interface CuotaVencida {
 
 export interface MemberCuota {
   id: string;
+  /** ID numérico primario de la cuota (Payment.Id) en la base de datos. */
+  idReal?: number;
   periodo: string; // ej. "Septiembre 2026"
   mesAno: string; // ej. "2026-09"
   fechaVencimiento: string; // ej. "15/09/2026"
@@ -143,5 +145,17 @@ export interface MemberCuota {
   paidAt?: string;
   paymentMethod?: string;
   receiptNumber?: string;
+}
+
+// Cuota del usuario devuelta por el backend (GET /api/payments/mine)
+export interface UserCuota {
+  id: number;             // ID numérico primario (Payment.Id)
+  period: string;         // "yyyy-MM"
+  amount: number;         // monto base
+  lateFeeApplied: number; // recargo por mora
+  status: string;         // "PENDING" | "PAID" | "OVERDUE" | "EXEMPT"
+  paymentDate?: string | null;
+  paymentMethod?: string;
+  createdAt: string;
 }
 

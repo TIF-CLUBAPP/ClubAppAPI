@@ -19,6 +19,14 @@ public class PaymentsController : ControllerBase
         _paymentService = paymentService;
     }
 
+    public class CreateMercadoPagoOrderRequest
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.Range(1, int.MaxValue, ErrorMessage = "cuotaId inválido")]
+        public int CuotaId { get; set; }
+    }
+
+
     [HttpGet]
     [Authorize(Roles = "ADMIN,SUPERADMIN")]
     public async Task<IActionResult> GetAll()
@@ -55,6 +63,23 @@ public class PaymentsController : ControllerBase
         }
 
         return Ok(await _paymentService.GetPaymentsByUserIdAsync(userId));
+    }
+
+    // ========== Mis cuotas (usuario autenticado) ==========
+    /// <summary>
+    /// Devuelve las cuotas del usuario autenticado con su ID numérico primario real.
+    /// El frontend las usa para pagar vía /api/payments/create-order con el ID de la BD.
+    /// </summary>
+    [HttpGet("mine")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetMine()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
+            return Unauthorized("Token inválido.");
+
+        return Ok(await _paymentService.GetUserCuotasAsync(userId));
     }
 
     [HttpPost]
@@ -203,5 +228,65 @@ public class PaymentsController : ControllerBase
         if (result == null)
             return NotFound(new { message = "No se pudo registrar el pago." });
         return Ok(result);
+    }
+
+    // ========== Mercado Pago - create order ==========
+    [HttpPost("create-order")]
+    public async Task<IActionResult> CreateOrder([FromBody] CreateMercadoPagoOrderRequest request)
+    {
+        if (request == null)
+            return BadRequest(new { message = "request inválido" });
+
+        // Validación principal vía atributos en el DTO.
+        if (request.CuotaId <= 0)
+            return BadRequest(new { message = "cuotaId inválido" });
+
+        var initPoint = await _paymentService.CreateOrderAsync(request.CuotaId);
+
+        switch (initPoint)
+        {
+            case "NOT_FOUND":
+                return NotFound(new { message = $"No se encontró la cuota {request.CuotaId} en la base de datos." });
+            case "ALREADY_PAID":
+                return BadRequest(new { message = "La cuota ya fue registrada como pagada." });
+        }
+
+        if (string.IsNullOrWhiteSpace(initPoint))
+            return BadRequest(new { message = "No se pudo crear la orden de pago en Mercado Pago." });
+
+        return Ok(new { init_point = initPoint, message = "Orden creada en Mercado Pago." });
+    }
+
+    // ========== Mercado Pago - webhook ==========
+    // POST /api/payments/webhook
+    [HttpPost("webhook")]
+    [AllowAnonymous]
+    public async Task<IActionResult> MercadoPagoWebhook()
+    {
+        using var reader = new StreamReader(Request.Body);
+        var payloadJson = await reader.ReadToEndAsync();
+
+        var result = await _paymentService.ProcessMercadoPagoWebhookAsync(payloadJson);
+
+        // Si el pago fue aprobado y ya se registró, devolvemos 200.
+        return result switch
+        {
+            "OK" => Ok(new { message = "Pago registrado." }),
+            "ALREADY_PAID" => Ok(new { message = "Pago ya estaba registrado." }),
+            "IGNORED" => Ok(new { message = "Evento ignorado." }),
+            _ => BadRequest(new { message = result })
+        };
+    }
+
+    // GET /api/payments/mercadopago/success?cuotaId=...
+    [HttpGet("mercadopago/success")]
+    [AllowAnonymous]
+    public IActionResult MercadoPagoSuccess([FromQuery] int cuotaId)
+    {
+        // El frontend está escuchando su propia ruta. Redirigimos con querystring.
+        // Si no existe una ruta exacta en el frontend, ajustá el destino.
+        var frontendBase = Environment.GetEnvironmentVariable("FRONTEND_BASE_URL") ?? "http://localhost:5173";
+        var url = $"{frontendBase}/cuotas?paid=1&cuotaId={cuotaId}";
+        return Redirect(url);
     }
 }

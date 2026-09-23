@@ -2,16 +2,66 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using ClubApp.Domain.Entities;
+using ClubApp.Domain.Constants;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace ClubApp.Infrastructure.Data
 {
     public static class DbInitializer
     {
-        public static void Seed(ApplicationContext context)
+        public static void Seed(ApplicationContext context, IConfiguration configuration)
         {
             // Use migrations to ensure schema is up-to-date (prevents divergence between EnsureCreated and migrations)
             context.Database.Migrate();
+
+            // ==========================================
+            // 0. SEEDING DE CONFIGURACIÓN DEL CLUB (ClubConfig)
+            // ==========================================
+            // Debe existir SIEMPRE al menos un registro de ClubConfig para que el
+            // flujo de pago (POST /api/payments/create-order) no falle con 404.
+            // Además se garantiza un token de Mercado Pago (config → fallback sandbox).
+            var mpAccessToken = ClubConfigDefaults.ResolveAccessToken(configuration["MercadoPago:AccessToken"]);
+            var mpPublicKey = ClubConfigDefaults.ResolvePublicKey(configuration["MercadoPago:PublicKey"]);
+
+            var clubConfig = context.ClubConfigs.FirstOrDefault();
+            if (clubConfig == null)
+            {
+                context.ClubConfigs.Add(new ClubConfig
+                {
+                    TrialEndsAt = DateTime.UtcNow.AddDays(ClubConfigDefaults.DefaultTrialDays),
+                    MonthlySubscriptionFee = ClubConfigDefaults.DefaultMonthlySubscriptionFee,
+                    ApplicationFeePercentage = ClubConfigDefaults.DefaultApplicationFeePercentage,
+                    MaxApplicationFeeAmount = ClubConfigDefaults.DefaultMaxApplicationFeeAmount,
+                    MercadoPagoAccessToken = mpAccessToken,
+                    MercadoPagoPublicKey = mpPublicKey
+                });
+                context.SaveChanges();
+            }
+            else
+            {
+                // Backfill: sincronizamos el token/key de Mercado Pago con el valor
+                // configurado (o el sandbox por defecto) para autocorregir credenciales
+                // viejas o vacías que hayan quedado persistidas en la BD local.
+                var changed = false;
+
+                if (clubConfig.MercadoPagoAccessToken != mpAccessToken)
+                {
+                    clubConfig.MercadoPagoAccessToken = mpAccessToken;
+                    changed = true;
+                }
+
+                if (clubConfig.MercadoPagoPublicKey != mpPublicKey)
+                {
+                    clubConfig.MercadoPagoPublicKey = mpPublicKey;
+                    changed = true;
+                }
+
+                if (changed)
+                {
+                    context.SaveChanges();
+                }
+            }
 
             // ==========================================
             // 1. SEEDING DE USUARIOS (Sin forzar IDs)

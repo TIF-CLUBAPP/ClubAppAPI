@@ -54,6 +54,11 @@ public class GlobalExceptionHandlingMiddleware
                 "Argumento inválido", 
                 ex.Message
             ),
+            InvalidOperationException ex => (
+                HttpStatusCode.InternalServerError, 
+                "Error interno del servidor", 
+                ex.Message
+            ),
             UnauthorizedAccessException ex => (
                 HttpStatusCode.Unauthorized, 
                 "No autorizado", 

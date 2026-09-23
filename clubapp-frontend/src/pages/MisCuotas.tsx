@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { CreditCard, RefreshCw, Sparkles } from 'lucide-react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
@@ -13,6 +14,27 @@ const fmt = (val: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(val);
 
 export const MisCuotas: React.FC = () => {
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const status = searchParams.get('status');
+    const paymentId = searchParams.get('payment_id');
+
+    if (status) {
+      if (status === 'success') {
+        alert(`¡Pago registrado exitosamente! ${paymentId ? `(ID: ${paymentId})` : ''}`);
+      } else if (status === 'failure') {
+        alert('El pago no pudo completarse. Por favor, intenta nuevamente.');
+      } else if (status === 'pending') {
+        alert('Tu pago está pendiente de procesamiento.');
+      }
+      
+      // Limpiar URL eliminando los parámetros de consulta
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [searchParams]);
+
+
   const { loading, settings, exemptionLabel, cuotas, totalPending, globalStatus, updateCuota } = useMisCuotas();
   const [selectedPay, setSelectedPay] = useState<MemberCuota | null>(null);
   const [selectedReceipt, setSelectedReceipt] = useState<MemberCuota | null>(null);

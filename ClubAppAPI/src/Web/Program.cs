@@ -1,5 +1,6 @@
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Services;
+using ClubApp.Application.Models;
 using ClubApp.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using ClubApp.Domain.Interfaces;
@@ -11,9 +12,16 @@ using ClubApp.Infrastructure.Services;
 using Microsoft.Data.Sqlite;
 using ClubApp.Domain.Entities;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Options;
 using ClubApp.API.Middlewares; 
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ==========================================
+// 0. CONFIGURACIÓN FUERTEMENTE TIPADA (Options Pattern)
+// ==========================================
+builder.Services.Configure<MercadoPagoSettings>(
+    builder.Configuration.GetSection("MercadoPago"));
 
 // ==========================================
 // 1. REGISTRO DE REPOSITORIOS (Capa Datos)
@@ -148,7 +156,7 @@ using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
     
-    ClubApp.Infrastructure.Data.DbInitializer.Seed(dbContext);
+    ClubApp.Infrastructure.Data.DbInitializer.Seed(dbContext, app.Configuration);
 }
 #endregion
 

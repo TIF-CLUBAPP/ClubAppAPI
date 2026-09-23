@@ -17,5 +17,8 @@ namespace ClubApp.Domain.Entities
 
         [Column(TypeName = "decimal(5,2)")]
         public decimal ApplicationFeePercentage { get; set; } = 3.5m;
+
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal MaxApplicationFeeAmount { get; set; } = 1500m;
     }
 }
