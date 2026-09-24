@@ -22,7 +22,9 @@ import {
   CheckCircle2,
   Receipt,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  Info,
+  Smartphone
 } from 'lucide-react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
@@ -110,6 +112,14 @@ export const PagosCuotas: React.FC = () => {
   // Modal de confirmación de cambio de tarifa (la nueva tarifa rige desde el 1° del mes siguiente)
   const [isSettingsConfirmOpen, setIsSettingsConfirmOpen] = useState(false);
   const [pendingSettings, setPendingSettings] = useState<FeeSettings | null>(null);
+  // Valores persistidos (último estado guardado en la API). Se usan como base para
+  // detectar cambios sin guardar y controlar la visibilidad del cartel amarillo.
+  const [savedSettings, setSavedSettings] = useState<FeeSettings>({
+    baseFeeAmount: 0,
+    lateFeePercentage: 0,
+    lateFeeType: 'percentage',
+    dueDayOfMonth: 10,
+  });
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -167,6 +177,7 @@ export const PagosCuotas: React.FC = () => {
         paymentsService.getExemptions(),
       ]);
       setSettings(settingsData);
+      setSavedSettings(settingsData);
       setBaseFeeInput(String(settingsData.baseFeeAmount ?? 0));
       setLateFeeInput(String(settingsData.lateFeePercentage ?? 0));
       setDueDayInput(String(settingsData.dueDayOfMonth ?? 10));
@@ -287,7 +298,10 @@ export const PagosCuotas: React.FC = () => {
       setSavingSettings(true);
       const saved = await paymentsService.updateSettings(updatedSettings);
       // El backend devuelve la fecha de vigencia; se refleja en el estado local.
-      setSettings(prev => ({ ...prev, ...saved }));
+      const persistedSettings: FeeSettings = { ...updatedSettings, ...saved };
+      setSettings(persistedSettings);
+      // Actualiza la base de comparación para ocultar el cartel amarillo de cambios.
+      setSavedSettings(persistedSettings);
       setMessage({
         text: `Tarifa registrada en el historial. Se aplicará desde el ${getProximoMesLabel()}.`,
         type: 'success'
@@ -477,6 +491,13 @@ export const PagosCuotas: React.FC = () => {
     (u.category && u.category.toLowerCase().includes(searchUser.toLowerCase())) ||
     (u.reason && u.reason.toLowerCase().includes(searchUser.toLowerCase()))
   );
+
+  // Detecta cambios sin guardar en los inputs de configuración de precios y mora.
+  // El cartel amarillo de advertencia solo se muestra mientras exista un cambio pendiente.
+  const hasPendingChanges =
+    settings.baseFeeAmount !== savedSettings.baseFeeAmount ||
+    settings.lateFeePercentage !== savedSettings.lateFeePercentage ||
+    settings.dueDayOfMonth !== savedSettings.dueDayOfMonth;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex selection:bg-emerald-500 selection:text-slate-950">
@@ -687,29 +708,84 @@ export const PagosCuotas: React.FC = () => {
                           </div>
                         </div>
                       </div>
+
+                      {/* TARIFA DIGITAL ATRIO (APP) */}
+                      <div className="bg-slate-900/90 border border-emerald-500/30 rounded-xl p-5 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-base font-semibold text-slate-300 flex items-center gap-2">
+                            <Smartphone className="w-4 h-4 text-emerald-400" />
+                            Tarifa Digital ATRIO (App)
+                          </span>
+                          <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded">
+                            RECARGO DIGITAL
+                          </span>
+                        </div>
+                        {(() => {
+                          const base = parseFloat(baseFeeInput) || 0;
+                          const comisionAtrio = Math.min(base * 0.035, 1500);
+                          const finalApp = base + comisionAtrio;
+                          const fmtARS = (value: number, decimals: number) =>
+                            new Intl.NumberFormat('es-AR', {
+                              style: 'currency',
+                              currency: 'ARS',
+                              minimumFractionDigits: decimals,
+                              maximumFractionDigits: decimals,
+                            }).format(value);
+                          return (
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                              <div>
+                                <p className="text-xs text-slate-400 mb-1">Cuota Base del Club</p>
+                                <p className="text-lg font-bold text-white">{fmtARS(base, 0)}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-slate-400 mb-1">Comisión de Plataforma ATRIO (3.5% - máx $1.500)</p>
+                                <p className="text-lg font-bold text-emerald-400">+{fmtARS(comisionAtrio, 2)}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-slate-400 mb-1">Monto Final Cobrado en App</p>
+                                <p className="text-lg font-bold text-emerald-300">{fmtARS(finalApp, 2)}</p>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+
+                      {/* NOTA INFORMATIVA: TÉRMINOS DE TARIFA ATRIO */}
+                      <div className="bg-sky-500/10 border border-sky-500/30 rounded-xl p-4 flex items-start gap-3">
+                        <Info className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />
+                        <div className="text-sm text-sky-200 leading-relaxed">
+                          <p className="font-semibold text-sky-300">Transparencia en el servicio</p>
+                          <p className="text-xs text-sky-300/80 mt-1">
+                            El precio final incluye el costo por uso de plataforma ATRIO (3.5% con tope de $1.500 por transacción). Estas tarifas están sujetas a modificaciones por parte de ATRIO previa notificación.
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  {/* AVISO: los cambios de tarifa no afectan deudas ya emitidas */}
-                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
-                    <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm text-amber-200 leading-relaxed">
-                      <p className="font-semibold text-amber-300">
-                        ⚠️ Atención: Los cambios en el valor de la cuota se registrarán en el historial y comenzarán a aplicarse automáticamente a partir del próximo mes. Las cuotas y deudas vigentes hasta la fecha no sufrirán modificaciones.
-                      </p>
-                      <p className="text-xs text-amber-300/80 mt-2">
-                        Nueva tarifa vigente desde el <span className="font-bold">{getProximoMesLabel()}</span>.
-                        {settings.pendingEffectiveFromDate && (
-                          <>
-                            {' '}Ya hay un cambio pendiente con vigencia{' '}
-                            <span className="font-bold">
-                              {new Date(settings.pendingEffectiveFromDate).toLocaleDateString('es-AR')}
-                            </span>.
-                          </>
-                        )}
-                      </p>
+                  {/* AVISO: los cambios de tarifa no afectan deudas ya emitidas.
+                      Solo se muestra cuando existe un cambio pendiente sin guardar. */}
+                  {hasPendingChanges && (
+                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
+                      <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                      <div className="text-sm text-amber-200 leading-relaxed">
+                        <p className="font-semibold text-amber-300">
+                          ⚠️ Atención: Los cambios en el valor de la cuota se registrarán en el historial y comenzarán a aplicarse automáticamente a partir del próximo mes. Las cuotas y deudas vigentes hasta la fecha no sufrirán modificaciones.
+                        </p>
+                        <p className="text-xs text-amber-300/80 mt-2">
+                          Nueva tarifa vigente desde el <span className="font-bold">{getProximoMesLabel()}</span>.
+                          {settings.pendingEffectiveFromDate && (
+                            <>
+                              {' '}Ya hay un cambio pendiente con vigencia{' '}
+                              <span className="font-bold">
+                                {new Date(settings.pendingEffectiveFromDate).toLocaleDateString('es-AR')}
+                              </span>.
+                            </>
+                          )}
+                        </p>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <div className="flex justify-end">
                     <button
@@ -753,9 +829,9 @@ export const PagosCuotas: React.FC = () => {
                     >
                       <div className="flex items-center gap-2.5">
                         {message.type === 'success' ? (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                         ) : (
-                          <ShieldAlert className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                          <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
                         )}
                         <span>{message.text}</span>
                       </div>
@@ -1148,7 +1224,7 @@ export const PagosCuotas: React.FC = () => {
 
               {/* OBSERVACIONES / MOTIVO */}
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-2 flex items-center gap-1.5">
+                <label className="text-xs font-medium text-slate-300 mb-2 flex items-center gap-1.5">
                   <FileText className="w-3.5 h-3.5 text-slate-400" />
                   Observaciones / Motivo (Opcional)
                 </label>
@@ -1199,9 +1275,9 @@ export const PagosCuotas: React.FC = () => {
               }`}
             >
               {message.type === 'success' ? (
-                <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
               ) : (
-                <ShieldAlert className="w-5 h-5 text-rose-400 flex-shrink-0" />
+                <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0" />
               )}
               <span>{message.text}</span>
               <button
@@ -1275,7 +1351,7 @@ export const PagosCuotas: React.FC = () => {
                 </div>
 
                 <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
-                  <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                   <p className="text-xs text-amber-200 leading-relaxed">
                     Las cuotas y deudas ya emitidas hasta la fecha <span className="font-semibold">no sufrirán modificaciones</span>.
                     El cambio queda guardado en el historial y se aplicará automáticamente el mes que viene.
