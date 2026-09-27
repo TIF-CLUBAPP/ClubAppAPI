@@ -19,6 +19,15 @@ public class FeeSettingsDto
     /// si el último cambio guardado todavía no entró en vigencia.
     /// </summary>
     public DateTime? PendingEffectiveFromDate { get; set; }
+
+    /// <summary>Precio base de la tarifa pendiente (aplicará desde PendingEffectiveFromDate). Null = sin cambio pendiente.</summary>
+    public decimal? PendingBaseFeeAmount { get; set; }
+
+    /// <summary>Porcentaje de recargo por mora pendiente. Null = sin cambio pendiente.</summary>
+    public decimal? PendingLateFeePercentage { get; set; }
+
+    /// <summary>Día de vencimiento pendiente. Null = sin cambio pendiente.</summary>
+    public int? PendingDueDayOfMonth { get; set; }
 }
 
 /// <summary>

@@ -38,7 +38,7 @@ const formatCurrency = (value: number) =>
 
 /** Configuración por defecto hasta que responda GET /payments/settings. */
 const DEFAULT_FEE_SETTINGS: FeeSettings = {
-  baseFeeAmount: 150000,
+  baseFeeAmount: 15000,
   lateFeePercentage: 10,
   lateFeeType: 'percentage',
   dueDayOfMonth: 10,

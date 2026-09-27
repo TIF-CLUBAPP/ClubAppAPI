@@ -1,14 +1,10 @@
 /**
  * Configuración de Mercado Pago en el frontend.
  *
- * El flujo de pago actual es una redirección al `init_point` que devuelve el
- * backend (POST /api/payments/create-order). En ese flujo NO se usa el SDK ni
- * los Checkout Bricks en el navegador, por lo que la clave pública NO es
- * estrictamente necesaria.
- *
- * `VITE_MERCADOPAGO_PUBLIC_KEY` solo se requiere si en el futuro se integra el
- * SDK/Checkout en el navegador. Se lee con un fallback seguro (cadena vacía)
- * para no interrumpir el flujo si no está definida en el `.env`.
+ * La clave pública (VITE_MERCADOPAGO_PUBLIC_KEY) es necesaria para tokenizar
+ * tarjetas en el navegador con el SDK v2 (`window.MercadoPago.createCardToken`).
+ * El pago con "Mercado Pago" (Checkout Pro) sigue siendo una redirección al
+ * `init_point` que devuelve el backend y NO usa la clave pública.
  */
 const rawPublicKey = import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY as string | undefined;
 
@@ -16,9 +12,22 @@ export const MERCADOPAGO_PUBLIC_KEY: string = (rawPublicKey ?? '').trim();
 
 export const hasMercadoPagoPublicKey = (): boolean => Boolean(MERCADOPAGO_PUBLIC_KEY);
 
-if (!hasMercadoPagoPublicKey()) {
-  console.warn(
-    '[mercadopago] VITE_MERCADOPAGO_PUBLIC_KEY no está definida. ' +
-      'El flujo actual (redirección a init_point) no la requiere; solo sería necesaria para el SDK/Checkout en el navegador.',
-  );
-}
+/**
+ * Devuelve una instancia del SDK v2 de Mercado Pago lista para tokenizar tarjetas.
+ * Lanza un error descriptivo si falta la clave pública o el script del SDK.
+ */
+export const getMercadoPagoInstance = () => {
+  if (!hasMercadoPagoPublicKey()) {
+    throw new Error(
+      'Falta VITE_MERCADOPAGO_PUBLIC_KEY. No se puede tokenizar la tarjeta de forma segura.',
+    );
+  }
+
+  if (typeof window === 'undefined' || !window.MercadoPago) {
+    throw new Error(
+      'El SDK de Mercado Pago no está cargado. Verificá el script https://sdk.mercadopago.com/js/v2.',
+    );
+  }
+
+  return new window.MercadoPago(MERCADOPAGO_PUBLIC_KEY);
+};

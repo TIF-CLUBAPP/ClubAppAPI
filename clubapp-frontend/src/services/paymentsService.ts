@@ -23,11 +23,32 @@ export interface CreateOrderResponse {
   message?: string;
 }
 
+/** Respuesta del backend al procesar un pago con tarjeta tokenizada. */
+export interface CardPaymentResult {
+  /** true si el pago fue aprobado y la cuota quedó registrada como pagada. */
+  success: boolean;
+  /** Estado devuelto por Mercado Pago: approved | pending | in_process | rejected | ... */
+  status: string;
+  /** Mensaje descriptivo para el usuario. */
+  message: string;
+  /** ID del pago en Mercado Pago (si se alcanzó a crear). */
+  mercadoPagoPaymentId?: number | null;
+  /** ID de la cuota registrada en el sistema. */
+  paymentId?: number | null;
+}
+
 export const paymentsService = {
   // ========== Creación de orden de pago (Mercado Pago) ==========
   /** Crea una orden de pago en Mercado Pago (POST /api/payments/create-order). */
   createOrder: async (cuotaId: number): Promise<CreateOrderResponse> => {
     const response = await api.post<CreateOrderResponse>('/payments/create-order', { cuotaId });
+    return response.data;
+  },
+
+  // ========== Pago con tarjeta tokenizada (Mercado Pago) ==========
+  /** Procesa el pago con tarjeta usando el token de Mercado Pago (POST /api/payments/pay-with-card). */
+  payWithCard: async (cuotaId: number, token: string): Promise<CardPaymentResult> => {
+    const response = await api.post<CardPaymentResult>('/payments/pay-with-card', { cuotaId, token });
     return response.data;
   },
 

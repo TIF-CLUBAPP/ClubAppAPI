@@ -112,7 +112,7 @@ export const PagosCuotas: React.FC = () => {
   // Modal de confirmación de cambio de tarifa (la nueva tarifa rige desde el 1° del mes siguiente)
   const [isSettingsConfirmOpen, setIsSettingsConfirmOpen] = useState(false);
   const [pendingSettings, setPendingSettings] = useState<FeeSettings | null>(null);
-  // Valores persistidos (último estado guardado en la API). Se usan como base para
+  // Valores persistidos (último borrador guardado en la API). Se usan como base para
   // detectar cambios sin guardar y controlar la visibilidad del cartel amarillo.
   const [savedSettings, setSavedSettings] = useState<FeeSettings>({
     baseFeeAmount: 0,
@@ -120,6 +120,9 @@ export const PagosCuotas: React.FC = () => {
     lateFeeType: 'percentage',
     dueDayOfMonth: 10,
   });
+
+  // Precio base vigente (en curso hoy, fijo). No cambia al editar los inputs del formulario.
+  const [vigenteBaseFee, setVigenteBaseFee] = useState<number>(0);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -176,11 +179,29 @@ export const PagosCuotas: React.FC = () => {
         paymentsService.getSettings(),
         paymentsService.getExemptions(),
       ]);
-      setSettings(settingsData);
-      setSavedSettings(settingsData);
-      setBaseFeeInput(String(settingsData.baseFeeAmount ?? 0));
-      setLateFeeInput(String(settingsData.lateFeePercentage ?? 0));
-      setDueDayInput(String(settingsData.dueDayOfMonth ?? 10));
+      // Tarifa vigente (en curso hoy): queda fija y no cambia al editar.
+      const vigenteBase = settingsData.baseFeeAmount ?? 0;
+      setVigenteBaseFee(vigenteBase);
+
+      // Borrador actual: refleja el cambio pendiente ya guardado (si existe),
+      // de lo contrario arranca desde el valor vigente.
+      const draftBase = settingsData.pendingBaseFeeAmount ?? vigenteBase;
+      const draftLate = settingsData.pendingLateFeePercentage ?? settingsData.lateFeePercentage ?? 0;
+      const draftDue = settingsData.pendingDueDayOfMonth ?? settingsData.dueDayOfMonth ?? 10;
+
+      const draftSettings: FeeSettings = {
+        ...settingsData,
+        baseFeeAmount: draftBase,
+        lateFeePercentage: draftLate,
+        dueDayOfMonth: draftDue,
+        lateFeeType: 'percentage',
+      };
+
+      setSettings(draftSettings);
+      setSavedSettings(draftSettings);
+      setBaseFeeInput(String(draftBase));
+      setLateFeeInput(String(draftLate));
+      setDueDayInput(String(draftDue));
       
       if (exemptionsData.Roles && exemptionsData.Roles.length > 0) {
         const mergedRoles = DEFAULT_ROLES.map(def => {
@@ -297,11 +318,17 @@ export const PagosCuotas: React.FC = () => {
     try {
       setSavingSettings(true);
       const saved = await paymentsService.updateSettings(updatedSettings);
-      // El backend devuelve la fecha de vigencia; se refleja en el estado local.
-      const persistedSettings: FeeSettings = { ...updatedSettings, ...saved };
-      setSettings(persistedSettings);
-      // Actualiza la base de comparación para ocultar el cartel amarillo de cambios.
-      setSavedSettings(persistedSettings);
+      // El backend devuelve la tarifa vigente (sin cambios) y el nuevo valor como pendiente.
+      const persistedDraft: FeeSettings = {
+        ...updatedSettings,
+        lateFeeType: updatedSettings.lateFeeType ?? 'percentage',
+        pendingEffectiveFromDate: saved.pendingEffectiveFromDate ?? updatedSettings.pendingEffectiveFromDate ?? null,
+      };
+      setSettings(persistedDraft);
+      // La base de comparación es el borrador ya persistido (oculta el cartel amarillo).
+      setSavedSettings(persistedDraft);
+      // La tarifa vigente (en curso) NO cambia hasta el 1° del mes siguiente.
+      setVigenteBaseFee(saved.baseFeeAmount ?? vigenteBaseFee);
       setMessage({
         text: `Tarifa registrada en el historial. Se aplicará desde el ${getProximoMesLabel()}.`,
         type: 'success'
@@ -639,18 +666,44 @@ export const PagosCuotas: React.FC = () => {
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                        {/* CUOTA REGULAR */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        {/* CUOTA VIGENTE (MES ACTUAL) */}
                         <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-5 flex flex-col justify-between space-y-3">
-                          <span className="text-base font-semibold text-slate-300">
-                            Cuota Regular (En término)
-                          </span>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-base font-semibold text-slate-300">
+                              Cuota Vigente (Mes Actual)
+                            </span>
+                            <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded whitespace-nowrap">
+                              Vigente este mes
+                            </span>
+                          </div>
                           <div>
                             <p className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+                              {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(vigenteBaseFee || 0)}
+                            </p>
+                            <p className="text-sm text-slate-400 mt-1">Monto que se cobra este mes</p>
+                          </div>
+                        </div>
+
+                        {/* CUOTA PROGRAMADA (PRÓXIMO MES) */}
+                        <div className="bg-slate-900/90 border border-amber-500/30 rounded-xl p-5 flex flex-col justify-between space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-base font-semibold text-slate-300">
+                              Cuota Programada (Próximo Mes)
+                            </span>
+                            <span className="text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded whitespace-nowrap">
+                              Aplica desde el {getProximoMesLabel()}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="text-2xl sm:text-3xl font-bold text-amber-400 tracking-tight">
                               {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(parseFloat(baseFeeInput) || 0)}
                             </p>
-                            <p className="text-sm text-slate-400 mt-1">Monto base mensual</p>
+                            <p className="text-sm text-slate-400 mt-1">Valor ingresado por el administrador</p>
                           </div>
+                          <p className="text-xs text-amber-200/80 leading-relaxed">
+                            💡 Los socios recibirán una notificación previa antes del inicio de vigencia.
+                          </p>
                         </div>
 
                         {/* CUOTA CON MORA */}
@@ -720,6 +773,9 @@ export const PagosCuotas: React.FC = () => {
                             RECARGO DIGITAL
                           </span>
                         </div>
+                        <p className="text-xs text-emerald-200/70">
+                          Simulación del monto a pagar en la app a partir del próximo mes, sobre la <span className="font-semibold">cuota programada</span>.
+                        </p>
                         {(() => {
                           const base = parseFloat(baseFeeInput) || 0;
                           const comisionAtrio = Math.min(base * 0.035, 1500);
@@ -734,7 +790,7 @@ export const PagosCuotas: React.FC = () => {
                           return (
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                               <div>
-                                <p className="text-xs text-slate-400 mb-1">Cuota Base del Club</p>
+                                <p className="text-xs text-slate-400 mb-1">Cuota Programada (Próximo Mes)</p>
                                 <p className="text-lg font-bold text-white">{fmtARS(base, 0)}</p>
                               </div>
                               <div>

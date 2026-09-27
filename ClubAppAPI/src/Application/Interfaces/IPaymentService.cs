@@ -22,6 +22,12 @@ public interface IPaymentService
     Task<string> CreateOrderAsync(int cuotaId);
 
     /// <summary>
+    /// Procesa el pago con tarjeta tokenizada (Branded) usando el token devuelto por
+    /// Mercado Pago en el cliente. Si el pago es aprobado, registra la cuota como pagada.
+    /// </summary>
+    Task<CardPaymentResult> ProcessCardPaymentAsync(int cuotaId, string token);
+
+    /// <summary>
     /// Devuelve las cuotas del usuario autenticado con su ID numérico primario real.
     /// Asegura que exista la cuota del período vigente en la base de datos (la crea si falta)
     /// para que el flujo de pago siempre tenga un ID relacional válido.
@@ -62,7 +68,8 @@ public interface IPaymentService
     Task<List<CuotaVencidaDto>> GetOverdueCuotasListAsync();
 
     /// <summary>Registra el pago de una única cuota (cobro total).</summary>
-    Task<string> RegistrarPagoAsync(int cuotaId);
+    /// <param name="paymentMethod">Método a registrar (ej. "MERCADOPAGO"). Null = no modificar.</param>
+    Task<string> RegistrarPagoAsync(int cuotaId, string? paymentMethod = null);
 
     /// <summary>
     /// Cobro parcial: registra únicamente las cuotas indicadas y deja el resto impagas.

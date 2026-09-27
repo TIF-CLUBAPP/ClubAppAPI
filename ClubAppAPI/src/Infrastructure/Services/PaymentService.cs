@@ -81,7 +81,7 @@ public class PaymentService : IPaymentService
             if (parts.Length != 2 || !int.TryParse(parts[1], out var cuotaId))
                 return "BAD_EXTERNAL_REFERENCE";
 
-            return await RegistrarPagoAsync(cuotaId);
+            return await RegistrarPagoAsync(cuotaId, "MERCADOPAGO");
         }
         catch
         {
@@ -202,17 +202,17 @@ public class PaymentService : IPaymentService
 
     public async Task<FeeSettingsDto> GetFeeSettingsAsync()
     {
-        // La tarifa vigente es la fila marcada como actual; si no existe,
-        // se toma la más reciente por fecha de vigencia.
-        var settings = await _context.FeeSettings
-            .Where(f => f.IsCurrent)
-            .OrderByDescending(f => f.EffectiveFromDate)
-            .FirstOrDefaultAsync()
-            ?? await _context.FeeSettings
-                .OrderByDescending(f => f.EffectiveFromDate)
-                .FirstOrDefaultAsync();
+        // La tarifa vigente es la fila cuyo EffectiveFromDate ya pasó (o es null,
+        // "vigente desde siempre"). La pendiente es la que tiene fecha futura.
+        var now = DateTime.UtcNow;
 
-        if (settings == null)
+        var vigente = await _context.FeeSettings
+            .Where(f => f.EffectiveFromDate == null || f.EffectiveFromDate <= now)
+            .OrderByDescending(f => f.EffectiveFromDate)
+            .ThenByDescending(f => f.Id)
+            .FirstOrDefaultAsync();
+
+        if (vigente == null)
         {
             return new FeeSettingsDto
             {
@@ -224,35 +224,36 @@ public class PaymentService : IPaymentService
             };
         }
 
-        // Si el último cambio registrado aún no entró en vigencia (fecha futura),
-        // se informa como pendiente sin aplicarlo todavía.
-        var ultimoCambio = await _context.FeeSettingsHistory
-            .OrderByDescending(h => h.ChangedAt)
+        var pendiente = await _context.FeeSettings
+            .Where(f => f.EffectiveFromDate != null && f.EffectiveFromDate > now)
+            .OrderByDescending(f => f.EffectiveFromDate)
+            .ThenByDescending(f => f.Id)
             .FirstOrDefaultAsync();
-
-        DateTime? pendiente = null;
-        if (ultimoCambio != null && ultimoCambio.EffectiveFromDate > DateTime.UtcNow)
-        {
-            pendiente = ultimoCambio.EffectiveFromDate;
-        }
 
         return new FeeSettingsDto
         {
-            BaseFeeAmount = settings.BaseFeeAmount,
-            LateFeePercentage = settings.LateFeePercentage,
-            DueDayOfMonth = settings.DueDayOfMonth,
-            EffectiveFromDate = settings.EffectiveFromDate,
-            PendingEffectiveFromDate = pendiente
+            BaseFeeAmount = vigente.BaseFeeAmount,
+            LateFeePercentage = vigente.LateFeePercentage,
+            DueDayOfMonth = vigente.DueDayOfMonth,
+            EffectiveFromDate = vigente.EffectiveFromDate,
+            PendingBaseFeeAmount = pendiente?.BaseFeeAmount,
+            PendingLateFeePercentage = pendiente?.LateFeePercentage,
+            PendingDueDayOfMonth = pendiente?.DueDayOfMonth,
+            PendingEffectiveFromDate = pendiente?.EffectiveFromDate
         };
     }
 
     public async Task<FeeSettingsDto> UpdateFeeSettingsAsync(UpdateFeeSettingsDto dto, int? changedByUserId = null)
     {
         var vigencia = CalcularVigenciaProximoMes();
+        var now = DateTime.UtcNow;
 
+        // La fila vigente (en curso) se determina por fecha de vigencia, no por IsCurrent,
+        // para no confundirla con el último cambio guardado (que aún no entró en vigencia).
         var actual = await _context.FeeSettings
-            .Where(f => f.IsCurrent)
+            .Where(f => f.EffectiveFromDate == null || f.EffectiveFromDate <= now)
             .OrderByDescending(f => f.EffectiveFromDate)
+            .ThenByDescending(f => f.Id)
             .FirstOrDefaultAsync();
 
         if (actual == null)
@@ -283,16 +284,15 @@ public class PaymentService : IPaymentService
             Notes = $"Nueva tarifa vigente desde {vigencia:yyyy-MM-dd}."
         });
 
-        // 2) La fila actual deja de ser la vigente y se crea una nueva con EffectiveFromDate.
-        actual.IsCurrent = false;
-
+        // 2) La tarifa vigente actual NO se toca: sigue rigiendo hasta el 1° del mes siguiente.
+        //    El nuevo valor queda como pendiente (IsCurrent = false) hasta esa fecha.
         var nueva = new FeeSettings
         {
             BaseFeeAmount = dto.BaseFeeAmount,
             LateFeePercentage = dto.LateFeePercentage,
             DueDayOfMonth = dto.DueDayOfMonth,
             EffectiveFromDate = vigencia,
-            IsCurrent = true
+            IsCurrent = false
         };
         _context.FeeSettings.Add(nueva);
 
@@ -300,11 +300,14 @@ public class PaymentService : IPaymentService
 
         return new FeeSettingsDto
         {
-            BaseFeeAmount = nueva.BaseFeeAmount,
-            LateFeePercentage = nueva.LateFeePercentage,
-            DueDayOfMonth = nueva.DueDayOfMonth,
-            EffectiveFromDate = nueva.EffectiveFromDate,
-            PendingEffectiveFromDate = vigencia
+            BaseFeeAmount = actual.BaseFeeAmount,
+            LateFeePercentage = actual.LateFeePercentage,
+            DueDayOfMonth = actual.DueDayOfMonth,
+            EffectiveFromDate = actual.EffectiveFromDate,
+            PendingBaseFeeAmount = nueva.BaseFeeAmount,
+            PendingLateFeePercentage = nueva.LateFeePercentage,
+            PendingDueDayOfMonth = nueva.DueDayOfMonth,
+            PendingEffectiveFromDate = nueva.EffectiveFromDate
         };
     }
 
@@ -614,7 +617,7 @@ public class PaymentService : IPaymentService
         if (exists) return;
 
         var settings = await GetFeeSettingsAsync();
-        var baseFee = settings.BaseFeeAmount > 0 ? settings.BaseFeeAmount : 150000m;
+        var baseFee = settings.BaseFeeAmount > 0 ? settings.BaseFeeAmount : 15000m;
 
         _context.Payments.Add(new Payment
         {
@@ -757,18 +760,34 @@ public class PaymentService : IPaymentService
         // 4) Construcción de la preferencia. UnitPrice redondeado a 2 decimales
         //    (Mercado Pago rechaza importes con más de 2 cifras decimales) y
         //    Quantity es un entero fijo >= 1.
+        //    El costo del servicio digital ATRIO se suma al total que abona el socio:
+        //    el comprador paga (amount + applicationFee) y el club recibe `amount`,
+        //    porque `MarketplaceFee` se descuenta de lo que cobra el vendedor.
+        var items = new List<PreferenceItemRequest>
+        {
+            new PreferenceItemRequest
+            {
+                Title = "Cuota Club",
+                Quantity = 1,
+                UnitPrice = Math.Round(amount, 2, MidpointRounding.AwayFromZero),
+                CurrencyId = "ARS"
+            }
+        };
+
+        if (applicationFee > 0)
+        {
+            items.Add(new PreferenceItemRequest
+            {
+                Title = "Costo Servicio Digital ATRIO",
+                Quantity = 1,
+                UnitPrice = Math.Round(applicationFee, 2, MidpointRounding.AwayFromZero),
+                CurrencyId = "ARS"
+            });
+        }
+
         var request = new PreferenceRequest
         {
-            Items = new List<PreferenceItemRequest>
-            {
-                new PreferenceItemRequest
-                {
-                    Title = "Cuota Club",
-                    Quantity = 1,
-                    UnitPrice = Math.Round(amount, 2, MidpointRounding.AwayFromZero),
-                    CurrencyId = "ARS"
-                }
-            },
+            Items = items,
             ExternalReference = $"cuota:{cuotaId}",
             MarketplaceFee = applicationFee,
             Payer = new PreferencePayerRequest
@@ -856,7 +875,159 @@ public class PaymentService : IPaymentService
         return isValid ? candidate : fallbackEmail;
     }
 
-    public async Task<string> RegistrarPagoAsync(int cuotaId)
+    public async Task<CardPaymentResult> ProcessCardPaymentAsync(int cuotaId, string token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return new CardPaymentResult
+            {
+                Success = false,
+                Status = "BAD_REQUEST",
+                Message = "El token de tarjeta es obligatorio."
+            };
+        }
+
+        var payment = await _context.Payments
+            .Include(p => p.User)
+            .FirstOrDefaultAsync(p => p.Id == cuotaId);
+
+        if (payment == null)
+        {
+            return new CardPaymentResult
+            {
+                Success = false,
+                Status = "NOT_FOUND",
+                Message = "No se encontró la cuota indicada."
+            };
+        }
+
+        if (payment.Status == PaymentStatus.Paid)
+        {
+            return new CardPaymentResult
+            {
+                Success = false,
+                Status = "ALREADY_PAID",
+                Message = "La cuota ya fue registrada como pagada."
+            };
+        }
+
+        // Configuración global (token de MP + comisión ATRIO). Garantiza un token no vacío.
+        var clubConfig = await GetOrCreateClubConfigAsync();
+
+        // Monto principal (sin comisión): lo adeudado por la cuota + recargo por mora.
+        var amount = payment.Amount + payment.LateFeeApplied;
+        if (amount <= 0)
+        {
+            return new CardPaymentResult
+            {
+                Success = false,
+                Status = "INVALID_AMOUNT",
+                Message = "El monto de la cuota debe ser mayor a 0."
+            };
+        }
+
+        // Costo del servicio digital ATRIO (comisión de ATRIO): min(3.5%, $1.500).
+        var rawFee = amount * (clubConfig.ApplicationFeePercentage / 100m);
+        var applicationFee = Math.Min(rawFee, clubConfig.MaxApplicationFeeAmount);
+        applicationFee = Math.Round(applicationFee, 2, MidpointRounding.AwayFromZero);
+        if (applicationFee < 0) applicationFee = 0;
+
+        // El comprador abona el total (base + comisión); `application_fee` se
+        // descuenta de lo que recibe el vendedor, por lo que el club netea `amount`.
+        var transactionAmount = Math.Round(amount + applicationFee, 2, MidpointRounding.AwayFromZero);
+
+        var accessToken = (clubConfig.MercadoPagoAccessToken ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(accessToken))
+        {
+            return new CardPaymentResult
+            {
+                Success = false,
+                Status = "NO_TOKEN",
+                Message = "El Access Token de Mercado Pago no está configurado."
+            };
+        }
+
+        MercadoPagoConfig.AccessToken = accessToken;
+
+        var request = new PaymentCreateRequest
+        {
+            TransactionAmount = transactionAmount,
+            Token = token.Trim(),
+            Description = $"Cuota Club - {FormatPeriodo(payment.Period)}",
+            Installments = 1,
+            Payer = new PaymentPayerRequest
+            {
+                Email = GetValidPayerEmail(payment.User?.Email)
+            },
+            ExternalReference = $"cuota:{cuotaId}",
+            ApplicationFee = applicationFee,
+            BinaryMode = true
+        };
+
+        try
+        {
+            var client = new PaymentClient();
+            var mpPayment = await client.CreateAsync(request);
+
+            if (mpPayment == null)
+            {
+                return new CardPaymentResult
+                {
+                    Success = false,
+                    Status = "MP_ERROR",
+                    Message = "No se recibió respuesta de Mercado Pago."
+                };
+            }
+
+            var status = mpPayment.Status?.ToLowerInvariant() ?? "unknown";
+
+            if (status == "approved")
+            {
+                var registrarResult = await RegistrarPagoAsync(cuotaId, "MERCADOPAGO");
+                if (registrarResult == "OK")
+                {
+                    return new CardPaymentResult
+                    {
+                        Success = true,
+                        Status = "approved",
+                        Message = "Pago aprobado y registrado correctamente.",
+                        MercadoPagoPaymentId = mpPayment.Id,
+                        PaymentId = cuotaId
+                    };
+                }
+
+                return new CardPaymentResult
+                {
+                    Success = false,
+                    Status = registrarResult,
+                    Message = "El pago fue aprobado pero no se pudo registrar internamente.",
+                    MercadoPagoPaymentId = mpPayment.Id,
+                    PaymentId = cuotaId
+                };
+            }
+
+            // pending / in_process / rejected: no se registra la cuota; si queda
+            // pendiente, el webhook (/api/payments/webhook) la confirmará.
+            return new CardPaymentResult
+            {
+                Success = false,
+                Status = status,
+                Message = $"El pago quedó en estado '{status}'.",
+                MercadoPagoPaymentId = mpPayment.Id
+            };
+        }
+        catch (MercadoPagoApiException apiEx)
+        {
+            return new CardPaymentResult
+            {
+                Success = false,
+                Status = "MP_ERROR",
+                Message = apiEx.Message ?? "Error al procesar el pago en Mercado Pago."
+            };
+        }
+    }
+
+    public async Task<string> RegistrarPagoAsync(int cuotaId, string? paymentMethod = null)
     {
         var payment = await _context.Payments
             .Include(p => p.User)
@@ -869,6 +1040,10 @@ public class PaymentService : IPaymentService
 
         payment.Status = PaymentStatus.Paid;
         payment.PaymentDate = now;
+        if (!string.IsNullOrWhiteSpace(paymentMethod))
+        {
+            payment.PaymentMethod = paymentMethod;
+        }
 
         var membership = await _context.Memberships
             .FirstOrDefaultAsync(m => m.UserId == payment.UserId);

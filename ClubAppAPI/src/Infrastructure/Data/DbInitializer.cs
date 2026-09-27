@@ -64,6 +64,26 @@ namespace ClubApp.Infrastructure.Data
             }
 
             // ==========================================
+            // 0.1 SEEDING DE TARIFA VIGENTE (FeeSettings)
+            // ==========================================
+            // Garantiza que exista una tarifa "vigente desde siempre" (EffectiveFromDate = null)
+            // para que GET /api/payments/settings devuelva el precio base real en curso
+            // (y no 0 ni el último cambio pendiente).
+            var vigenteFee = context.FeeSettings.FirstOrDefault(f => f.EffectiveFromDate == null);
+            if (vigenteFee == null)
+            {
+                context.FeeSettings.Add(new FeeSettings
+                {
+                    BaseFeeAmount = 15000m,
+                    LateFeePercentage = 10m,
+                    DueDayOfMonth = 10,
+                    EffectiveFromDate = null,
+                    IsCurrent = true
+                });
+                context.SaveChanges();
+            }
+
+            // ==========================================
             // 1. SEEDING DE USUARIOS (Sin forzar IDs)
             // ==========================================
             if (!context.Users.Any())

@@ -8,6 +8,12 @@ export interface FeeSettings {
   effectiveFromDate?: string | null;
   /** Fecha ISO (1° del mes siguiente) en la que entrará en vigencia el último cambio guardado. */
   pendingEffectiveFromDate?: string | null;
+  /** Precio base de la tarifa pendiente (aplicará desde pendingEffectiveFromDate). null = sin cambio pendiente. */
+  pendingBaseFeeAmount?: number | null;
+  /** Porcentaje de recargo por mora pendiente. null = sin cambio pendiente. */
+  pendingLateFeePercentage?: number | null;
+  /** Día de vencimiento pendiente. null = sin cambio pendiente. */
+  pendingDueDayOfMonth?: number | null;
 }
 
 // Entrada del historial de precios (GET /api/payments/settings/history)

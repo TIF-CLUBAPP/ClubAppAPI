@@ -257,6 +257,31 @@ public class PaymentsController : ControllerBase
         return Ok(new { init_point = initPoint, message = "Orden creada en Mercado Pago." });
     }
 
+    // ========== Mercado Pago - pago con tarjeta (token) ==========
+    /// <summary>
+    /// Procesa el pago con tarjeta tokenizada (Branded). El frontend tokeniza los
+    /// datos en el navegador con el SDK de Mercado Pago y envía solo el token.
+    /// </summary>
+    [HttpPost("pay-with-card")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> PayWithCard([FromBody] PayWithCardRequest request)
+    {
+        if (request == null || request.CuotaId <= 0 || string.IsNullOrWhiteSpace(request.Token))
+            return BadRequest(new { message = "request inválido: cuotaId y token son obligatorios." });
+
+        var result = await _paymentService.ProcessCardPaymentAsync(request.CuotaId, request.Token);
+
+        if (!result.Success && result.Status == "NOT_FOUND")
+            return NotFound(new { message = result.Message });
+
+        if (!result.Success && result.Status == "ALREADY_PAID")
+            return BadRequest(new { message = result.Message });
+
+        return Ok(result);
+    }
+
     // ========== Mercado Pago - webhook ==========
     // POST /api/payments/webhook
     [HttpPost("webhook")]

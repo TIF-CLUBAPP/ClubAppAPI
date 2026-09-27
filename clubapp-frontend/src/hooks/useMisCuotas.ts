@@ -67,7 +67,7 @@ const mapCuota = (p: UserCuota, s: FeeSettings): MemberCuota => {
 
 /** Fallback demo: cuotas generadas al vuelo (solo si el backend no responde). */
 const buildMockCuotas = (s: FeeSettings): MemberCuota[] => {
-  const base = s.baseFeeAmount ?? 150000;
+  const base = s.baseFeeAmount ?? 15000;
   const due = s.dueDayOfMonth ?? 15;
   const lfType = s.lateFeeType ?? 'percentage';
   const lfVal = s.lateFeePercentage ?? 10;
@@ -117,7 +117,7 @@ export function useMisCuotas() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState<FeeSettings>({
-    baseFeeAmount: 150000, lateFeePercentage: 10, lateFeeType: 'percentage', dueDayOfMonth: 15,
+    baseFeeAmount: 15000, lateFeePercentage: 10, lateFeeType: 'percentage', dueDayOfMonth: 15,
   });
   const [exemptionLabel, setExemptionLabel] = useState('');
   const [cuotas, setCuotas] = useState<MemberCuota[]>([]);
@@ -128,7 +128,7 @@ export function useMisCuotas() {
     try {
       setLoading(true);
       const [sData, eData] = await Promise.all([
-        paymentsService.getSettings().catch(() => ({ baseFeeAmount: 150000, lateFeePercentage: 10, lateFeeType: 'percentage' as const, dueDayOfMonth: 15 })),
+        paymentsService.getSettings().catch(() => ({ baseFeeAmount: 15000, lateFeePercentage: 10, lateFeeType: 'percentage' as const, dueDayOfMonth: 15 })),
         paymentsService.getExemptions().catch(() => ({ Roles: [], Users: [] })),
       ]);
       setSettings(sData);
