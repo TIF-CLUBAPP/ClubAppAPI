@@ -15,6 +15,12 @@ namespace ClubApp.Domain.Entities
 
         public string? MercadoPagoPublicKey { get; set; }
 
+        /// <summary>Identificador de la cuenta de Mercado Pago vinculada a la Institución.</summary>
+        public string? MercadoPagoUserId { get; set; }
+
+        /// <summary>Alias / CBU / CVU de la cuenta bancaria que recibe las transferencias del Club.</summary>
+        public string? BankAlias { get; set; }
+
         [Column(TypeName = "decimal(5,2)")]
         public decimal ApplicationFeePercentage { get; set; } = 3.5m;
 

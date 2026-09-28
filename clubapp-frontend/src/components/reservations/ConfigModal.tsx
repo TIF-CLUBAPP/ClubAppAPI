@@ -139,7 +139,7 @@ export default function ConfigModal({ isOpen, onClose, config, onSave }: ConfigM
               className={`w-full py-3.5 px-4 font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all mt-6 ${
                 saved
                   ? 'bg-emerald-500 text-slate-950 shadow-emerald-500/20'
-                  : 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 hover:from-emerald-400 hover:to-teal-400 shadow-emerald-500/20'
+                  : 'bg-linear-to-r from-emerald-500 to-teal-500 text-slate-950 hover:from-emerald-400 hover:to-teal-400 shadow-emerald-500/20'
               }`}
             >
               <Save size={18} />

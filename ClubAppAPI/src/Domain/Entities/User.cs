@@ -43,6 +43,19 @@ public class User : BaseEntity
     // Exención de cuotas: si es true, el usuario no genera cuotas mensuales
     public bool IsExemptFromFees { get; set; } = false;
 
+    // ========== Configuración de cobro (split payments) ==========
+    // Aplica a profesores que cobran sus clases de forma directa.
+    public bool AllowsDirectPayment { get; set; } = false;
+
+    /// <summary>Token de acceso de la cuenta de Mercado Pago del profesor.</summary>
+    public string? MercadoPagoAccessToken { get; set; }
+
+    /// <summary>Identificador de la cuenta de Mercado Pago del profesor.</summary>
+    public string? MercadoPagoUserId { get; set; }
+
+    /// <summary>Alias / CBU / CVU de la cuenta bancaria que recibe los pagos del profesor.</summary>
+    public string? BankAlias { get; set; }
+
     public virtual ICollection<Enrollment> Enrollments { get; set; } = new List<Enrollment>();
 
     // Relación con membresías

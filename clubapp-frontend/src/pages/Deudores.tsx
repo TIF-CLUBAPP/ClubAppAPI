@@ -29,7 +29,7 @@ import { useAuth } from '../context/AuthContext';
 import { cuotasService } from '../services/cuotasService';
 import { paymentsService } from '../services/paymentsService';
 import type { CuotaVencida, CuotasVencidasStats } from '../types/deudores';
-import type { FeeSettings } from '../types/cuotas';
+import type { FeeSettings, PendingTransfer } from '../types/cuotas';
 
 const formatNumber = (value: number) => value.toLocaleString('es-AR');
 
@@ -374,6 +374,10 @@ export default function Deudores() {
   // Resumen del último cobro registrado (para el estado de éxito del modal).
   const [lastPayment, setLastPayment] = useState<{ cantidad: number; monto: number } | null>(null);
 
+  // Transferencias bancarias pendientes de aprobación (para tesorería).
+  const [pendingTransfers, setPendingTransfers] = useState<PendingTransfer[]>([]);
+  const [transfersLoading, setTransfersLoading] = useState(false);
+
   const toastTimer = useRef<number | null>(null);
 
   const loadData = useCallback(async () => {
@@ -401,12 +405,26 @@ export default function Deudores() {
     }
   }, []);
 
+  const loadPendingTransfers = useCallback(async () => {
+    setTransfersLoading(true);
+    try {
+      const transfers = await paymentsService.getPendingTransfers();
+      setPendingTransfers(transfers ?? []);
+    } catch (err) {
+      console.warn('No se pudieron cargar las transferencias pendientes.', err);
+      setPendingTransfers([]);
+    } finally {
+      setTransfersLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadData();
+    loadPendingTransfers();
     return () => {
       if (toastTimer.current) window.clearTimeout(toastTimer.current);
     };
-  }, [loadData]);
+  }, [loadData, loadPendingTransfers]);
 
   const showToast = (message: string) => {
     setToast(message);
@@ -676,6 +694,66 @@ export default function Deudores() {
                   icon={<Clock size={18} />}
                   iconClass="bg-amber-500/10 text-amber-400 border-amber-500/20"
                 />
+              </div>
+
+              {/* Transferencias pendientes de aprobación */}
+              <div className="rounded-3xl border border-amber-500/30 bg-amber-950/10 p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Clock size={16} className="text-amber-400" />
+                    <h2 className="text-sm font-bold text-white">Transferencias pendientes de aprobación</h2>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                      {pendingTransfers.length}
+                    </span>
+                  </div>
+                  <button
+                    onClick={loadPendingTransfers}
+                    disabled={transfersLoading}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-amber-300 transition disabled:opacity-50"
+                  >
+                    <RefreshCw size={13} className={transfersLoading ? 'animate-spin' : ''} />
+                    Actualizar
+                  </button>
+                </div>
+
+                {pendingTransfers.length === 0 ? (
+                  <p className="text-xs text-slate-400">No hay transferencias pendientes de verificación.</p>
+                ) : (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="text-slate-500 border-b border-slate-800">
+                            <th className="py-2 pr-3 font-semibold">Socio</th>
+                            <th className="py-2 pr-3 font-semibold">Período</th>
+                            <th className="py-2 pr-3 font-semibold text-right">Monto neto</th>
+                            <th className="py-2 pr-3 font-semibold text-right">Comisión ATRIO</th>
+                            <th className="py-2 pr-3 font-semibold text-right">Total</th>
+                            <th className="py-2 font-semibold">Referencia</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/60">
+                          {pendingTransfers.map((t) => (
+                            <tr key={t.id} className="text-slate-300">
+                              <td className="py-2.5 pr-3 font-medium text-white">{t.userName || `Socio #${t.userId}`}</td>
+                              <td className="py-2.5 pr-3 text-slate-400">{t.period}</td>
+                              <td className="py-2.5 pr-3 text-right">{formatCurrency((t.amount || 0) + (t.lateFeeApplied || 0))}</td>
+                              <td className="py-2.5 pr-3 text-right text-sky-400">+{formatCurrency(t.marketplaceFee || 0)}</td>
+                              <td className="py-2.5 pr-3 text-right font-bold text-amber-300">{formatCurrency(t.totalAmount || 0)}</td>
+                              <td className="py-2.5 font-mono text-slate-400">{t.transferReference || '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+                      <span className="text-xs text-slate-400">Comisión ATRIO acumulada (a facturar a fin de mes):</span>
+                      <span className="text-sm font-bold text-sky-400">
+                        {formatCurrency(pendingTransfers.reduce((sum, t) => sum + (t.marketplaceFee || 0), 0))}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Buscador y ordenamiento */}

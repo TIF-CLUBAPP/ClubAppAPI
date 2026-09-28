@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Dtos;
 using ClubApp.Domain.Entities;
@@ -230,6 +230,65 @@ public class PaymentsController : ControllerBase
         return Ok(result);
     }
 
+    // ========== Transferencia bancaria ==========
+    /// <summary>
+    /// Registra una transferencia bancaria (pendiente de aprobación del club).
+    /// El frontend envía cuotaId, montos y referencia; el backend recalcula la
+    /// comisión ATRIO y persiste el registro para auditoría/facturación.
+    /// </summary>
+    [HttpPost("register-transfer")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RegisterTransfer([FromForm] RegisterTransferRequest request, IFormFile? proofFile)
+    {
+        if (request == null || request.CuotaId <= 0)
+            return BadRequest(new { message = "request inválido: cuotaId es obligatorio." });
+
+        if (proofFile != null && proofFile.Length > 0)
+        {
+            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".pdf" };
+            var ext = System.IO.Path.GetExtension(proofFile.FileName).ToLowerInvariant();
+            if (!allowedExtensions.Contains(ext))
+                return BadRequest(new { message = "El archivo adjunto debe ser JPG, PNG o PDF." });
+                
+            var uploadDir = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "wwwroot", "uploads", "receipts");
+            if (!System.IO.Directory.Exists(uploadDir))
+                System.IO.Directory.CreateDirectory(uploadDir);
+                
+            var fileName = $"receipt_{request.CuotaId}_{Guid.NewGuid()}{ext}";
+            var filePath = System.IO.Path.Combine(uploadDir, fileName);
+            
+            using (var stream = new System.IO.FileStream(filePath, System.IO.FileMode.Create))
+            {
+                await proofFile.CopyToAsync(stream);
+            }
+            
+            request.ReceiptUrl = $"/uploads/receipts/{fileName}";
+        }
+
+        var result = await _paymentService.RegisterTransferAsync(request);
+
+        if (!result.Success && result.Status == "NOT_FOUND")
+            return NotFound(new { message = result.Message });
+
+        if (!result.Success && result.Status == "ALREADY_PAID")
+            return BadRequest(new { message = result.Message });
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Transferencias pendientes de aprobación (con desglose de comisión ATRIO).
+    /// </summary>
+    [HttpGet("transfers/pending")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPendingTransfers()
+    {
+        return Ok(await _paymentService.GetPendingTransfersAsync());
+    }
+
     // ========== Mercado Pago - create order ==========
     [HttpPost("create-order")]
     public async Task<IActionResult> CreateOrder([FromBody] CreateMercadoPagoOrderRequest request)
@@ -315,3 +374,4 @@ public class PaymentsController : ControllerBase
         return Redirect(url);
     }
 }
+

@@ -40,6 +40,13 @@ public interface IPaymentService
     Task<string> ProcessMercadoPagoWebhookAsync(string payloadJson);
 
 
+    // ========== Configuración de cobros (payout) ==========
+    /// <summary>Configuración de cobro de la Institución (cuenta MP + alias).</summary>
+    Task<PayoutConfigDto> GetPayoutConfigAsync();
+
+    /// <summary>Guarda/víncula las credenciales y el alias de cobro del Club.</summary>
+    Task<PayoutConfigDto> SavePayoutConfigAsync(SavePayoutConfigRequest dto);
+
     // ========== Configuración de cuotas (FeeSettings) ==========
     Task<FeeSettingsDto> GetFeeSettingsAsync();
 
@@ -62,6 +69,16 @@ public interface IPaymentService
 
     // ========== Registro manual de pago ==========
     Task<PaymentDto?> RegisterPaymentAsync(RegisterPaymentDto dto);
+
+    // ========== Transferencia bancaria ==========
+    /// <summary>
+    /// Registra una transferencia bancaria como pendiente de aprobación del club,
+    /// con la comisión ATRIO (MarketplaceFee) para auditoría/facturación.
+    /// </summary>
+    Task<TransferPaymentResult> RegisterTransferAsync(RegisterTransferRequest dto);
+
+    /// <summary>Lista las transferencias pendientes de aprobación para el panel admin.</summary>
+    Task<List<PaymentDto>> GetPendingTransfersAsync();
 
     // ========== Cuotas vencidas / Gestión de deudores ==========
     Task<CuotasVencidasStatsDto> GetOverdueCuotasStatsAsync();

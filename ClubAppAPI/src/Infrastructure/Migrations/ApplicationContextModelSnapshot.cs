@@ -23,6 +23,10 @@ namespace Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
@@ -40,13 +44,83 @@ namespace Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("RequiresBooking")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Schedule")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("TeacherId")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
+                    b.HasIndex("TeacherId");
+
                     b.ToTable("Activities");
+                });
+
+            modelBuilder.Entity("ClubApp.Domain.Entities.ActivitySchedule", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ActivityId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("DayOfWeek")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<TimeSpan>("EndTime")
+                        .HasColumnType("TEXT");
+
+                    b.Property<TimeSpan>("StartTime")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActivityId");
+
+                    b.ToTable("ActivitySchedules");
+                });
+
+            modelBuilder.Entity("ClubApp.Domain.Entities.AttendanceRecord", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ActivityScheduleId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Present")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("ActivityScheduleId", "UserId", "Date")
+                        .IsUnique();
+
+                    b.ToTable("AttendanceRecords");
                 });
 
             modelBuilder.Entity("ClubApp.Domain.Entities.ClubConfig", b =>
@@ -58,6 +132,9 @@ namespace Infrastructure.Migrations
                     b.Property<decimal>("ApplicationFeePercentage")
                         .HasColumnType("decimal(5,2)");
 
+                    b.Property<string>("BankAlias")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
@@ -68,6 +145,9 @@ namespace Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("MercadoPagoPublicKey")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("MercadoPagoUserId")
                         .HasColumnType("TEXT");
 
                     b.Property<decimal>("MonthlySubscriptionFee")
@@ -266,6 +346,9 @@ namespace Infrastructure.Migrations
                     b.Property<decimal>("LateFeeApplied")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<decimal>("MarketplaceFee")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<int?>("MembershipId")
                         .HasColumnType("INTEGER");
 
@@ -282,8 +365,16 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ReceiptUrl")
+                        .HasMaxLength(255)
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("Status")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("TransferReference")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("UserId")
                         .HasColumnType("INTEGER");
@@ -296,6 +387,43 @@ namespace Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Payments");
+                });
+
+            modelBuilder.Entity("ClubApp.Domain.Entities.ResourceBooking", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("EndTime")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("PaymentId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ResourceName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("StartTime")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PaymentId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("ResourceBookings");
                 });
 
             modelBuilder.Entity("ClubApp.Domain.Entities.RoleConfiguration", b =>
@@ -331,8 +459,14 @@ namespace Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("AllowsDirectPayment")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("BadgeNum")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BankAlias")
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("BirthDate")
@@ -372,6 +506,12 @@ namespace Infrastructure.Migrations
                     b.Property<DateTime?>("LastPaymentDate")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("MercadoPagoAccessToken")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("MercadoPagoUserId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -395,6 +535,46 @@ namespace Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("ClubApp.Domain.Entities.Activity", b =>
+                {
+                    b.HasOne("ClubApp.Domain.Entities.User", "Teacher")
+                        .WithMany()
+                        .HasForeignKey("TeacherId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Teacher");
+                });
+
+            modelBuilder.Entity("ClubApp.Domain.Entities.ActivitySchedule", b =>
+                {
+                    b.HasOne("ClubApp.Domain.Entities.Activity", "Activity")
+                        .WithMany("Schedules")
+                        .HasForeignKey("ActivityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Activity");
+                });
+
+            modelBuilder.Entity("ClubApp.Domain.Entities.AttendanceRecord", b =>
+                {
+                    b.HasOne("ClubApp.Domain.Entities.ActivitySchedule", "ActivitySchedule")
+                        .WithMany("AttendanceRecords")
+                        .HasForeignKey("ActivityScheduleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ClubApp.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ActivitySchedule");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("ClubApp.Domain.Entities.Enrollment", b =>
@@ -442,9 +622,34 @@ namespace Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("ClubApp.Domain.Entities.ResourceBooking", b =>
+                {
+                    b.HasOne("ClubApp.Domain.Entities.Payment", "Payment")
+                        .WithMany()
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ClubApp.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Payment");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("ClubApp.Domain.Entities.Activity", b =>
                 {
                     b.Navigation("Enrollments");
+
+                    b.Navigation("Schedules");
+                });
+
+            modelBuilder.Entity("ClubApp.Domain.Entities.ActivitySchedule", b =>
+                {
+                    b.Navigation("AttendanceRecords");
                 });
 
             modelBuilder.Entity("ClubApp.Domain.Entities.Membership", b =>

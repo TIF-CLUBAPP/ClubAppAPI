@@ -9,6 +9,9 @@ import Dashboard from './pages/Dashboard';
 import Reservations from './pages/Reservations'; 
 import Deudores from './pages/Deudores';
 import Socios from './pages/Socios';
+import InscripcionActividades from './pages/InscripcionActividades';
+import ReservaCanchas from './pages/ReservaCanchas';
+import PanelAsistencia from './pages/PanelAsistencia';
 import { PagosCuotas } from './pages/PagosCuotas';
 import { MisCuotas } from './pages/MisCuotas';
 // Error pages
@@ -57,6 +60,9 @@ export default function App() {
           {/* Rutas Protegidas (Requieren Token) */}
           <Route element={<ProtectedRoute />}>
             <Route path="/reservas" element={<Reservations />} /> 
+            <Route path="/actividades" element={<InscripcionActividades />} />
+            <Route path="/canchas" element={<ReservaCanchas />} />
+            <Route path="/asistencia" element={<PanelAsistencia />} />
             <Route path="/deudores" element={<Deudores />} />
             <Route path="/socios" element={<Socios />} />
             <Route path="/pagos" element={<PagosCuotas />} />

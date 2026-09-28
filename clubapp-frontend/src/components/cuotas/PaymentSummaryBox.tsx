@@ -5,54 +5,51 @@ import { DIGITAL_SERVICE_FEE_PERCENTAGE, DIGITAL_SERVICE_FEE_MAX_AMOUNT } from '
 interface PaymentSummaryBoxProps {
   cuota: MemberCuota;
   formatCurrency: (val: number) => string;
-  /** true cuando el método seleccionado es un cobro digital (Mercado Pago / Tarjeta). */
-  isDigital: boolean;
-  /** Costo del servicio digital ATRIO ya calculado (0 si no es digital). */
+  /** Costo del servicio digital ATRIO ya calculado (0 si no aplica). */
   digitalServiceFee: number;
-  /** Total final a abonar (incluye el costo digital si corresponde). */
+  /** Total final a abonar (incluye el costo del servicio si corresponde). */
   totalToPay: number;
 }
 
 export const PaymentSummaryBox: React.FC<PaymentSummaryBoxProps> = ({
   cuota,
   formatCurrency,
-  isDigital,
   digitalServiceFee,
   totalToPay,
 }) => (
-  <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-1.5 text-xs">
+  <div className="bg-slate-950 border border-slate-800 rounded-2xl p-2.5 space-y-1.5 text-sm">
     <div className="flex justify-between text-slate-400">
       <span>Concepto:</span>
-      <span className="text-slate-200">Cuota {cuota.periodo}</span>
+      <span className="text-slate-200 font-medium">Cuota {cuota.periodo}</span>
     </div>
     <div className="flex justify-between text-slate-400">
       <span>Precio Base:</span>
-      <span>{formatCurrency(cuota.baseAmount)}</span>
+      <span className="text-base text-slate-200 font-semibold">{formatCurrency(cuota.baseAmount)}</span>
     </div>
     {cuota.discountPercentage > 0 && (
       <div className="flex justify-between text-emerald-400">
         <span>Descuento Exención (-{cuota.discountPercentage}%):</span>
-        <span>-{formatCurrency((cuota.baseAmount * cuota.discountPercentage) / 100)}</span>
+        <span className="text-base font-semibold">-{formatCurrency((cuota.baseAmount * cuota.discountPercentage) / 100)}</span>
       </div>
     )}
     {cuota.lateFeeAmount > 0 && (
       <div className="flex justify-between text-rose-400">
         <span>Recargo por Mora:</span>
-        <span>+{formatCurrency(cuota.lateFeeAmount)}</span>
+        <span className="text-base font-semibold">+{formatCurrency(cuota.lateFeeAmount)}</span>
       </div>
     )}
-    {isDigital && digitalServiceFee > 0 && (
+    {digitalServiceFee > 0 && (
       <div className="flex justify-between text-sky-400">
         <span>
           Costo Servicio Digital ATRIO ({DIGITAL_SERVICE_FEE_PERCENTAGE}% - máx{' '}
           {formatCurrency(DIGITAL_SERVICE_FEE_MAX_AMOUNT)}):
         </span>
-        <span>+{formatCurrency(digitalServiceFee)}</span>
+        <span className="text-base font-semibold">+{formatCurrency(digitalServiceFee)}</span>
       </div>
     )}
-    <div className="pt-2 border-t border-slate-800 flex justify-between font-bold text-sm text-white">
+    <div className="pt-2 border-t border-slate-800 flex justify-between items-center font-bold text-base text-white">
       <span>Total a Abonar:</span>
-      <span className="text-emerald-400 text-base">{formatCurrency(totalToPay)}</span>
+      <span className="text-emerald-400 text-lg">{formatCurrency(totalToPay)}</span>
     </div>
   </div>
 );

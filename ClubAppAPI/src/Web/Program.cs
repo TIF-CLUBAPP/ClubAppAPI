@@ -112,7 +112,7 @@ builder.Services.AddOpenApi(options =>
 // ==========================================
 // 4. CONFIGURACIÓN DE BASE DE DATOS (Fijada para Azure)
 // ==========================================
-string dbFileName = "clubapp_v2.db";
+string dbFileName = "clubapp_v3.db";
 string dbPath;
 
 if (Environment.GetEnvironmentVariable("HOME") != null)
@@ -132,6 +132,8 @@ builder.Services.AddDbContext<ApplicationContext>(options =>
 // 5. INYECCIÓN DE SERVICIOS DE APLICACIÓN
 // ==========================================
 builder.Services.AddScoped<IActivityService, ActivityService>();
+builder.Services.AddScoped<IBookingService, BookingService>();
+builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
@@ -156,6 +158,9 @@ using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
     
+    // Aplicar migraciones antes de inicializar la DB
+    dbContext.Database.Migrate();
+
     ClubApp.Infrastructure.Data.DbInitializer.Seed(dbContext, app.Configuration);
 }
 #endregion
@@ -175,6 +180,7 @@ if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 }
 
+app.UseStaticFiles();
 app.UseCors("AllowReactApp");
 
 app.UseAuthentication();

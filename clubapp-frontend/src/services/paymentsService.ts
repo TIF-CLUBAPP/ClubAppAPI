@@ -1,4 +1,4 @@
-import { api } from './api';
+﻿import { api } from './api';
 import type { 
   FeeSettings, 
   FeeSettingsHistoryEntry,
@@ -9,14 +9,19 @@ import type {
   PaymentFilter,
   RegisterPaymentRequest,
   Payment,
-  UserCuota
+  UserCuota,
+  RegisterTransferRequest,
+  TransferPaymentResult,
+  PendingTransfer
 } from '../types/cuotas';
+import type { PayoutConfig, SavePayoutConfigRequest } from '../types/payout';
+
 
 /** Respuesta del backend al crear una orden de pago en Mercado Pago. */
 export interface CreateOrderResponse {
   /** `init_point` (snake_case) que devuelve el backend actual. */
   init_point?: string;
-  /** Variantes camelCase / sandbox por si cambia la serialización o el SDK. */
+  /** Variantes camelCase / sandbox por si cambia la serializaciÃ³n o el SDK. */
   initPoint?: string;
   sandboxInitPoint?: string;
   id?: string;
@@ -25,20 +30,20 @@ export interface CreateOrderResponse {
 
 /** Respuesta del backend al procesar un pago con tarjeta tokenizada. */
 export interface CardPaymentResult {
-  /** true si el pago fue aprobado y la cuota quedó registrada como pagada. */
+  /** true si el pago fue aprobado y la cuota quedÃ³ registrada como pagada. */
   success: boolean;
   /** Estado devuelto por Mercado Pago: approved | pending | in_process | rejected | ... */
   status: string;
   /** Mensaje descriptivo para el usuario. */
   message: string;
-  /** ID del pago en Mercado Pago (si se alcanzó a crear). */
+  /** ID del pago en Mercado Pago (si se alcanzÃ³ a crear). */
   mercadoPagoPaymentId?: number | null;
   /** ID de la cuota registrada en el sistema. */
   paymentId?: number | null;
 }
 
 export const paymentsService = {
-  // ========== Creación de orden de pago (Mercado Pago) ==========
+  // ========== CreaciÃ³n de orden de pago (Mercado Pago) ==========
   /** Crea una orden de pago en Mercado Pago (POST /api/payments/create-order). */
   createOrder: async (cuotaId: number): Promise<CreateOrderResponse> => {
     const response = await api.post<CreateOrderResponse>('/payments/create-order', { cuotaId });
@@ -52,14 +57,14 @@ export const paymentsService = {
     return response.data;
   },
 
-  // ========== Configuración de cuotas ==========
-  /** Obtener configuración actual de cuotas (GET /api/payments/settings) */
+  // ========== ConfiguraciÃ³n de cuotas ==========
+  /** Obtener configuraciÃ³n actual de cuotas (GET /api/payments/settings) */
   getSettings: async (): Promise<FeeSettings> => {
     const response = await api.get<FeeSettings>('/payments/settings');
     return response.data;
   },
 
-  /** Actualizar configuración de cuotas (PUT /api/payments/settings) */
+  /** Actualizar configuraciÃ³n de cuotas (PUT /api/payments/settings) */
   updateSettings: async (data: FeeSettings): Promise<FeeSettings> => {
     const response = await api.put<FeeSettings>('/payments/settings', data);
     return response.data;
@@ -78,14 +83,14 @@ export const paymentsService = {
     return response.data;
   },
 
-  /** Alternar exención de un usuario (PUT /api/payments/exemptions/user/{userId}) */
+  /** Alternar exenciÃ³n de un usuario (PUT /api/payments/exemptions/user/{userId}) */
   toggleUserExemption: async (userId: string, isExempt: boolean): Promise<UserExemption> => {
     // Backend expects: { IsExemptFromFees: boolean }
     const response = await api.put<UserExemption>(`/payments/exemptions/user/${userId}`, { IsExemptFromFees: isExempt });
     return response.data;
   },
 
-  /** Alternar exención de un rol (PUT /api/payments/exemptions/role/{roleName}) */
+  /** Alternar exenciÃ³n de un rol (PUT /api/payments/exemptions/role/{roleName}) */
   toggleRoleExemption: async (roleName: string, isExempt: boolean): Promise<RoleExemption> => {
     // Backend expects: { AreFeesExempt: boolean }
     const response = await api.put<RoleExemption>(`/payments/exemptions/role/${roleName}`, { AreFeesExempt: isExempt });
@@ -119,4 +124,46 @@ export const paymentsService = {
     const response = await api.post<Payment>('/payments/register', data);
     return response.data;
   },
+
+  // ========== Transferencia bancaria ==========
+  /** Registrar una transferencia bancaria (POST /api/payments/register-transfer). */
+  registerTransfer: async (data: RegisterTransferRequest, proofFile?: File | null): Promise<TransferPaymentResult> => {
+    const formData = new FormData();
+    formData.append('cuotaId', data.cuotaId.toString());
+    formData.append('totalAmount', data.totalAmount.toString());
+    formData.append('netAmount', data.netAmount.toString());
+    formData.append('marketplaceFee', data.marketplaceFee.toString());
+    if (data.referenceNumber) {
+      formData.append('referenceNumber', data.referenceNumber);
+    }
+    if (proofFile) {
+      formData.append('proofFile', proofFile);
+    }
+    const response = await api.post<TransferPaymentResult>('/payments/register-transfer', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  /** Transferencias pendientes de aprobaciÃ³n (GET /api/payments/transfers/pending). */
+  getPendingTransfers: async (): Promise<PendingTransfer[]> => {
+    const response = await api.get<PendingTransfer[]>('/payments/transfers/pending');
+    return response.data;
+  },
+
+  // ========== Configuración de cobro (payout) ==========
+  /** Configuración de cobro de la Institución (GET /api/settings/payout-config). */
+  getPayoutConfig: async (): Promise<PayoutConfig> => {
+    const response = await api.get<PayoutConfig>('/settings/payout-config');
+    return response.data;
+  },
+
+  /** Guarda/víncula credenciales de Mercado Pago y alias del Club (POST /api/settings/payout-config). */
+  savePayoutConfig: async (data: SavePayoutConfigRequest): Promise<PayoutConfig> => {
+    const response = await api.post<PayoutConfig>('/settings/payout-config', data);
+    return response.data;
+  },
 };
+

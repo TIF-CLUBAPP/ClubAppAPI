@@ -24,7 +24,10 @@ import {
   Clock,
   AlertTriangle,
   Info,
-  Smartphone
+  Smartphone,
+  Landmark,
+  Link2,
+  Wallet
 } from 'lucide-react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
@@ -32,6 +35,7 @@ import { paymentsService } from '../services/paymentsService';
 import { userService } from '../services/userService';
 import type { FeeSettings, RoleExemption, UserExemption } from '../types/cuotas';
 import type { UserListItem } from '../types/user';
+import type { PayoutConfig } from '../types/payout';
 
 const DEFAULT_ROLES: RoleExemption[] = [
   { Role: 'STAFF', AreFeesExempt: true, discountPercentage: 100, Description: 'Personal administrativo y de campo', userCount: 8 },
@@ -99,6 +103,14 @@ export const PagosCuotas: React.FC = () => {
   const [baseFeeInput, setBaseFeeInput] = useState<string>('0');
   const [lateFeeInput, setLateFeeInput] = useState<string>('0');
   const [dueDayInput, setDueDayInput] = useState<string>('10');
+
+  // Estados de Cuentas de Cobro (payout)
+  const [payoutConfig, setPayoutConfig] = useState<PayoutConfig | null>(null);
+  const [bankAliasInput, setBankAliasInput] = useState('');
+  const [mpUserIdInput, setMpUserIdInput] = useState('');
+  const [mpAccessTokenInput, setMpAccessTokenInput] = useState('');
+  const [showMpLinkForm, setShowMpLinkForm] = useState(false);
+  const [savingPayout, setSavingPayout] = useState(false);
 
   // Estados de Exenciones
   const [roleExemptions, setRoleExemptions] = useState<RoleExemption[]>(DEFAULT_ROLES);
@@ -172,12 +184,34 @@ export const PagosCuotas: React.FC = () => {
     return () => clearTimeout(timer);
   }, [userSearchInput, selectedUser]);
 
+  const handleSavePayout = async () => {
+    setSavingPayout(true);
+    try {
+      const updated = await paymentsService.savePayoutConfig({
+        bankAlias: bankAliasInput,
+        mercadoPagoAccessToken: mpAccessTokenInput || undefined,
+        mercadoPagoUserId: mpUserIdInput || undefined,
+      });
+      setPayoutConfig(updated);
+      setBankAliasInput(updated.bankAlias || '');
+      setMpUserIdInput(updated.mercadoPagoUserId || '');
+      setMpAccessTokenInput('');
+      setShowMpLinkForm(false);
+      setMessage({ text: 'Cuenta de cobro guardada correctamente.', type: 'success' });
+    } catch (err) {
+      setMessage({ text: 'No se pudo guardar la cuenta de cobro.', type: 'error' });
+    } finally {
+      setSavingPayout(false);
+    }
+  };
+
   const loadData = async () => {
     try {
       setLoading(true);
-      const [settingsData, exemptionsData] = await Promise.all([
+      const [settingsData, exemptionsData, payoutData] = await Promise.all([
         paymentsService.getSettings(),
         paymentsService.getExemptions(),
+        paymentsService.getPayoutConfig().catch(() => null),
       ]);
       // Tarifa vigente (en curso hoy): queda fija y no cambia al editar.
       const vigenteBase = settingsData.baseFeeAmount ?? 0;
@@ -226,6 +260,12 @@ export const PagosCuotas: React.FC = () => {
           reason: u.reason || 'Exención autorizada',
         }));
         setUserExemptions(enrichedUsers);
+      }
+
+      if (payoutData) {
+        setPayoutConfig(payoutData);
+        setBankAliasInput(payoutData.bankAlias || '');
+        setMpUserIdInput(payoutData.mercadoPagoUserId || '');
       }
     } catch (err) {
       setMessage({ text: 'Error al cargar los datos del módulo de cuotas.', type: 'error' });
@@ -855,6 +895,94 @@ export const PagosCuotas: React.FC = () => {
                   </div>
                 </form>
               </div>
+
+              {/* 1.5 CUENTAS DE COBRO (SPLIT PAYMENTS) */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                <div>
+                  <h2 className="text-lg font-semibold flex items-center gap-2">
+                    <Landmark className="w-5 h-5 text-emerald-400" />
+                    Cuentas de Cobro
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Configurá la cuenta que recibe los pagos del Club (Mercado Pago y transferencias).
+                    Es el alias/CBU que verán los socios al pagar por transferencia.
+                  </p>
+                </div>
+
+                <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2.5 rounded-xl border ${payoutConfig?.hasMercadoPagoAccessToken ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-slate-800 border-slate-700 text-slate-400'}`}>
+                      <Wallet className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-white">
+                        {payoutConfig?.hasMercadoPagoAccessToken ? 'Mercado Pago vinculado' : 'Mercado Pago sin vincular'}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {payoutConfig?.mercadoPagoUserId ? `Cuenta: ${payoutConfig.mercadoPagoUserId}` : 'Conectá la cuenta que cobrará los pagos digitales.'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowMpLinkForm(v => !v)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl border border-sky-500/30 bg-sky-500/10 text-sky-300 text-sm font-semibold hover:bg-sky-500/20 transition"
+                  >
+                    <Link2 className="w-4 h-4" />
+                    {payoutConfig?.hasMercadoPagoAccessToken ? 'Revincular' : 'Vincular Mercado Pago'}
+                  </button>
+                </div>
+
+                {showMpLinkForm && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-950/60 border border-slate-800 rounded-xl p-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-400">Access Token de Mercado Pago</label>
+                      <input
+                        type="password"
+                        value={mpAccessTokenInput}
+                        onChange={e => setMpAccessTokenInput(e.target.value)}
+                        placeholder={payoutConfig?.hasMercadoPagoAccessToken ? 'Dejá vacío para mantener el actual' : 'APP_USR-...'}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 outline-none focus:border-sky-500"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-400">ID de usuario de Mercado Pago</label>
+                      <input
+                        type="text"
+                        value={mpUserIdInput}
+                        onChange={e => setMpUserIdInput(e.target.value)}
+                        placeholder="Ej: 123456789"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 outline-none focus:border-sky-500"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-400">Alias / CBU / CVU del Club</label>
+                  <input
+                    type="text"
+                    value={bankAliasInput}
+                    onChange={e => setBankAliasInput(e.target.value)}
+                    placeholder="Ej: CLUB.ATLETICO.MP"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-slate-600 outline-none focus:border-emerald-500"
+                  />
+                  <p className="text-[11px] text-slate-500">Se muestra en el checkout de transferencia de los socios.</p>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleSavePayout}
+                    disabled={savingPayout}
+                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-5 py-2.5 rounded-xl transition shadow-lg shadow-emerald-950/40 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <Save className="w-4 h-4" />
+                    {savingPayout ? 'Guardando...' : 'Guardar Cuenta de Cobro'}
+                  </button>
+                </div>
+              </div>
+
 
               {/* 2. EXENCIÓN DE CUOTA POR ROL COMPLETO */}
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">

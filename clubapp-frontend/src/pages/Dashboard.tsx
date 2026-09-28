@@ -70,7 +70,7 @@ export default function Dashboard() {
                     <button
                       type="button"
                       onClick={() => navigate('/login')}
-                      className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-3 text-sm font-semibold text-slate-950 transition-all hover:from-emerald-400 hover:to-teal-400"
+                      className="inline-flex items-center justify-center rounded-2xl bg-linear-to-r from-emerald-500 to-teal-500 px-6 py-3 text-sm font-semibold text-slate-950 transition-all hover:from-emerald-400 hover:to-teal-400"
                     >
                       Iniciar Sesión
                     </button>

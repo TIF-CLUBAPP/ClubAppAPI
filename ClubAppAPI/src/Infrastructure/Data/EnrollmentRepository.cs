@@ -15,5 +15,11 @@ namespace ClubApp.Infrastructure.Data
         {
             return await _context.Enrollments.CountAsync(e => e.ActivityId == activityId);
         }
+
+        public async Task<int> GetActiveCountByActivityIdAsync(int activityId)
+        {
+            return await _context.Enrollments
+                .CountAsync(e => e.ActivityId == activityId && e.Status == EnrollmentStatus.ACTIVE);
+        }
     }
 }

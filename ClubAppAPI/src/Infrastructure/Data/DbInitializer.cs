@@ -566,6 +566,86 @@ namespace ClubApp.Infrastructure.Data
 
             context.SaveChanges();
 
+            // ==========================================
+            // 7. SEEDING PROFESOR DEMO + ACTIVIDAD CON HORARIOS + INSCRIPCIONES
+            // ==========================================
+            // Provee datos para el módulo de Actividades / Asistencia: un profesor
+            // TEACHER, una actividad a su cargo con horarios estructurados y algunos
+            // alumnos inscriptos para poder registrar asistencia desde el panel.
+            var teacherDemo = context.Users.FirstOrDefault(u => u.Email == "profesor.tenis@clubapp.com");
+            if (teacherDemo == null)
+            {
+                teacherDemo = new User
+                {
+                    BadgeNum = "P-001",
+                    FirstName = "Juan",
+                    LastName = "Pérez",
+                    Email = "profesor.tenis@clubapp.com",
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("1234"),
+                    Role = UserRole.TEACHER,
+                    Dni = "40000001",
+                    Phone = "+54900000001",
+                    BirthDate = new DateTime(1988, 5, 20),
+                    CreatedAt = DateTime.UtcNow
+                };
+                context.Users.Add(teacherDemo);
+                context.SaveChanges();
+            }
+
+            var teacherActivity = context.Activities.FirstOrDefault(a => a.Name == "Clases de Tenis");
+            if (teacherActivity == null)
+            {
+                teacherActivity = new Activity
+                {
+                    Name = "Clases de Tenis",
+                    Description = "Clases de tenis para adultos, nivel inicial y avanzado.",
+                    Category = "Deportes",
+                    Price = 8000m,
+                    MaxCapacity = 8,
+                    TeacherId = teacherDemo.Id,
+                    RequiresBooking = false,
+                    Schedule = "Lunes y Miércoles 18:00 hs",
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
+                };
+                context.Activities.Add(teacherActivity);
+                context.SaveChanges();
+            }
+
+            if (teacherActivity != null && !context.ActivitySchedules.Any(s => s.ActivityId == teacherActivity.Id))
+            {
+                context.ActivitySchedules.AddRange(
+                    new ActivitySchedule { ActivityId = teacherActivity.Id, DayOfWeek = 1, StartTime = new TimeSpan(18, 0, 0), EndTime = new TimeSpan(19, 0, 0), CreatedAt = DateTime.UtcNow },
+                    new ActivitySchedule { ActivityId = teacherActivity.Id, DayOfWeek = 3, StartTime = new TimeSpan(18, 0, 0), EndTime = new TimeSpan(19, 0, 0), CreatedAt = DateTime.UtcNow }
+                );
+                context.SaveChanges();
+            }
+
+            if (teacherActivity != null)
+            {
+                foreach (var email in new[] { "usuario1@clubapp.com", "usuario2@clubapp.com", "usuario3@clubapp.com" })
+                {
+                    var socio = context.Users.FirstOrDefault(u => u.Email == email);
+                    if (socio == null) continue;
+
+                    bool exists = context.Enrollments.Any(e =>
+                        e.ActivityId == teacherActivity.Id && e.UserId == socio.Id && e.Status == EnrollmentStatus.ACTIVE);
+
+                    if (!exists)
+                    {
+                        context.Enrollments.Add(new Enrollment
+                        {
+                            UserId = socio.Id,
+                            ActivityId = teacherActivity.Id,
+                            EnrollmentDate = DateTime.UtcNow,
+                            Status = EnrollmentStatus.ACTIVE,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                    }
+                }
+                context.SaveChanges();
+            }
+
 
         }
 

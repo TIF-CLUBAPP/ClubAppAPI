@@ -62,6 +62,8 @@ const mapCuota = (p: UserCuota, s: FeeSettings): MemberCuota => {
     paidAt: p.paymentDate ? formatPaidAt(p.paymentDate) : undefined,
     paymentMethod: p.paymentMethod || undefined,
     receiptNumber: status === 'PAGADA' ? `REC-${year}-${mm}` : undefined,
+    transferAlias: p.transferAlias || 'CLUB.ATLETICO.MP',
+    payoutCollector: p.payoutCollector || 'Club',
   };
 };
 
@@ -108,6 +110,8 @@ const buildMockCuotas = (s: FeeSettings): MemberCuota[] => {
       paidAt: isPaid ? `${String(Math.floor(Math.random() * 15) + 1).padStart(2, '0')}/${mm}/${y} 14:30` : undefined,
       paymentMethod: isPaid ? methods[i - 1] || 'Mercado Pago' : undefined,
       receiptNumber: isPaid ? `REC-${y}-${mm}${Math.floor(100 + Math.random() * 900)}` : undefined,
+      transferAlias: 'CLUB.ATLETICO.MP',
+      payoutCollector: 'Club',
     });
   }
   return gen;

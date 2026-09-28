@@ -1,5 +1,6 @@
 import { api } from './api';
 import type { UserListItem } from '../types/user';
+import type { TeacherPayoutSettings, TeacherPayoutSettingsRequest } from '../types/payout';
 
 export interface GetUsersParams {
   searchQuery?: string;
@@ -29,6 +30,22 @@ export const userService = {
   /** Elimina un usuario (soft delete en backend). */
   deleteUser: async (id: number): Promise<{ message: string }> => {
     const response = await api.delete(`/users/${id}`);
+    return response.data;
+  },
+
+  // ========== Cobro directo de profesores (split payments) ==========
+  /** Configuración de cobro directo de un profesor (GET /api/teachers/{id}/payout-settings). */
+  getTeacherPayoutSettings: async (id: number): Promise<TeacherPayoutSettings> => {
+    const response = await api.get<TeacherPayoutSettings>(`/teachers/${id}/payout-settings`);
+    return response.data;
+  },
+
+  /** Permite/deniega el cobro directo y guarda los datos de cobro (PATCH /api/teachers/{id}/payout-settings). */
+  updateTeacherPayoutSettings: async (
+    id: number,
+    data: TeacherPayoutSettingsRequest
+  ): Promise<TeacherPayoutSettings> => {
+    const response = await api.patch<TeacherPayoutSettings>(`/teachers/${id}/payout-settings`, data);
     return response.data;
   },
 };

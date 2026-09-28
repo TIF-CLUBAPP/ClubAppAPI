@@ -7,7 +7,10 @@ import {
   AlertTriangle,
   DollarSign,
   CreditCard,
-  LogOut 
+  LogOut,
+  Dumbbell,
+  MapPin,
+  ClipboardCheck
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -41,11 +44,11 @@ export default function Sidebar() {
         };
 
   return (
-    <aside className="w-64 border-r border-slate-800 bg-slate-900/50 p-6 flex flex-col justify-between hidden md:flex shrink-0 h-screen sticky top-0">
+    <aside className="w-64 border-r border-slate-800 bg-slate-900/50 p-6 flex-col justify-between hidden md:flex shrink-0 h-screen sticky top-0">
       <div>
         {/* Logo ClubApp */}
         <div className="flex items-center gap-3 mb-8 px-2">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center font-black text-slate-950 text-lg shadow-lg shadow-emerald-500/20">
+          <div className="w-9 h-9 rounded-xl bg-linear-to-tr from-emerald-500 to-teal-400 flex items-center justify-center font-black text-slate-950 text-lg shadow-lg shadow-emerald-500/20">
             C
           </div>
           <div>
@@ -78,6 +81,32 @@ export default function Sidebar() {
               }`}
             >
               <Calendar size={18} /> Reservas & Agenda
+            </Link>
+          )}
+
+          {isAuthenticated && (
+            <Link 
+              to="/canchas" 
+              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
+                location.pathname === '/canchas'
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+              }`}
+            >
+              <MapPin size={18} /> Reservar Cancha
+            </Link>
+          )}
+
+          {isAuthenticated && (
+            <Link 
+              to="/actividades" 
+              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
+                location.pathname === '/actividades'
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+              }`}
+            >
+              <Dumbbell size={18} /> Actividades
             </Link>
           )}
 
@@ -134,6 +163,19 @@ export default function Sidebar() {
               <Users size={18} /> Socios
             </Link>
           )}
+
+          {isAuthenticated && (role === 'TEACHER' || role === 'ADMIN' || role === 'SUPERADMIN') && (
+            <Link 
+              to="/asistencia" 
+              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
+                location.pathname === '/asistencia'
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+              }`}
+            >
+              <ClipboardCheck size={18} /> Asistencia
+            </Link>
+          )}
         </nav>
       </div>
 
@@ -164,7 +206,7 @@ export default function Sidebar() {
             <div className="space-y-3">
               <button
                 onClick={() => navigate('/login')}
-                className="w-full py-3 text-sm font-semibold rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 hover:from-emerald-400 hover:to-teal-400 transition-all"
+                className="w-full py-3 text-sm font-semibold rounded-xl bg-linear-to-r from-emerald-500 to-teal-500 text-slate-950 hover:from-emerald-400 hover:to-teal-400 transition-all"
               >
                 Iniciar Sesión
               </button>

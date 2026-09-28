@@ -188,4 +188,37 @@ public class UserService : IUserService
         await _userRepository.UpdateAsync(user);
         return true;
     }
+
+    public async Task<TeacherPayoutSettingsDto?> GetTeacherPayoutSettingsAsync(int teacherId)
+    {
+        var user = await _userRepository.GetByIdAsync(teacherId);
+        if (user == null || user.Role != UserRole.TEACHER) return null;
+
+        return new TeacherPayoutSettingsDto
+        {
+            TeacherId = user.Id,
+            AllowsDirectPayment = user.AllowsDirectPayment,
+            BankAlias = user.BankAlias,
+            HasMercadoPagoAccessToken = !string.IsNullOrWhiteSpace(user.MercadoPagoAccessToken),
+            MercadoPagoUserId = user.MercadoPagoUserId
+        };
+    }
+
+    public async Task<TeacherPayoutSettingsDto?> UpdateTeacherPayoutSettingsAsync(int teacherId, TeacherPayoutSettingsRequest request)
+    {
+        var user = await _userRepository.GetByIdAsync(teacherId);
+        if (user == null || user.Role != UserRole.TEACHER) return null;
+
+        user.AllowsDirectPayment = request.AllowsDirectPayment;
+        user.BankAlias = string.IsNullOrWhiteSpace(request.BankAlias) ? null : request.BankAlias.Trim();
+        user.MercadoPagoUserId = string.IsNullOrWhiteSpace(request.MercadoPagoUserId) ? null : request.MercadoPagoUserId.Trim();
+
+        // El token se actualiza solo si se envía uno nuevo; nunca se expone de vuelta.
+        if (!string.IsNullOrWhiteSpace(request.MercadoPagoAccessToken))
+            user.MercadoPagoAccessToken = request.MercadoPagoAccessToken.Trim();
+
+        await _userRepository.UpdateAsync(user);
+
+        return await GetTeacherPayoutSettingsAsync(teacherId);
+    }
 }

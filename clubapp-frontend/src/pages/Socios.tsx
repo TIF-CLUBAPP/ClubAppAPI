@@ -19,6 +19,7 @@ import {
   UserCog,
   Users,
   X,
+  Wallet,
 } from 'lucide-react';
 import Header from '../components/layout/Header';
 import Sidebar from '../components/layout/Sidebar';
@@ -96,6 +97,7 @@ function ActionButtons({
   onRole,
   onStatus,
   onDelete,
+  onPayout,
 }: {
   item: UserListItem;
   isSelf: boolean;
@@ -103,6 +105,7 @@ function ActionButtons({
   onRole: (u: UserListItem) => void;
   onStatus: (u: UserListItem) => void;
   onDelete: (u: UserListItem) => void;
+  onPayout: (u: UserListItem) => void;
 }) {
   const disabled = isSelf || !canManage;
   const disabledTooltip = isSelf
@@ -114,6 +117,16 @@ function ActionButtons({
 
   return (
     <div className="flex items-center gap-1.5">
+      {item.role === 'TEACHER' && (
+        <button
+          onClick={() => onPayout(item)}
+          disabled={disabled}
+          title={disabled ? disabledTooltip : 'Configurar cobro directo de clases'}
+          className={`${baseClass} hover:bg-emerald-500/15 hover:text-emerald-400`}
+        >
+          <Wallet size={16} className="text-emerald-400" />
+        </button>
+      )}
       <button
         onClick={() => onRole(item)}
         disabled={disabled}
@@ -154,6 +167,7 @@ function UserCard({
   onRole,
   onStatus,
   onDelete,
+  onPayout,
 }: {
   item: UserListItem;
   isSelf: boolean;
@@ -161,6 +175,7 @@ function UserCard({
   onRole: (u: UserListItem) => void;
   onStatus: (u: UserListItem) => void;
   onDelete: (u: UserListItem) => void;
+  onPayout: (u: UserListItem) => void;
 }) {
   return (
     <div className="p-4 rounded-3xl border border-slate-800 bg-slate-900/80">
@@ -195,6 +210,7 @@ function UserCard({
           onRole={onRole}
           onStatus={onStatus}
           onDelete={onDelete}
+          onPayout={onPayout}
         />
       </div>
     </div>
@@ -307,6 +323,154 @@ function RoleModal({
 }
 
 
+/** Modal para configurar el cobro directo de un profesor (split payments). */
+function PayoutModal({
+  user,
+  value,
+  onChange,
+  bankAlias,
+  onBankAliasChange,
+  mpAccessToken,
+  onMpAccessTokenChange,
+  mpUserId,
+  onMpUserIdChange,
+  hasMpToken,
+  loading,
+  processing,
+  error,
+  onConfirm,
+  onClose,
+}: {
+  user: UserListItem;
+  value: boolean;
+  onChange: (v: boolean) => void;
+  bankAlias: string;
+  onBankAliasChange: (v: string) => void;
+  mpAccessToken: string;
+  onMpAccessTokenChange: (v: string) => void;
+  mpUserId: string;
+  onMpUserIdChange: (v: string) => void;
+  hasMpToken: boolean;
+  loading: boolean;
+  processing: boolean;
+  error: string | null;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <ModalShell onClose={onClose}>
+      <div className="flex items-start justify-between">
+        <div className="p-2.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
+          <Wallet size={20} />
+        </div>
+        <button
+          onClick={onClose}
+          className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
+        >
+          <X size={18} />
+        </button>
+      </div>
+
+      <h3 className="mt-4 text-lg font-black text-white">Cobro Directo de Clases</h3>
+      <p className="mt-1 text-xs text-slate-400">
+        Configurá si <strong className="text-slate-200">{user.fullName}</strong> cobra sus clases
+        directamente. Si está habilitado, los pagos de sus clases se rutean a su cuenta.
+      </p>
+
+      {loading ? (
+        <div className="mt-5 flex items-center justify-center py-8">
+          <Loader2 size={22} className="animate-spin text-emerald-400" />
+        </div>
+      ) : (
+        <>
+          <label className="mt-5 flex items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-950 p-4 cursor-pointer">
+            <span className="text-sm font-semibold text-slate-200">Permitir cobro directo de clases</span>
+            <button
+              type="button"
+              onClick={() => onChange(!value)}
+              className={`relative w-12 h-7 rounded-full transition-colors ${value ? 'bg-emerald-500' : 'bg-slate-700'}`}
+              aria-pressed={value}
+            >
+              <span
+                className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-transform ${value ? 'translate-x-5' : ''}`}
+              />
+            </button>
+          </label>
+
+          {value && (
+            <div className="mt-4 space-y-3">
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
+                  Alias / CBU / CVU
+                </label>
+                <input
+                  type="text"
+                  value={bankAlias}
+                  onChange={(e) => onBankAliasChange(e.target.value)}
+                  placeholder="Ej: PROFE.JUAN.MP"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none transition-all"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
+                  Access Token Mercado Pago{' '}
+                  {hasMpToken && <span className="text-emerald-400 normal-case">(ya vinculado)</span>}
+                </label>
+                <input
+                  type="password"
+                  value={mpAccessToken}
+                  onChange={(e) => onMpAccessTokenChange(e.target.value)}
+                  placeholder={hasMpToken ? 'Dejá vacío para mantener el actual' : 'APP_USR-...'}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none transition-all"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
+                  ID de usuario Mercado Pago
+                </label>
+                <input
+                  type="text"
+                  value={mpUserId}
+                  onChange={(e) => onMpUserIdChange(e.target.value)}
+                  placeholder="Ej: 123456789"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none transition-all"
+                />
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {error && (
+        <div className="mt-4 flex items-center gap-2 px-4 py-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300">
+          <AlertCircle size={15} className="shrink-0" /> {error}
+        </div>
+      )}
+
+      <div className="mt-6 grid grid-cols-2 gap-3">
+        <button
+          onClick={onClose}
+          disabled={processing}
+          className="py-3 rounded-2xl border border-slate-700 text-slate-300 hover:text-white text-sm font-bold transition-all disabled:opacity-50"
+        >
+          Cancelar
+        </button>
+        <button
+          onClick={onConfirm}
+          disabled={processing || loading}
+          className="py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-sm font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+        >
+          {processing ? <Loader2 size={15} className="animate-spin" /> : <ShieldCheck size={15} />}
+          Guardar
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+
 /** Modal de advertencia (ámbar) o peligro (rojo) con confirmación explícita. */
 function ConfirmModal({
   variant,
@@ -411,6 +575,17 @@ export default function Socios() {
   const [deleteProcessing, setDeleteProcessing] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  // Modal de cobro directo (profesores)
+  const [payoutTarget, setPayoutTarget] = useState<UserListItem | null>(null);
+  const [payoutLoading, setPayoutLoading] = useState(false);
+  const [payoutProcessing, setPayoutProcessing] = useState(false);
+  const [payoutError, setPayoutError] = useState<string | null>(null);
+  const [payoutAllowsDirect, setPayoutAllowsDirect] = useState(false);
+  const [payoutBankAlias, setPayoutBankAlias] = useState('');
+  const [payoutMpAccessToken, setPayoutMpAccessToken] = useState('');
+  const [payoutMpUserId, setPayoutMpUserId] = useState('');
+  const [payoutHasMpToken, setPayoutHasMpToken] = useState(false);
+
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const toastTimer = useRef<number | null>(null);
 
@@ -503,6 +678,61 @@ export default function Socios() {
   };
   const closeDeleteModal = () => {
     if (!deleteProcessing) setDeleteTarget(null);
+  };
+
+  // Apertura / cierre / confirmación del modal de cobro directo
+  const openPayoutModal = async (u: UserListItem) => {
+    setPayoutTarget(u);
+    setPayoutError(null);
+    setPayoutLoading(true);
+    setPayoutAllowsDirect(false);
+    setPayoutBankAlias('');
+    setPayoutMpAccessToken('');
+    setPayoutMpUserId('');
+    setPayoutHasMpToken(false);
+    try {
+      const settings = await userService.getTeacherPayoutSettings(u.id);
+      setPayoutAllowsDirect(settings.allowsDirectPayment);
+      setPayoutBankAlias(settings.bankAlias || '');
+      setPayoutMpUserId(settings.mercadoPagoUserId || '');
+      setPayoutHasMpToken(settings.hasMercadoPagoAccessToken);
+    } catch (err) {
+      setPayoutError('No se pudo cargar la configuración de cobro del profesor.');
+    } finally {
+      setPayoutLoading(false);
+    }
+  };
+
+  const closePayoutModal = () => {
+    if (!payoutProcessing) setPayoutTarget(null);
+  };
+
+  const confirmPayout = async () => {
+    if (!payoutTarget) return;
+    const target = payoutTarget;
+    setPayoutProcessing(true);
+    setPayoutError(null);
+    try {
+      await userService.updateTeacherPayoutSettings(target.id, {
+        allowsDirectPayment: payoutAllowsDirect,
+        bankAlias: payoutBankAlias || undefined,
+        mercadoPagoAccessToken: payoutMpAccessToken || undefined,
+        mercadoPagoUserId: payoutMpUserId || undefined,
+      });
+      setPayoutTarget(null);
+      showToast(
+        'success',
+        payoutAllowsDirect
+          ? `${target.fullName} ahora cobra sus clases directamente.`
+          : `${target.fullName} ya no cobra sus clases directamente.`
+      );
+    } catch (err) {
+      const apiMessage = extractApiMessage(err);
+      setPayoutError(apiMessage ?? 'No se pudo guardar la configuración de cobro.');
+      showToast('error', 'No se pudo guardar la configuración de cobro.');
+    } finally {
+      setPayoutProcessing(false);
+    }
   };
 
   // Confirmación: cambiar rol
@@ -693,6 +923,30 @@ export default function Socios() {
                       Limpiar
                     </button>
                   )}
+          {/* Modal: cobro directo (profesores) */}
+          <AnimatePresence>
+            {payoutTarget && (
+              <PayoutModal
+                user={payoutTarget}
+                value={payoutAllowsDirect}
+                onChange={setPayoutAllowsDirect}
+                bankAlias={payoutBankAlias}
+                onBankAliasChange={setPayoutBankAlias}
+                mpAccessToken={payoutMpAccessToken}
+                onMpAccessTokenChange={setPayoutMpAccessToken}
+                mpUserId={payoutMpUserId}
+                onMpUserIdChange={setPayoutMpUserId}
+                hasMpToken={payoutHasMpToken}
+                loading={payoutLoading}
+                processing={payoutProcessing}
+                error={payoutError}
+                onConfirm={confirmPayout}
+                onClose={closePayoutModal}
+              />
+            )}
+          </AnimatePresence>
+
+
                 </div>
               </div>
 
@@ -749,6 +1003,7 @@ export default function Socios() {
                         onRole={openRoleModal}
                         onStatus={openStatusModal}
                         onDelete={openDeleteModal}
+                        onPayout={openPayoutModal}
                       />
                     ))}
                   </div>
@@ -808,6 +1063,7 @@ export default function Socios() {
                                     onRole={openRoleModal}
                                     onStatus={openStatusModal}
                                     onDelete={openDeleteModal}
+                                    onPayout={openPayoutModal}
                                   />
                                 </div>
                               </td>

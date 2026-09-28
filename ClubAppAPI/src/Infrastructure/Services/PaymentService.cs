@@ -450,15 +450,7 @@ public class PaymentService : IPaymentService
             TotalCount = totalCount,
             Page = filter.Page,
             PageSize = filter.PageSize,
-            Payments = payments.Select(p => new PaymentDto
-            {
-                Id = p.Id,
-                UserId = p.UserId,
-                Amount = p.Amount + p.LateFeeApplied,
-                Method = p.PaymentMethod,
-                Status = p.Status.ToString().ToUpper(),
-                PaymentDate = p.PaymentDate ?? DateTime.MinValue
-            }).ToList()
+            Payments = payments.Select(MapToPaymentDto).ToList()
         };
     }
 
@@ -503,6 +495,83 @@ public class PaymentService : IPaymentService
             PaymentDate = payment.PaymentDate ?? DateTime.MinValue
         };
     }
+
+    // ========== Transferencia bancaria ==========
+
+    public async Task<TransferPaymentResult> RegisterTransferAsync(RegisterTransferRequest dto)
+    {
+        var payment = await _context.Payments
+            .Include(p => p.User)
+            .FirstOrDefaultAsync(p => p.Id == dto.CuotaId);
+
+        if (payment == null)
+            return new TransferPaymentResult { Success = false, Status = "NOT_FOUND", Message = "No se encontró la cuota indicada." };
+
+        if (payment.Status == PaymentStatus.Paid)
+            return new TransferPaymentResult { Success = false, Status = "ALREADY_PAID", Message = "La cuota ya fue registrada como pagada." };
+
+        // Monto neto que recibe el club: lo adeudado por la cuota + mora.
+        var netAmount = payment.Amount + payment.LateFeeApplied;
+
+        // Comisión ATRIO recalculada de forma autoritativa en el servidor
+        // (min 3.5%, máx $1.500). El comprador abona netAmount + fee.
+        var clubConfig = await GetOrCreateClubConfigAsync();
+        var rawFee = netAmount * (clubConfig.ApplicationFeePercentage / 100m);
+        var marketplaceFee = Math.Min(rawFee, clubConfig.MaxApplicationFeeAmount);
+        marketplaceFee = Math.Round(marketplaceFee, 2, MidpointRounding.AwayFromZero);
+        if (marketplaceFee < 0) marketplaceFee = 0;
+        var totalAmount = Math.Round(netAmount + marketplaceFee, 2, MidpointRounding.AwayFromZero);
+
+        payment.PaymentMethod = "TRANSFER";
+        payment.Status = PaymentStatus.Pending; // pendiente de aprobación del administrador del club
+        payment.MarketplaceFee = marketplaceFee;
+        payment.TransferReference = string.IsNullOrWhiteSpace(dto.ReferenceNumber)
+            ? null
+            : dto.ReferenceNumber.Trim();
+
+        await _context.SaveChangesAsync();
+
+        return new TransferPaymentResult
+        {
+            Success = true,
+            Status = "PENDING",
+            Message = "Transferencia registrada. Queda pendiente de aprobación por el club.",
+            PaymentId = payment.Id,
+            NetAmount = netAmount,
+            MarketplaceFee = marketplaceFee,
+            TotalAmount = totalAmount
+        };
+    }
+
+    public async Task<List<PaymentDto>> GetPendingTransfersAsync()
+    {
+        var transfers = await _context.Payments
+            .Include(p => p.User)
+            .Where(p => p.PaymentMethod == "TRANSFER" && p.Status == PaymentStatus.Pending)
+            .OrderByDescending(p => p.CreatedAt)
+            .ToListAsync();
+
+        return transfers.Select(MapToPaymentDto).ToList();
+    }
+
+    private static PaymentDto MapToPaymentDto(Payment p) => new()
+    {
+        Id = p.Id,
+        UserId = p.UserId,
+        UserName = $"{p.User?.FirstName} {p.User?.LastName}".Trim(),
+        Period = p.Period,
+        Amount = p.Amount,
+        LateFeeApplied = p.LateFeeApplied,
+        MarketplaceFee = p.MarketplaceFee,
+        TotalAmount = p.Amount + p.LateFeeApplied + p.MarketplaceFee,
+        Method = p.PaymentMethod,
+        PaymentMethod = p.PaymentMethod,
+        Status = p.Status.ToString().ToUpper(),
+        PaymentDate = p.PaymentDate ?? DateTime.MinValue,
+        TransferReference = p.TransferReference,
+        ReceiptUrl = p.ReceiptUrl
+    };
+
     private static void CheckAndUpdateOverdueStatus(IEnumerable<Payment> payments)
     {
         foreach (var payment in payments)
@@ -585,6 +654,10 @@ public class PaymentService : IPaymentService
         CheckAndUpdateOverdueStatus(payments);
         await _context.SaveChangesAsync();
 
+        // Las cuotas de membresía las cobra el Club. Se resuelve el alias una sola vez
+        // para que el checkout muestre el receptor correcto en el tab de transferencia.
+        var collector = await ResolvePayoutCollectorAsync();
+
         return payments
             .Select(p => new UserCuotaDto
             {
@@ -595,7 +668,9 @@ public class PaymentService : IPaymentService
                 Status = p.Status.ToString().ToUpperInvariant(),
                 PaymentDate = p.PaymentDate,
                 PaymentMethod = p.PaymentMethod,
-                CreatedAt = p.CreatedAt
+                CreatedAt = p.CreatedAt,
+                TransferAlias = collector.BankAlias,
+                PayoutCollector = collector.Label
             })
             .ToList();
     }
@@ -658,8 +733,13 @@ public class PaymentService : IPaymentService
         applicationFee = Math.Round(applicationFee, 2, MidpointRounding.AwayFromZero);
         if (applicationFee < 0) applicationFee = 0;
 
+        // Resuelve el receptor final del cobro. Para cuotas de membresía es el Club;
+        // si en el futuro el concepto fuera una clase de un profesor habilitado, acá
+        // se pasaría su userId para rutear el pago a su cuenta de Mercado Pago.
+        var collector = await ResolvePayoutCollectorAsync();
+
         // Back URL / webhook
-        return await CreateMercadoPagoOrderAsync(cuotaId, amount, applicationFee, payment.User, clubConfig.MercadoPagoAccessToken ?? string.Empty);
+        return await CreateMercadoPagoOrderAsync(cuotaId, amount, applicationFee, payment.User, collector.AccessToken);
     }
 
     /// <summary>
@@ -720,6 +800,84 @@ public class PaymentService : IPaymentService
         }
 
         return clubConfig;
+    }
+
+    // ========== Configuración de cobros (payout) ==========
+
+    public async Task<PayoutConfigDto> GetPayoutConfigAsync()
+    {
+        var config = await GetOrCreateClubConfigAsync();
+        return new PayoutConfigDto
+        {
+            HasMercadoPagoAccessToken = !string.IsNullOrWhiteSpace(config.MercadoPagoAccessToken),
+            MercadoPagoUserId = config.MercadoPagoUserId,
+            BankAlias = ClubConfigDefaults.ResolveBankAlias(config.BankAlias),
+            ApplicationFeePercentage = config.ApplicationFeePercentage,
+            MaxApplicationFeeAmount = config.MaxApplicationFeeAmount
+        };
+    }
+
+    public async Task<PayoutConfigDto> SavePayoutConfigAsync(SavePayoutConfigRequest dto)
+    {
+        var config = await GetOrCreateClubConfigAsync();
+
+        if (!string.IsNullOrWhiteSpace(dto.MercadoPagoAccessToken))
+            config.MercadoPagoAccessToken = dto.MercadoPagoAccessToken.Trim();
+
+        config.MercadoPagoUserId = string.IsNullOrWhiteSpace(dto.MercadoPagoUserId)
+            ? null
+            : dto.MercadoPagoUserId.Trim();
+
+        config.BankAlias = string.IsNullOrWhiteSpace(dto.BankAlias)
+            ? null
+            : dto.BankAlias.Trim();
+
+        await _context.SaveChangesAsync();
+        return await GetPayoutConfigAsync();
+    }
+
+    /// <summary>Receptor final de un cobro: token MP, alias bancario y etiqueta legible.</summary>
+    private sealed record PayoutCollector(string AccessToken, string BankAlias, string Label);
+
+    /// <summary>Resuelve la cuenta de cobro del Club (concepto: cuota de membresía).</summary>
+    private async Task<PayoutCollector> ResolveClubCollectorAsync()
+    {
+        var clubConfig = await GetOrCreateClubConfigAsync();
+        return new PayoutCollector(
+            ClubConfigDefaults.ResolveAccessToken(clubConfig.MercadoPagoAccessToken),
+            ClubConfigDefaults.ResolveBankAlias(clubConfig.BankAlias),
+            "Club");
+    }
+
+    /// <summary>
+    /// Resuelve la cuenta de cobro de un profesor. Si el profesor no está habilitado
+    /// para cobro directo (o no existe / no es TEACHER), el cobro recae en el Club.
+    /// </summary>
+    private async Task<PayoutCollector> ResolveTeacherCollectorAsync(int teacherId)
+    {
+        var teacher = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == teacherId && u.Role == UserRole.TEACHER);
+
+        if (teacher == null || !teacher.AllowsDirectPayment)
+            return await ResolveClubCollectorAsync();
+
+        return new PayoutCollector(
+            ClubConfigDefaults.ResolveAccessToken(teacher.MercadoPagoAccessToken),
+            ClubConfigDefaults.ResolveBankAlias(teacher.BankAlias),
+            teacher.FullName);
+    }
+
+    /// <summary>
+    /// Resuelve quién cobra un pago. Los pagos de cuotas (membresía) siempre los cobra el Club.
+    /// Si un concepto proviene de una clase dictada por un profesor habilitado, se resuelve la
+    /// cuenta del profesor a través de <paramref name="teacherId"/>.
+    /// </summary>
+    private async Task<PayoutCollector> ResolvePayoutCollectorAsync(int? teacherId = null)
+    {
+        if (teacherId.HasValue)
+            return await ResolveTeacherCollectorAsync(teacherId.Value);
+
+        return await ResolveClubCollectorAsync();
     }
 
     private async Task<string> CreateMercadoPagoOrderAsync(

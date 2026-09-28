@@ -26,4 +26,10 @@ public class UserCuotaDto
     public string PaymentMethod { get; set; } = string.Empty;
 
     public DateTime CreatedAt { get; set; }
+
+    /// <summary>Alias / CBU / CVU que debe mostrarse en el checkout de transferencia.</summary>
+    public string TransferAlias { get; set; } = string.Empty;
+
+    /// <summary>Receptor final del cobro (\"Club\" o el nombre del profesor).</summary>
+    public string PayoutCollector { get; set; } = string.Empty;
 }

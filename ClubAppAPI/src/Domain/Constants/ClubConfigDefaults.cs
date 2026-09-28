@@ -26,6 +26,12 @@ public static class ClubConfigDefaults
         "APP_USR-fda22464-758a-4fcd-9f56-a7d3087fa424";
 
     /// <summary>
+    /// Alias bancario por defecto que se muestra en el checkout de transferencia
+    /// mientras el Club no configure su propio alias/CBU/CVU.
+    /// </summary>
+    public const string DefaultBankAlias = "CLUB.ATLETICO.MP";
+
+    /// <summary>
     /// Devuelve el AccessToken configurado o, si viene nulo/vacío, la clave sandbox por defecto.
     /// </summary>
     public static string ResolveAccessToken(string? configured) =>
@@ -36,4 +42,10 @@ public static class ClubConfigDefaults
     /// </summary>
     public static string ResolvePublicKey(string? configured) =>
         string.IsNullOrWhiteSpace(configured) ? DefaultMercadoPagoPublicKey : configured!.Trim();
+
+    /// <summary>
+    /// Devuelve el alias bancario configurado o, si viene nulo/vacío, el alias por defecto.
+    /// </summary>
+    public static string ResolveBankAlias(string? configured) =>
+        string.IsNullOrWhiteSpace(configured) ? DefaultBankAlias : configured!.Trim();
 }

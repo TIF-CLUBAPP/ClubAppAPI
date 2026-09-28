@@ -1,8 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using ClubApp.Application.Interfaces;
-using ClubApp.Application.Dtos;
 using Microsoft.AspNetCore.Authorization;
-using ClubApp.Application.Models.Dtos;
+using ClubApp.Application.Dtos;
+using System.Security.Claims;
+using ClubApp.Domain.Entities;
 
 namespace ClubApp.API.Controllers;
 
@@ -19,7 +20,7 @@ public class ActivitiesController : ControllerBase
     }
 
     // =======================================================================
-    // ACCIONES DISPONIBLES PARA CUALQUIER SOCIO LOGUEADO
+    // ACCIONES DISPONIBLES PARA CUALQUIER USUARIO LOGUEADO
     // =======================================================================
 
     [HttpGet]
@@ -29,53 +30,62 @@ public class ActivitiesController : ControllerBase
     public async Task<IActionResult> GetById([FromRoute] int activityId)
     {
         var activity = await _activityService.GetActivityByIdAsync(activityId);
-
-        if (activity == null)
-        {
-            return NotFound(new { message = "Actividad no encontrada" });
-        }
-
+        if (activity == null) return NotFound(new { message = "Actividad no encontrada" });
         return Ok(activity);
     }
 
     // =======================================================================
-    // ACCIONES EXCLUSIVAS PARA ADMINISTRADORES
+    // GESTIÓN DEL CATÁLOGO (Admin y Profesores para sus clases)
     // =======================================================================
 
     [HttpPost]
-    [Authorize(Roles = "ADMIN,SUPERADMIN")]
-    [ProducesResponseType(StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> Post([FromBody] ActivityDto dto)
+    [Authorize(Roles = "ADMIN,SUPERADMIN,TEACHER")]
+    public async Task<IActionResult> Post([FromBody] SaveActivityRequest dto)
     {
-        var createdActivity = await _activityService.CreateActivityAsync(dto);
-        
+        var (actorId, actorRole) = GetActorIdentity();
+        var createdActivity = await _activityService.CreateActivityAsync(dto, actorId, actorRole);
+
         return CreatedAtAction(
-            nameof(GetById), 
-            new { activityId = createdActivity.Id }, 
+            nameof(GetById),
+            new { activityId = createdActivity.Id },
             createdActivity
         );
     }
 
     [HttpPut("{activityId:int}")]
-    [Authorize(Roles = "ADMIN,SUPERADMIN")]
-    public async Task<IActionResult> Put(int activityId, [FromBody] ActivityDto dto)
+    [Authorize(Roles = "ADMIN,SUPERADMIN,TEACHER")]
+    public async Task<IActionResult> Put(int activityId, [FromBody] SaveActivityRequest dto)
     {
-        var result = await _activityService.UpdateActivityAsync(activityId, dto);
+        var (actorId, actorRole) = GetActorIdentity();
+        var result = await _activityService.UpdateActivityAsync(activityId, dto, actorId, actorRole);
 
-        if (!result) return NotFound($"No se encontró la actividad con ID {activityId}");
+        if (!result) return NotFound(new { message = $"No se encontró la actividad con ID {activityId}" });
 
-        return Ok("Actividad modificada con éxito");
+        return Ok(new { message = "Actividad modificada con éxito" });
     }
 
     [HttpDelete("{activityId:int}")]
-    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN,TEACHER")]
     public async Task<IActionResult> Delete(int activityId)
     {
-        var result = await _activityService.DeleteActivityAsync(activityId);
+        var (actorId, actorRole) = GetActorIdentity();
+        var result = await _activityService.DeleteActivityAsync(activityId, actorId, actorRole);
 
-        if (!result) return NotFound($"No se pudo eliminar: ID {activityId} no encontrado");
+        if (!result) return NotFound(new { message = $"No se pudo eliminar: ID {activityId} no encontrado" });
 
-        return Ok($"Actividad {activityId} eliminada");
+        return Ok(new { message = $"Actividad {activityId} eliminada" });
+    }
+
+    private (int Id, UserRole Role) GetActorIdentity()
+    {
+        var idRaw = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                    ?? User.FindFirst("sub")?.Value;
+        int id = int.TryParse(idRaw, out var parsed) ? parsed : 0;
+
+        var roleRaw = User.FindFirst(ClaimTypes.Role)?.Value
+                      ?? User.FindFirst("role")?.Value;
+        UserRole role = Enum.TryParse<UserRole>(roleRaw, ignoreCase: true, out var r) ? r : UserRole.MEMBER;
+
+        return (id, role);
     }
 }

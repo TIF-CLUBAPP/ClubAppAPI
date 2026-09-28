@@ -151,6 +151,10 @@ export interface MemberCuota {
   paidAt?: string;
   paymentMethod?: string;
   receiptNumber?: string;
+  /** Alias / CBU / CVU que recibe la transferencia (Club o Profesor). */
+  transferAlias?: string;
+  /** Receptor final del cobro (para mostrar en el checkout). */
+  payoutCollector?: string;
 }
 
 // Cuota del usuario devuelta por el backend (GET /api/payments/mine)
@@ -163,5 +167,48 @@ export interface UserCuota {
   paymentDate?: string | null;
   paymentMethod?: string;
   createdAt: string;
+  /** Alias / CBU / CVU a mostrar en el checkout de transferencia. */
+  transferAlias?: string;
+  /** Receptor final del cobro ("Club" o el nombre del profesor). */
+  payoutCollector?: string;
+}
+
+// DTO para registrar transferencia bancaria (POST /api/payments/register-transfer)
+export interface RegisterTransferRequest {
+  cuotaId: number;
+  totalAmount: number;   // base + comisión
+  netAmount: number;     // base + mora
+  marketplaceFee: number; // comisión ATRIO
+  referenceNumber?: string;
+}
+
+// Resultado del registro de una transferencia (POST /api/payments/register-transfer)
+export interface TransferPaymentResult {
+  success: boolean;
+  status: string; // PENDING | NOT_FOUND | ALREADY_PAID
+  message: string;
+  paymentId?: number | null;
+  netAmount: number;
+  marketplaceFee: number;
+  totalAmount: number;
+}
+
+// Transferencia pendiente de aprobación (GET /api/payments/transfers/pending)
+export interface PendingTransfer {
+  id: number;
+  userId: number;
+  membershipId: number;
+  userName: string;
+  period: string;
+  amount: number;
+  lateFeeApplied: number;
+  marketplaceFee: number;
+  totalAmount: number;
+  method: string;
+  paymentMethod: string;
+  status: string;
+  paymentDate: string;
+  externalTransactionId?: string | null;
+  transferReference?: string | null;
 }
 

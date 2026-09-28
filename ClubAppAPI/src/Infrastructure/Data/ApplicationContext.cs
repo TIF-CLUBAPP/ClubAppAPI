@@ -19,6 +19,9 @@ namespace ClubApp.Infrastructure.Data
         public DbSet<FeeSettingsHistory> FeeSettingsHistory { get; set; }
         public DbSet<RoleConfiguration> RoleConfigurations { get; set; }
         public DbSet<ClubConfig> ClubConfigs { get; set; }
+        public DbSet<ActivitySchedule> ActivitySchedules { get; set; }
+        public DbSet<ResourceBooking> ResourceBookings { get; set; }
+        public DbSet<AttendanceRecord> AttendanceRecords { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -59,6 +62,51 @@ namespace ClubApp.Infrastructure.Data
                 .WithMany()
                 .HasForeignKey(p => p.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            // Actividad -> Profesor (opcional). Si se borra el profesor, la actividad queda sin docente.
+            modelBuilder.Entity<Activity>()
+                .HasOne(a => a.Teacher)
+                .WithMany()
+                .HasForeignKey(a => a.TeacherId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Horarios de actividad (se eliminan en cascada con la actividad).
+            modelBuilder.Entity<ActivitySchedule>()
+                .HasOne(s => s.Activity)
+                .WithMany(a => a.Schedules)
+                .HasForeignKey(s => s.ActivityId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Reserva de espacio -> Usuario (obligatorio).
+            modelBuilder.Entity<ResourceBooking>()
+                .HasOne(b => b.User)
+                .WithMany()
+                .HasForeignKey(b => b.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Reserva de espacio -> Pago (opcional).
+            modelBuilder.Entity<ResourceBooking>()
+                .HasOne(b => b.Payment)
+                .WithMany()
+                .HasForeignKey(b => b.PaymentId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Registro de asistencia -> Horario + Usuario.
+            modelBuilder.Entity<AttendanceRecord>()
+                .HasOne(r => r.ActivitySchedule)
+                .WithMany(s => s.AttendanceRecords)
+                .HasForeignKey(r => r.ActivityScheduleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<AttendanceRecord>()
+                .HasOne(r => r.User)
+                .WithMany()
+                .HasForeignKey(r => r.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<AttendanceRecord>()
+                .HasIndex(r => new { r.ActivityScheduleId, r.UserId, r.Date })
+                .IsUnique();
         }
     }
 }

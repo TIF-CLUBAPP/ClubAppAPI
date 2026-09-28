@@ -17,4 +17,10 @@ public interface IUserService
     Task<bool> ChangePasswordAsync(int id, ChangePasswordDto dto);
     Task<bool> UpdateUserRoleAsync(int id, UpdateRoleDto dto);
     Task<bool> SetUserStatusAsync(int id, bool isActive);
+
+    /// <summary>Configuración de cobro directo de un profesor. Null si no existe / no es TEACHER.</summary>
+    Task<TeacherPayoutSettingsDto?> GetTeacherPayoutSettingsAsync(int teacherId);
+
+    /// <summary>Permite/deniega el cobro directo y guarda los datos de cobro del profesor.</summary>
+    Task<TeacherPayoutSettingsDto?> UpdateTeacherPayoutSettingsAsync(int teacherId, TeacherPayoutSettingsRequest request);
 }
