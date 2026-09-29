@@ -1,5 +1,6 @@
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Services;
+using ClubApp.Infrastructure.Services;
 using ClubApp.Application.Models;
 using ClubApp.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -133,6 +134,7 @@ builder.Services.AddDbContext<ApplicationContext>(options =>
 // ==========================================
 builder.Services.AddScoped<IActivityService, ActivityService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
+builder.Services.AddScoped<ISpaceService, SpaceService>();
 builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
 builder.Services.AddScoped<IUserService, UserService>();

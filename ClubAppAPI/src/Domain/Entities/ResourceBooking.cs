@@ -18,6 +18,10 @@ public class ResourceBooking : BaseEntity
     public int UserId { get; set; }
     public virtual User User { get; set; } = null!;
 
+    /// <summary>Espacio reservado (clave foránea a Space). Null = reserva legacy por nombre.</summary>
+    public int? SpaceId { get; set; }
+    public virtual Space? Space { get; set; }
+
     public DateTime StartTime { get; set; }
     public DateTime EndTime { get; set; }
 

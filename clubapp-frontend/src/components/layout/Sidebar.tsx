@@ -10,7 +10,8 @@ import {
   LogOut,
   Dumbbell,
   MapPin,
-  ClipboardCheck
+  ClipboardCheck,
+  Map
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -148,6 +149,19 @@ export default function Sidebar() {
               }`}
             >
               <AlertTriangle size={18} /> Deudores & Cuotas
+            </Link>
+          )}
+
+          {isAuthenticated && (role === 'ADMIN' || role === 'SUPERADMIN') && (
+            <Link 
+              to="/espacios" 
+              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
+                location.pathname === '/espacios'
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+              }`}
+            >
+              <Map size={18} /> Espacios & Canchas
             </Link>
           )}
 

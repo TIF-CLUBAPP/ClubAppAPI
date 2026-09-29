@@ -35,6 +35,7 @@ public class SaveActivityRequest
     public decimal Price { get; set; }
     public int MaxCapacity { get; set; }
     public int? TeacherId { get; set; }
+    public int? SpaceId { get; set; }
     public bool RequiresBooking { get; set; }
     public bool IsActive { get; set; } = true;
     public string Schedule { get; set; } = string.Empty;

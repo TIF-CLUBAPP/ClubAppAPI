@@ -10,6 +10,8 @@ public class ActivityDto
     public int MaxCapacity { get; set; }
     public int? TeacherId { get; set; }
     public string? TeacherName { get; set; }
+    public int? SpaceId { get; set; }
+    public string? SpaceName { get; set; }
     public bool RequiresBooking { get; set; }
     public string Schedule { get; set; } = string.Empty;
     public bool IsActive { get; set; }

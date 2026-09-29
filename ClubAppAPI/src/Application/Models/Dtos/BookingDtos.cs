@@ -6,6 +6,10 @@ namespace ClubApp.Application.Dtos;
 public class CreateBookingRequest
 {
     public string ResourceName { get; set; } = string.Empty;
+
+    /// <summary>Espacio reservado (opcional, si se usa el catálogo de espacios).</summary>
+    public int? SpaceId { get; set; }
+
     public DateTime StartTime { get; set; }
     public DateTime EndTime { get; set; }
 
@@ -18,6 +22,8 @@ public class BookingDto
 {
     public int Id { get; set; }
     public string ResourceName { get; set; } = string.Empty;
+    public int? SpaceId { get; set; }
+    public string? SpaceName { get; set; }
     public int UserId { get; set; }
     public string UserName { get; set; } = string.Empty;
     public DateTime StartTime { get; set; }

@@ -27,6 +27,7 @@ public class BookingService : IBookingService
         var bookings = await _context.ResourceBookings
             .Include(b => b.User)
             .Include(b => b.Payment)
+            .Include(b => b.Space)
             .Where(b => b.Status != BookingStatus.Cancelled && b.StartTime >= dayStart && b.StartTime < dayEnd)
             .OrderBy(b => b.StartTime)
             .ToListAsync();
@@ -39,6 +40,7 @@ public class BookingService : IBookingService
         var bookings = await _context.ResourceBookings
             .Include(b => b.User)
             .Include(b => b.Payment)
+            .Include(b => b.Space)
             .Where(b => b.UserId == userId)
             .OrderByDescending(b => b.StartTime)
             .ToListAsync();
@@ -48,9 +50,6 @@ public class BookingService : IBookingService
 
     public async Task<BookingDto> CreateBookingAsync(int userId, CreateBookingRequest dto)
     {
-        if (string.IsNullOrWhiteSpace(dto.ResourceName))
-            throw new AppValidationException("Debés indicar el espacio a reservar.");
-
         if (dto.StartTime >= dto.EndTime)
             throw new AppValidationException("El horario de fin debe ser posterior al de inicio.");
 
@@ -60,11 +59,29 @@ public class BookingService : IBookingService
         var user = await _context.Users.FindAsync(userId);
         if (user == null) throw new NotFoundException("User", userId);
 
+        // Resolver el espacio (si viene del catálogo) y validar conflicto con clases.
+        Space? space = null;
+        if (dto.SpaceId.HasValue)
+        {
+            space = await _context.Spaces.FindAsync(dto.SpaceId.Value);
+            if (space == null) throw new NotFoundException("Space", dto.SpaceId.Value);
+            await EnsureNoClassConflictAsync(space, dto.StartTime, dto.EndTime);
+        }
+
+        var resourceName = string.IsNullOrWhiteSpace(dto.ResourceName)
+            ? (space?.Name ?? string.Empty)
+            : dto.ResourceName.Trim();
+
+        if (string.IsNullOrWhiteSpace(resourceName))
+            throw new AppValidationException("Debés indicar el espacio a reservar.");
+
         var overlap = await _context.ResourceBookings.AnyAsync(b =>
-            b.ResourceName == dto.ResourceName.Trim() &&
             b.Status != BookingStatus.Cancelled &&
             b.StartTime < dto.EndTime &&
-            dto.StartTime < b.EndTime);
+            dto.StartTime < b.EndTime &&
+            (dto.SpaceId.HasValue
+                ? b.SpaceId == dto.SpaceId.Value
+                : b.ResourceName == resourceName));
 
         if (overlap)
             throw new AppValidationException("El turno seleccionado ya no está disponible.");
@@ -99,7 +116,8 @@ public class BookingService : IBookingService
 
         var booking = new ResourceBooking
         {
-            ResourceName = dto.ResourceName.Trim(),
+            ResourceName = resourceName,
+            SpaceId = dto.SpaceId,
             UserId = userId,
             StartTime = dto.StartTime,
             EndTime = dto.EndTime,
@@ -120,6 +138,8 @@ public class BookingService : IBookingService
         {
             Id = booking.Id,
             ResourceName = booking.ResourceName,
+            SpaceId = booking.SpaceId,
+            SpaceName = space?.Name,
             UserId = userId,
             UserName = user.FullName,
             StartTime = booking.StartTime,
@@ -158,6 +178,27 @@ public class BookingService : IBookingService
         return true;
     }
 
+    private async Task EnsureNoClassConflictAsync(Space space, DateTime start, DateTime end)
+    {
+        if (space.AllowReservationsDuringClasses)
+            return;
+
+        var dayOfWeek = (int)start.DayOfWeek;
+        var startTime = start.TimeOfDay;
+        var endTime = end.TimeOfDay;
+
+        var conflict = await _context.ActivitySchedules
+            .AnyAsync(s =>
+                s.Activity.SpaceId == space.Id &&
+                s.Activity.IsActive &&
+                s.DayOfWeek == dayOfWeek &&
+                s.StartTime < endTime &&
+                startTime < s.EndTime);
+
+        if (conflict)
+            throw new AppValidationException("El turno seleccionado está ocupado por una Clase / Actividad del Club.");
+    }
+
     private static BookingDto Map(ResourceBooking b)
     {
         var amount = b.Payment?.Amount ?? 0m;
@@ -167,6 +208,8 @@ public class BookingService : IBookingService
         {
             Id = b.Id,
             ResourceName = b.ResourceName,
+            SpaceId = b.SpaceId,
+            SpaceName = b.Space?.Name,
             UserId = b.UserId,
             UserName = b.User?.FullName ?? string.Empty,
             StartTime = b.StartTime,

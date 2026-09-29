@@ -5,21 +5,11 @@ import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import { CheckoutModal } from '../components/cuotas/CheckoutModal';
 import { bookingService } from '../services/bookingService';
+import { spaceService } from '../services/spaceService';
 import type { Booking } from '../types/booking';
+import type { Space } from '../types/space';
 import type { MemberCuota } from '../types/cuotas';
 
-interface Court {
-  id: string;
-  name: string;
-  discipline: string;
-}
-
-const COURTS: Court[] = [
-  { id: 'c1', name: 'Cancha 1 - Polvo', discipline: 'Tenis' },
-  { id: 'c2', name: 'Cancha 2 - Rápida', discipline: 'Tenis' },
-  { id: 'c3', name: 'Cancha Central', discipline: 'Pádel' },
-  { id: 'c4', name: 'Cancha 2 - Cristal', discipline: 'Pádel' },
-];
 
 const OPEN_HOUR = 8;
 const CLOSE_HOUR = 22;
@@ -41,18 +31,23 @@ export default function ReservaCanchas() {
   const today = useMemo(() => new Date(), []);
   const [selectedDate, setSelectedDate] = useState<string>(toDateInput(today));
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [spaces, setSpaces] = useState<Space[]>([]);
   const [loading, setLoading] = useState(true);
   const [creatingSlot, setCreatingSlot] = useState<string | null>(null);
+  const [pendingBooking, setPendingBooking] = useState<Booking | null>(null);
   const [toast, setToast] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
 
   const [checkoutCuota, setCheckoutCuota] = useState<MemberCuota | null>(null);
-  const [pendingBooking, setPendingBooking] = useState<Booking | null>(null);
 
   const load = async () => {
     try {
       setLoading(true);
-      const data = await bookingService.getBookingsByDate(selectedDate);
-      setBookings(data);
+      const [bookingsData, spacesData] = await Promise.all([
+        bookingService.getBookingsByDate(selectedDate),
+        spaceService.getSpaces()
+      ]);
+      setBookings(bookingsData);
+      setSpaces(spacesData.filter(s => s.isActive));
     } catch (err: any) {
       setToast({ type: 'error', text: err?.response?.data?.detail ?? 'No se pudo consultar la disponibilidad.' });
     } finally {
@@ -84,30 +79,30 @@ export default function ReservaCanchas() {
     return { start, end };
   };
 
-  const isOccupied = (court: Court, slot: { start: string; end: string }) => {
+  const isOccupied = (space: Space, slot: { start: string; end: string }) => {
     const { start, end } = slotDateRange(slot);
     return bookings.some(
       (b) =>
-        b.resourceName === court.name &&
+        b.resourceName === space.name &&
         b.status !== 'Cancelled' &&
         new Date(b.startTime) < end &&
         start < new Date(b.endTime),
     );
   };
 
-  const handleSelectSlot = async (court: Court, slot: { key: string; start: string; end: string }) => {
+  const handleSelectSlot = async (space: Space, slot: { key: string; start: string; end: string }) => {
     const { start, end } = slotDateRange(slot);
-    setCreatingSlot(`${court.id}-${slot.key}`);
+    setCreatingSlot(`${space.id}-${slot.key}`);
     try {
       const booking = await bookingService.createBooking({
-        resourceName: court.name,
+        resourceName: space.name,
         startTime: start.toISOString(),
         endTime: end.toISOString(),
         amount: TURN_PRICE,
       });
 
       setPendingBooking(booking);
-      setCheckoutCuota(buildCheckoutCuota(booking, court));
+      setCheckoutCuota(buildCheckoutCuota(booking, space));
       await load();
     } catch (err: any) {
       setToast({
@@ -197,15 +192,15 @@ export default function ReservaCanchas() {
                   <span className="text-sm font-medium">Consultando disponibilidad...</span>
                 </div>
               ) : (
-                <div className="min-w-[760px]">
-                  <div className="grid gap-3 pb-4 border-b border-slate-800" style={{ gridTemplateColumns: `80px repeat(${COURTS.length}, minmax(0, 1fr))` }}>
+                <div className="min-w-190">
+                  <div className="grid gap-3 pb-4 border-b border-slate-800" style={{ gridTemplateColumns: `80px repeat(${spaces.length}, minmax(0, 1fr))` }}>
                     <div className="text-xs font-bold text-slate-500 uppercase flex items-center justify-center gap-1">
                       <Clock size={14} /> Turno
                     </div>
-                    {COURTS.map((court) => (
-                      <div key={court.id} className="bg-slate-950 p-2.5 rounded-2xl border border-slate-800 text-center">
-                        <p className="text-xs font-bold text-white truncate">{court.name}</p>
-                        <span className="text-[10px] text-emerald-400 font-medium">{court.discipline}</span>
+                    {spaces.map((space: Space) => (
+                      <div key={space.id} className="bg-slate-950 p-2.5 rounded-2xl border border-slate-800 text-center">
+                        <p className="text-xs font-bold text-white truncate">{space.name}</p>
+                        <span className="text-[10px] text-emerald-400 font-medium">{space.sportCategory}</span>
                       </div>
                     ))}
                   </div>
@@ -215,7 +210,7 @@ export default function ReservaCanchas() {
                       <div
                         key={slot.key}
                         className="grid gap-3 py-2.5 items-center"
-                        style={{ gridTemplateColumns: `80px repeat(${COURTS.length}, minmax(0, 1fr))` }}
+                        style={{ gridTemplateColumns: `80px repeat(${spaces.length}, minmax(0, 1fr))` }}
                       >
                         <div className="text-center">
                           <p className="text-xs font-bold text-white">
@@ -223,12 +218,12 @@ export default function ReservaCanchas() {
                           </p>
                         </div>
 
-                        {COURTS.map((court) => {
-                          const occupied = isOccupied(court, slot);
-                          const isCreating = creatingSlot === `${court.id}-${slot.key}`;
+                        {spaces.map((space: Space) => {
+                          const occupied = isOccupied(space, slot);
+                          const isCreating = creatingSlot === `${space.id}-${slot.key}`;
 
                           return (
-                            <div key={court.id} className="text-center">
+                            <div key={space.id} className="text-center">
                               {occupied ? (
                                 <div className="p-2.5 rounded-xl bg-slate-950 border border-amber-500/20 text-slate-500 text-xs flex items-center justify-center gap-1.5">
                                   <MapPin size={12} className="text-amber-400 shrink-0" />
@@ -236,7 +231,7 @@ export default function ReservaCanchas() {
                                 </div>
                               ) : (
                                 <button
-                                  onClick={() => handleSelectSlot(court, slot)}
+                                  onClick={() => handleSelectSlot(space, slot)}
                                   disabled={!!creatingSlot}
                                   className="w-full p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 font-bold text-xs transition-all flex items-center justify-center gap-1 disabled:opacity-50"
                                 >
@@ -273,11 +268,11 @@ export default function ReservaCanchas() {
   );
 }
 
-function buildCheckoutCuota(booking: Booking, court: Court): MemberCuota {
+function buildCheckoutCuota(booking: Booking, space: Space): MemberCuota {
   return {
     id: `booking-${booking.id}`,
     idReal: booking.paymentId ?? undefined,
-    periodo: `Reserva - ${court.name}`,
+    periodo: `Reserva - ${space.name}`,
     mesAno: '',
     fechaVencimiento: new Date(booking.startTime).toLocaleDateString('es-AR'),
     baseAmount: booking.amount,

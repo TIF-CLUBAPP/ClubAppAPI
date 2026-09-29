@@ -14,6 +14,7 @@ import ReservaCanchas from './pages/ReservaCanchas';
 import PanelAsistencia from './pages/PanelAsistencia';
 import { PagosCuotas } from './pages/PagosCuotas';
 import { MisCuotas } from './pages/MisCuotas';
+import EspaciosConfig from './pages/EspaciosConfig';
 // Error pages
 import Forbidden403 from './pages/errors/Forbidden403';
 import Unauthorized401 from './pages/errors/Unauthorized401';
@@ -59,6 +60,7 @@ export default function App() {
 
           {/* Rutas Protegidas (Requieren Token) */}
           <Route element={<ProtectedRoute />}>
+            <Route path="/espacios" element={<EspaciosConfig />} />
             <Route path="/reservas" element={<Reservations />} /> 
             <Route path="/actividades" element={<InscripcionActividades />} />
             <Route path="/canchas" element={<ReservaCanchas />} />

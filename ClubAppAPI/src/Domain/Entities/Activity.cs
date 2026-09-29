@@ -21,6 +21,10 @@ public class Activity : BaseEntity
     public int? TeacherId { get; set; }
     public virtual User? Teacher { get; set; }
 
+    /// <summary>Espacio físico donde se dicta la actividad (clave foránea a Space).</summary>
+    public int? SpaceId { get; set; }
+    public virtual Space? Space { get; set; }
+
     /// <summary>Indica si la actividad requiere reserva previa de turno/espacio.</summary>
     public bool RequiresBooking { get; set; }
 

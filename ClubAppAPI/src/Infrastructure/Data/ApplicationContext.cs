@@ -22,6 +22,7 @@ namespace ClubApp.Infrastructure.Data
         public DbSet<ActivitySchedule> ActivitySchedules { get; set; }
         public DbSet<ResourceBooking> ResourceBookings { get; set; }
         public DbSet<AttendanceRecord> AttendanceRecords { get; set; }
+        public DbSet<Space> Spaces { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -89,6 +90,20 @@ namespace ClubApp.Infrastructure.Data
                 .HasOne(b => b.Payment)
                 .WithMany()
                 .HasForeignKey(b => b.PaymentId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Espacio -> Actividades (si se borra el espacio, la actividad queda sin espacio).
+            modelBuilder.Entity<Activity>()
+                .HasOne(a => a.Space)
+                .WithMany(s => s.Activities)
+                .HasForeignKey(a => a.SpaceId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Espacio -> Reservas (si se borra el espacio, la reserva queda sin espacio).
+            modelBuilder.Entity<ResourceBooking>()
+                .HasOne(b => b.Space)
+                .WithMany(s => s.ResourceBookings)
+                .HasForeignKey(b => b.SpaceId)
                 .OnDelete(DeleteBehavior.SetNull);
 
             // Registro de asistencia -> Horario + Usuario.

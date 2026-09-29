@@ -21,6 +21,7 @@ public class ActivityService : IActivityService
     {
         var activities = await _context.Activities
             .Include(a => a.Teacher)
+            .Include(a => a.Space)
             .Include(a => a.Schedules)
             .ToListAsync();
 
@@ -36,6 +37,7 @@ public class ActivityService : IActivityService
     {
         var activity = await _context.Activities
             .Include(a => a.Teacher)
+            .Include(a => a.Space)
             .Include(a => a.Schedules)
             .FirstOrDefaultAsync(a => a.Id == activityId);
 
@@ -50,6 +52,8 @@ public class ActivityService : IActivityService
         // Un profesor solo puede crear actividades a su cargo.
         int? teacherId = actorRole == UserRole.TEACHER ? actorId : dto.TeacherId;
 
+        await EnsureSpaceExistsAsync(dto.SpaceId);
+
         var activity = new Activity
         {
             Name = dto.Name.Trim(),
@@ -58,6 +62,7 @@ public class ActivityService : IActivityService
             Price = dto.Price,
             MaxCapacity = dto.MaxCapacity,
             TeacherId = teacherId,
+            SpaceId = dto.SpaceId,
             RequiresBooking = dto.RequiresBooking,
             Schedule = dto.Schedule?.Trim() ?? string.Empty,
             IsActive = dto.IsActive,
@@ -80,6 +85,7 @@ public class ActivityService : IActivityService
 
         EnsureCanManage(existing, actorId, actorRole);
         Validate(dto);
+        await EnsureSpaceExistsAsync(dto.SpaceId);
 
         existing.Name = dto.Name.Trim();
         existing.Description = dto.Description?.Trim() ?? string.Empty;
@@ -89,6 +95,7 @@ public class ActivityService : IActivityService
         existing.RequiresBooking = dto.RequiresBooking;
         existing.Schedule = dto.Schedule?.Trim() ?? string.Empty;
         existing.IsActive = dto.IsActive;
+        existing.SpaceId = dto.SpaceId;
 
         if (actorRole != UserRole.TEACHER)
         {
@@ -164,6 +171,8 @@ public class ActivityService : IActivityService
             MaxCapacity = activity.MaxCapacity,
             TeacherId = activity.TeacherId,
             TeacherName = activity.Teacher?.FullName,
+            SpaceId = activity.SpaceId,
+            SpaceName = activity.Space?.Name,
             RequiresBooking = activity.RequiresBooking,
             Schedule = activity.Schedule,
             IsActive = activity.IsActive,
@@ -181,6 +190,12 @@ public class ActivityService : IActivityService
                 })
                 .ToList()
         };
+    }
+
+    private async Task EnsureSpaceExistsAsync(int? spaceId)
+    {
+        if (spaceId.HasValue && !await _context.Spaces.AnyAsync(s => s.Id == spaceId.Value))
+            throw new AppValidationException("El espacio seleccionado no existe.");
     }
 
     private static void Validate(SaveActivityRequest dto)

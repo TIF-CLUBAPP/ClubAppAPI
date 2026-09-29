@@ -2,6 +2,8 @@
 export interface Booking {
   id: number;
   resourceName: string;
+  spaceId?: number | null;
+  spaceName?: string | null;
   userId: number;
   userName: string;
   startTime: string;
