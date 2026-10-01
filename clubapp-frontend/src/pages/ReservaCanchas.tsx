@@ -47,7 +47,7 @@ export default function ReservaCanchas() {
         spaceService.getSpaces()
       ]);
       setBookings(bookingsData);
-      setSpaces(spacesData.filter(s => s.isActive));
+      setSpaces(spacesData);
     } catch (err: any) {
       setToast({ type: 'error', text: err?.response?.data?.detail ?? 'No se pudo consultar la disponibilidad.' });
     } finally {
@@ -64,6 +64,9 @@ export default function ReservaCanchas() {
     const t = setTimeout(() => setToast(null), 3500);
     return () => clearTimeout(t);
   }, [toast]);
+
+  const activeSpaces = useMemo(() => spaces.filter((s) => s.isActive), [spaces]);
+  const maintenanceSpaces = useMemo(() => spaces.filter((s) => !s.isActive), [spaces]);
 
   const slots = useMemo(() => {
     const out: { key: string; start: string; end: string }[] = [];
@@ -184,6 +187,25 @@ export default function ReservaCanchas() {
               </motion.div>
             )}
 
+            {/* Aviso de espacios en mantenimiento */}
+            {maintenanceSpaces.length > 0 && (
+              <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 px-5 py-4">
+                <p className="text-sm font-bold text-amber-300 flex items-center gap-2">
+                  <AlertCircle size={16} /> Espacios en mantenimiento
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {maintenanceSpaces.map((s) => (
+                    <span
+                      key={s.id}
+                      className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-200"
+                    >
+                      <AlertCircle size={12} /> {s.name} — Desactivado por mantenimiento
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Grilla de turnos */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 overflow-x-auto">
               {loading ? (
@@ -193,11 +215,11 @@ export default function ReservaCanchas() {
                 </div>
               ) : (
                 <div className="min-w-190">
-                  <div className="grid gap-3 pb-4 border-b border-slate-800" style={{ gridTemplateColumns: `80px repeat(${spaces.length}, minmax(0, 1fr))` }}>
+                  <div className="grid gap-3 pb-4 border-b border-slate-800" style={{ gridTemplateColumns: `80px repeat(${activeSpaces.length}, minmax(0, 1fr))` }}>
                     <div className="text-xs font-bold text-slate-500 uppercase flex items-center justify-center gap-1">
                       <Clock size={14} /> Turno
                     </div>
-                    {spaces.map((space: Space) => (
+                    {activeSpaces.map((space: Space) => (
                       <div key={space.id} className="bg-slate-950 p-2.5 rounded-2xl border border-slate-800 text-center">
                         <p className="text-xs font-bold text-white truncate">{space.name}</p>
                         <span className="text-[10px] text-emerald-400 font-medium">{space.sportCategory}</span>
@@ -210,7 +232,7 @@ export default function ReservaCanchas() {
                       <div
                         key={slot.key}
                         className="grid gap-3 py-2.5 items-center"
-                        style={{ gridTemplateColumns: `80px repeat(${spaces.length}, minmax(0, 1fr))` }}
+                        style={{ gridTemplateColumns: `80px repeat(${activeSpaces.length}, minmax(0, 1fr))` }}
                       >
                         <div className="text-center">
                           <p className="text-xs font-bold text-white">
@@ -218,7 +240,7 @@ export default function ReservaCanchas() {
                           </p>
                         </div>
 
-                        {spaces.map((space: Space) => {
+                        {activeSpaces.map((space: Space) => {
                           const occupied = isOccupied(space, slot);
                           const isCreating = creatingSlot === `${space.id}-${slot.key}`;
 

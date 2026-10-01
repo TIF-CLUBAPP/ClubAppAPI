@@ -11,6 +11,8 @@ public class SpaceDto
     public string SportCategory { get; set; } = string.Empty;
     public string Location { get; set; } = string.Empty;
     public bool IsActive { get; set; }
+
+    [JsonPropertyName("allowReservations")]
     public bool AllowReservationsDuringClasses { get; set; }
 
     [JsonPropertyName("permitir_superposicion")]
@@ -24,6 +26,8 @@ public class SaveSpaceRequest
     public string SportCategory { get; set; } = string.Empty;
     public string Location { get; set; } = string.Empty;
     public bool IsActive { get; set; } = true;
+
+    [JsonPropertyName("allowReservations")]
     public bool AllowReservationsDuringClasses { get; set; } = false;
 
     [JsonPropertyName("permitir_superposicion")]

@@ -462,7 +462,7 @@ export default function GestionActividades() {
                       return (
                         <div key={index} className={`rounded-xl border p-3 ${rowStyle(row.status)}`}>
                           <div className="flex flex-wrap items-end gap-2">
-                            <div className="flex-1 min-w-[120px]">
+                            <div className="flex-1 min-w-30">
                               <label className="block text-[10px] font-bold text-slate-500 mb-1">Día</label>
                               <select
                                 value={row.dayOfWeek}

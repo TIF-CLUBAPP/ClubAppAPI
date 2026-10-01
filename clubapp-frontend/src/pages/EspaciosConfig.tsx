@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Trash2, Edit2, X, Save, ChevronDown, MapPin, LocateFixed, ExternalLink, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Edit2, X, Save, ChevronDown, MapPin, LocateFixed, ExternalLink, CheckCircle2, AlertCircle, Wrench } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -123,6 +123,8 @@ export default function EspaciosConfig() {
   const [flyTarget, setFlyTarget] = useState<[number, number] | null>(null);
   const [locationQuery, setLocationQuery] = useState('');
   const [suggestions, setSuggestions] = useState<MapboxFeature[]>([]);
+  const [helpOpen, setHelpOpen] = useState(true);
+  const [togglingId, setTogglingId] = useState<number | null>(null);
 
   const currentLat = formData.lat ?? -34.6037;
   const currentLng = formData.lng ?? -58.3816;
@@ -130,7 +132,6 @@ export default function EspaciosConfig() {
   // Autocompletado con Mapbox Geocoding, filtrado a Argentina (debounce de 400ms)
   useEffect(() => {
     if (locationQuery.trim().length < 3) {
-      setSuggestions([]);
       return;
     }
     const timer = setTimeout(async () => {
@@ -159,20 +160,24 @@ export default function EspaciosConfig() {
     return () => clearTimeout(timer);
   }, [locationQuery, currentLat, currentLng]);
 
-  const load = async () => {
-    try {
-      setLoading(true);
-      const data = await spaceService.getSpaces();
-      setSpaces(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    load();
+    let cancelled = false;
+
+    spaceService
+      .getSpaces()
+      .then((data) => {
+        if (!cancelled) setSpaces(data);
+      })
+      .catch((err) => {
+        console.error(err);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -319,15 +324,22 @@ export default function EspaciosConfig() {
     e.preventDefault();
     try {
       if (modalMode === 'create') {
-        await spaceService.createSpace(formData);
+        const created = await spaceService.createSpace(formData);
+        setSpaces((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+        showToast('Espacio creado correctamente');
       } else if (modalMode === 'edit' && selectedSpace) {
-        await spaceService.updateSpace(selectedSpace.id, formData);
+        const updated = await spaceService.updateSpace(selectedSpace.id, formData);
+        setSpaces((prev) =>
+          prev
+            .map((s) => (s.id === updated.id ? updated : s))
+            .sort((a, b) => a.name.localeCompare(b.name)),
+        );
+        showToast('Espacio actualizado correctamente');
       }
       setModalMode(null);
-      load();
     } catch (err) {
       console.error(err);
-      alert('Error al guardar el espacio');
+      showToast('Error al guardar el espacio', 'error');
     }
   };
 
@@ -354,14 +366,119 @@ export default function EspaciosConfig() {
     }
   };
 
+  const handleToggleActive = async (space: Space) => {
+    if (togglingId === space.id) return;
+    const nextActive = !space.isActive;
+    setTogglingId(space.id);
+    setSpaces((prev) =>
+      prev.map((s) => (s.id === space.id ? { ...s, isActive: nextActive } : s)),
+    );
+    try {
+      await spaceService.updateSpace(space.id, {
+        name: space.name,
+        sportCategory: space.sportCategory,
+        location: space.location,
+        lat: space.lat,
+        lng: space.lng,
+        isActive: nextActive,
+        allowReservations: space.allowReservations,
+        permitir_superposicion: space.permitir_superposicion,
+      });
+      showToast(nextActive ? 'Espacio activado' : 'Espacio desactivado (mantenimiento)');
+    } catch (err) {
+      console.error(err);
+      setSpaces((prev) =>
+        prev.map((s) => (s.id === space.id ? { ...s, isActive: space.isActive } : s)),
+      );
+      showToast('No se pudo actualizar el estado del espacio', 'error');
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col">
         <Header />
         <main className="p-8">
-          <h2 className="text-2xl font-bold">Espacios &amp; Canchas</h2>
-          <p className="text-sm text-slate-400 mt-1">Gestioná canchas/espacios y su configuración de reservas.</p>
+          <p className="text-sm text-slate-400">Gestioná canchas/espacios y su configuración de reservas.</p>
+
+          {/* Sección interactiva de ayuda y buenas prácticas */}
+          <div className="mt-6 rounded-2xl border border-slate-800/80 bg-slate-900/60 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setHelpOpen((v) => !v)}
+              className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left hover:bg-slate-800/40 transition-colors"
+            >
+              <span className="flex items-center gap-2.5 text-sm font-bold text-white">
+                <span className="text-base">💡</span> Consejos y Recomendaciones de Configuración
+              </span>
+              <ChevronDown size={18} className={`text-slate-400 transition-transform duration-200 ${helpOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            <AnimatePresence initial={false}>
+              {helpOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.25 }}
+                  className="overflow-hidden"
+                >
+                  <div className="px-5 pb-5 pt-1 space-y-4 text-sm text-slate-300">
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 text-emerald-400 font-bold">•</span>
+                      <p>
+                        <strong className="text-white">Canchas Individuales:</strong> Se recomienda crear cada superficie
+                        de juego como un espacio independiente.{' '}
+                        <em className="text-slate-400">
+                          Ejemplo: Si el club tiene 4 canchas de bochas, crea 4 espacios separados ("Bochas 1", "Bochas 2",
+                          "Bochas 3" y "Bochas 4") para gestionar sus reservas de forma precisa y evitar sobreturnos.
+                        </em>
+                      </p>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 text-emerald-400 font-bold">•</span>
+                      <p>
+                        <strong className="text-white">Espacios Comodín:</strong> Usa categorías como{' '}
+                        <code className="px-1.5 py-0.5 rounded bg-slate-800 text-emerald-300 text-xs">"Espacio Cubierto"</code> o{' '}
+                        <code className="px-1.5 py-0.5 rounded bg-slate-800 text-emerald-300 text-xs">"Espacio al Aire Libre"</code>{' '}
+                        para actividades generales (entrenamientos físicos, preparación o eventos) que no ocupen una cancha específica.
+                      </p>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 text-emerald-400 font-bold">•</span>
+                      <div>
+                        <p className="mb-2"><strong className="text-white">Superposición de Horarios:</strong></p>
+                        <ul className="space-y-2 pl-1">
+                          <li className="flex items-start gap-2">
+                            <span className="text-red-400 font-bold">–</span>
+                            <span>
+                              <strong className="text-emerald-300">Deshabilitada (Recomendado):</strong> Evita que dos
+                              actividades compartan espacio y hora. Los bloques ocupados se marcarán en{' '}
+                              <strong className="text-red-400">ROJO</strong>.
+                            </span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-amber-400 font-bold">–</span>
+                            <span>
+                              <strong className="text-amber-300">Habilitada:</strong> Permite que actividades del{' '}
+                              <strong>mismo deporte</strong> compartan el espacio (se advertirá en{' '}
+                              <strong className="text-amber-400">AMARILLO</strong>).{' '}
+                              <em className="text-slate-400">Nota: Por seguridad, deportes distintos nunca se pueden superponer.</em>
+                            </span>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
           <div className="mt-6 flex items-center justify-between gap-4">
             {loading ? (
@@ -394,14 +511,7 @@ export default function EspaciosConfig() {
                   className="bg-slate-900 p-4 rounded-lg flex items-center justify-between border border-slate-800"
                 >
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-white truncate">{s.name}</h3>
-                      {!s.isActive && (
-                        <span className="text-[10px] font-black px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300">
-                          Mantenimiento
-                        </span>
-                      )}
-                    </div>
+                    <h3 className="font-bold text-white truncate">{s.name}</h3>
                     <p className="text-sm text-slate-400 mt-1">
                       {s.sportCategory} • {s.location}
                     </p>
@@ -412,7 +522,28 @@ export default function EspaciosConfig() {
                     </p>
                   </div>
 
-                  <div className="flex gap-2 shrink-0">
+                  <div className="flex items-center gap-4 shrink-0">
+                    <div className="flex flex-col items-center justify-center gap-1.5 w-40 shrink-0">
+                      <span className={`flex items-center gap-1 text-[11px] font-bold whitespace-nowrap transition-all duration-300 ease-in-out ${s.isActive ? 'text-emerald-400' : 'text-amber-400'}`}>
+                        {s.isActive ? (
+                          <><CheckCircle2 size={12} /> Activo</>
+                        ) : (
+                          <><Wrench size={12} /> En Mantenimiento</>
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleActive(s)}
+                        disabled={togglingId === s.id}
+                        aria-label={s.isActive ? 'Desactivar espacio' : 'Activar espacio'}
+                        title={s.isActive ? 'Desactivar (mantenimiento)' : 'Activar espacio'}
+                        className={`w-11 h-6 rounded-full p-1 transition-all duration-300 ease-in-out shrink-0 ${s.isActive ? 'bg-emerald-500' : 'bg-amber-500'} disabled:opacity-50 disabled:cursor-wait`}
+                      >
+                        <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-300 ease-in-out ${s.isActive ? 'translate-x-5' : 'translate-x-0'}`} />
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+
                     <button 
                       onClick={() => handleOpenModal('edit', s)}
                       className="p-2 bg-slate-800 rounded-md hover:bg-slate-700 border border-slate-700" title="Editar"
@@ -426,6 +557,7 @@ export default function EspaciosConfig() {
                     >
                       <Trash2 size={16} />
                     </button>
+                  </div>
                   </div>
                 </div>
               ))}
@@ -514,8 +646,12 @@ export default function EspaciosConfig() {
                             required
                             value={formData.location}
                             onChange={(e) => {
-                              setFormData({ ...formData, location: e.target.value });
-                              setLocationQuery(e.target.value);
+                              const value = e.target.value;
+                              setFormData({ ...formData, location: value });
+                              setLocationQuery(value);
+                              if (value.trim().length < 3) {
+                                setSuggestions([]);
+                              }
                             }}
                             className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
                             placeholder="Buscar dirección..."
