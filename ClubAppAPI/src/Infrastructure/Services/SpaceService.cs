@@ -42,6 +42,7 @@ public class SpaceService : ISpaceService
             Location = dto.Location?.Trim() ?? string.Empty,
             IsActive = dto.IsActive,
             AllowReservationsDuringClasses = dto.AllowReservationsDuringClasses,
+            PermitirSuperposicion = dto.PermitirSuperposicion,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -63,6 +64,7 @@ public class SpaceService : ISpaceService
         space.Location = dto.Location?.Trim() ?? string.Empty;
         space.IsActive = dto.IsActive;
         space.AllowReservationsDuringClasses = dto.AllowReservationsDuringClasses;
+        space.PermitirSuperposicion = dto.PermitirSuperposicion;
 
         await _context.SaveChangesAsync();
 
@@ -115,6 +117,7 @@ public class SpaceService : ISpaceService
         SportCategory = s.SportCategory,
         Location = s.Location,
         IsActive = s.IsActive,
-        AllowReservationsDuringClasses = s.AllowReservationsDuringClasses
+        AllowReservationsDuringClasses = s.AllowReservationsDuringClasses,
+        PermitirSuperposicion = s.PermitirSuperposicion
     };
 }

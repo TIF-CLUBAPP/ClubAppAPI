@@ -26,6 +26,13 @@ public class Space : BaseEntity
     /// </summary>
     public bool AllowReservationsDuringClasses { get; set; } = false;
 
+    /// <summary>
+    /// Si es true, permite que dos actividades del mismo deporte/categoría
+    /// compartan este espacio en el mismo horario. Deportes distintos nunca
+    /// pueden superponerse.
+    /// </summary>
+    public bool PermitirSuperposicion { get; set; }
+
     public virtual ICollection<Activity> Activities { get; set; } = new List<Activity>();
 
     public virtual ICollection<ResourceBooking> ResourceBookings { get; set; } = new List<ResourceBooking>();

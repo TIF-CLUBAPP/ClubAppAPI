@@ -53,6 +53,7 @@ public class ActivityService : IActivityService
         int? teacherId = actorRole == UserRole.TEACHER ? actorId : dto.TeacherId;
 
         await EnsureSpaceExistsAsync(dto.SpaceId);
+        await ValidateScheduleOverlapsAsync(dto, null);
 
         var activity = new Activity
         {
@@ -86,6 +87,7 @@ public class ActivityService : IActivityService
         EnsureCanManage(existing, actorId, actorRole);
         Validate(dto);
         await EnsureSpaceExistsAsync(dto.SpaceId);
+        await ValidateScheduleOverlapsAsync(dto, activityId);
 
         existing.Name = dto.Name.Trim();
         existing.Description = dto.Description?.Trim() ?? string.Empty;
@@ -197,6 +199,63 @@ public class ActivityService : IActivityService
         if (spaceId.HasValue && !await _context.Spaces.AnyAsync(s => s.Id == spaceId.Value))
             throw new AppValidationException("El espacio seleccionado no existe.");
     }
+
+    /// <summary>
+    /// Valida que los horarios de una actividad no colisionen con actividades
+    /// ya asignadas al mismo espacio, aplicando las reglas de superposición:
+    ///  - Espacio sin superposición: cualquier colisión bloquea (ROJO).
+    ///  - Espacio con superposición: mismo deporte comparte (AMARILLO),
+    ///    deporte distinto bloquea (ROJO).
+    /// </summary>
+    private async Task ValidateScheduleOverlapsAsync(SaveActivityRequest dto, int? excludeActivityId)
+    {
+        if (dto.SpaceId is null || dto.Schedules is null || dto.Schedules.Count == 0)
+            return;
+
+        var space = await _context.Spaces.FindAsync(dto.SpaceId.Value);
+        if (space is null) return;
+
+        var conflicting = await _context.ActivitySchedules
+            .Include(s => s.Activity)
+            .Where(s => s.Activity.SpaceId == dto.SpaceId.Value
+                        && s.Activity.IsActive
+                        && (excludeActivityId == null || s.ActivityId != excludeActivityId.Value))
+            .ToListAsync();
+
+        foreach (var input in dto.Schedules)
+        {
+            if (input.DayOfWeek < 0 || input.DayOfWeek > 6) continue;
+
+            var start = ParseTime(input.StartTime, "inicio");
+            var end = ParseTime(input.EndTime, "fin");
+            if (end <= start) continue;
+
+            foreach (var existing in conflicting.Where(c => c.DayOfWeek == input.DayOfWeek))
+            {
+                var overlaps = start < existing.EndTime && existing.StartTime < end;
+                if (!overlaps) continue;
+
+                var sameCategory = string.Equals(
+                    dto.Category?.Trim(), existing.Activity.Category?.Trim(),
+                    StringComparison.OrdinalIgnoreCase);
+
+                if (!space.PermitirSuperposicion)
+                {
+                    throw new AppValidationException(
+                        $"El {DayName(input.DayOfWeek)} de {input.StartTime} a {input.EndTime} ya está ocupado por la actividad \"{existing.Activity.Name}\" en este espacio.");
+                }
+
+                if (!sameCategory)
+                {
+                    throw new AppValidationException(
+                        $"No se puede superponer \"{existing.Activity.Name}\" ({existing.Activity.Category}) con \"{dto.Name.Trim()}\" ({dto.Category?.Trim()}) el {DayName(input.DayOfWeek)} de {input.StartTime} a {input.EndTime}: son deportes distintos.");
+                }
+            }
+        }
+    }
+
+    private static string DayName(int dayOfWeek) =>
+        CultureInfo.GetCultureInfo("es-AR").DateTimeFormat.GetDayName((DayOfWeek)dayOfWeek);
 
     private static void Validate(SaveActivityRequest dto)
     {

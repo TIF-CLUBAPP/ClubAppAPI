@@ -7,6 +7,7 @@ export interface Space {
   lng?: number; // Added
   isActive: boolean;
   allowReservations: boolean;
+  permitir_superposicion: boolean;
 }
 
 export interface SaveSpaceRequest {
@@ -17,6 +18,7 @@ export interface SaveSpaceRequest {
   lng?: number; // Added
   isActive: boolean;
   allowReservations: boolean;
+  permitir_superposicion: boolean;
 }
 
 export interface SpaceBlock {
@@ -42,9 +44,10 @@ export interface ConflictResolutionPayload {
 export type ModalMode = 'create' | 'edit';
 
 export const SPORT_CATEGORIES = [
-  "Fútbol 11", "Fútbol 7", "Fútbol 5", "Padel", "Tenis", "Básquet", "Vóley", "Hockey", "Rugby", "Squash",
+  "Fútbol 11", "Fútbol 7", "Fútbol 5", "Pádel", "Pelota Paleta", "Bochas", "Tenis", "Básquet", "Vóley", "Hockey", "Rugby", "Squash",
   "Gimnasio / Musculación", "Natación / Pileta", "Fitness / Funcional", "Artes Marciales / Boxeo",
-  "SUM / Salón de Eventos", "Quincho / Parrilla", "Multideporte / General"
+  "SUM / Salón de Eventos", "Quincho / Parrilla", "Multideporte / General",
+  "Espacio Cubierto (Comodín)", "Espacio al Aire Libre (Comodín)"
 ];
 
 // Returns true if the category is typically NOT rentable privately by members by default

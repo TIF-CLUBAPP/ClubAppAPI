@@ -10,6 +10,7 @@ import Reservations from './pages/Reservations';
 import Deudores from './pages/Deudores';
 import Socios from './pages/Socios';
 import InscripcionActividades from './pages/InscripcionActividades';
+import GestionActividades from './pages/GestionActividades';
 import ReservaCanchas from './pages/ReservaCanchas';
 import PanelAsistencia from './pages/PanelAsistencia';
 import { PagosCuotas } from './pages/PagosCuotas';
@@ -63,6 +64,7 @@ export default function App() {
             <Route path="/espacios" element={<EspaciosConfig />} />
             <Route path="/reservas" element={<Reservations />} /> 
             <Route path="/actividades" element={<InscripcionActividades />} />
+            <Route path="/gestion-actividades" element={<GestionActividades />} />
             <Route path="/canchas" element={<ReservaCanchas />} />
             <Route path="/asistencia" element={<PanelAsistencia />} />
             <Route path="/deudores" element={<Deudores />} />

@@ -30,30 +30,24 @@ export interface Activity {
   spaceName?: string;
 }
 
-// Horario estructurado de una actividad
-export interface ActivitySchedule {
-  id: number;
+// Entrada de un horario al crear/actualizar una actividad (POST/PUT /api/activities).
+export interface ActivityScheduleInput {
   dayOfWeek: number; // 0 = Domingo ... 6 = Sábado
-  dayName: string;   // "Lunes"
   startTime: string; // "HH:mm"
   endTime: string;   // "HH:mm"
-  spaceId?: number;
 }
 
-// Actividad del catálogo (GET /api/activities)
-export interface Activity {
-  id: number;
+// Payload para crear/actualizar una actividad.
+export interface SaveActivityRequest {
   name: string;
   description: string;
   category: string;
   price: number;
   maxCapacity: number;
   teacherId?: number | null;
-  teacherName?: string | null;
+  spaceId?: number | null;
   requiresBooking: boolean;
-  schedule: string;
   isActive: boolean;
-  schedules: ActivitySchedule[];
-  enrolledCount: number;
-  availableSpots: number;
+  schedule: string;
+  schedules: ActivityScheduleInput[];
 }

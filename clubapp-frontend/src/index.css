@@ -260,3 +260,9 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(16, 185, 129, 0.5);
 }
+
+/* Tema oscuro para los tiles de OpenStreetMap: invierte los colores del mapa base
+   sin afectar a los marcadores (que viven en .leaflet-marker-pane). */
+.leaflet-tile-pane {
+  filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+}

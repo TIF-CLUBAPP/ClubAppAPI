@@ -27,6 +27,7 @@ export default function Header() {
     '/reservas': 'Reservas & Agenda',
     '/reservar-cancha': 'Reservar Cancha',
     '/actividades': 'Actividades',
+    '/gestion-actividades': 'Gestión de Actividades',
     '/mis-cuotas': 'Mis Cuotas',
     '/pagos': 'Pagos & Cuotas',
     '/deudores': 'Deudores & Cuotas',

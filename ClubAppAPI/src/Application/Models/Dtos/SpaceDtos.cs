@@ -1,4 +1,5 @@
 using System;
+using System.Text.Json.Serialization;
 
 namespace ClubApp.Application.Dtos;
 
@@ -11,6 +12,9 @@ public class SpaceDto
     public string Location { get; set; } = string.Empty;
     public bool IsActive { get; set; }
     public bool AllowReservationsDuringClasses { get; set; }
+
+    [JsonPropertyName("permitir_superposicion")]
+    public bool PermitirSuperposicion { get; set; }
 }
 
 /// <summary>Entrada para crear/actualizar un espacio (POST/PUT /api/spaces).</summary>
@@ -21,6 +25,9 @@ public class SaveSpaceRequest
     public string Location { get; set; } = string.Empty;
     public bool IsActive { get; set; } = true;
     public bool AllowReservationsDuringClasses { get; set; } = false;
+
+    [JsonPropertyName("permitir_superposicion")]
+    public bool PermitirSuperposicion { get; set; }
 }
 
 /// <summary>Turno bloqueado de una cancha por una clase/actividad del club.</summary>
