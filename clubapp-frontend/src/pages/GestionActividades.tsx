@@ -14,6 +14,11 @@ import { SPORT_CATEGORIES } from '../types/space';
 
 const DAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
+const parseNumericInput = (raw: string): number => {
+  const cleaned = raw.replace(/^0+(?=\d)/, '');
+  return cleaned === '' ? 0 : Number(cleaned);
+};
+
 const timeToMin = (t: string): number => {
   const [h, m] = t.split(':').map((n) => Number(n));
   return (h || 0) * 60 + (m || 0);
@@ -71,6 +76,8 @@ export default function GestionActividades() {
   const [editing, setEditing] = useState<Activity | null>(null);
   const [form, setForm] = useState<SaveActivityRequest>(emptyForm());
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Activity | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const load = async () => {
@@ -190,14 +197,18 @@ export default function GestionActividades() {
     }));
   };
 
-  const handleDelete = async (a: Activity) => {
-    if (!window.confirm(`¿Eliminar la actividad "${a.name}"?`)) return;
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await activityService.deleteActivity(a.id);
+      await activityService.deleteActivity(deleteTarget.id);
       setToast({ type: 'success', message: 'Actividad eliminada correctamente.' });
+      setDeleteTarget(null);
       await load();
     } catch (err: any) {
       setToast({ type: 'error', message: err?.response?.data?.message ?? 'No se pudo eliminar la actividad.' });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -302,7 +313,7 @@ export default function GestionActividades() {
                           <Edit2 size={15} />
                         </button>
                         <button
-                          onClick={() => handleDelete(a)}
+                          onClick={() => setDeleteTarget(a)}
                           className="p-2 bg-red-900/20 text-red-400 rounded-md hover:bg-red-900/40 border border-red-900/20"
                           title="Eliminar"
                         >
@@ -427,8 +438,8 @@ export default function GestionActividades() {
                     <input
                       type="number"
                       min={0}
-                      value={form.price}
-                      onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
+                      value={form.price === 0 ? '' : form.price}
+                      onChange={(e) => setForm({ ...form, price: parseNumericInput(e.target.value) })}
                       className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
                     />
                   </div>
@@ -438,8 +449,8 @@ export default function GestionActividades() {
                     <input
                       type="number"
                       min={0}
-                      value={form.maxCapacity}
-                      onChange={(e) => setForm({ ...form, maxCapacity: Number(e.target.value) })}
+                      value={form.maxCapacity === 0 ? '' : form.maxCapacity}
+                      onChange={(e) => setForm({ ...form, maxCapacity: parseNumericInput(e.target.value) })}
                       className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
                     />
                   </div>
@@ -564,6 +575,55 @@ export default function GestionActividades() {
                   {saving ? 'Guardando...' : 'Guardar'}
                 </button>
               </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {deleteTarget && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60]"
+          >
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl"
+            >
+              <div className="flex items-start gap-4">
+                <div className="w-11 h-11 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 shrink-0">
+                  <AlertTriangle size={22} />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-white">Eliminar actividad</h3>
+                  <p className="text-sm text-slate-400 mt-1">
+                    ¿Seguro que deseas eliminar la actividad <strong className="text-slate-200">“{deleteTarget.name}”</strong>? Esta acción no se puede deshacer.
+                  </p>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setDeleteTarget(null)}
+                  disabled={deleting}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-300 border border-slate-700 hover:bg-slate-800 disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDelete}
+                  disabled={deleting}
+                  className="px-4 py-2 rounded-lg text-sm font-bold bg-red-500 hover:bg-red-600 text-white flex items-center gap-2 disabled:opacity-50"
+                >
+                  {deleting ? <RefreshCw size={15} className="animate-spin" /> : <Trash2 size={15} />}
+                  {deleting ? 'Eliminando…' : 'Eliminar'}
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}

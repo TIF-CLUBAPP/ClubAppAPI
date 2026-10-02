@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, MapPin, RefreshCw, CheckCircle2, AlertCircle, Sparkles, GraduationCap, Layers } from 'lucide-react';
+import { Calendar, MapPin, RefreshCw, CheckCircle2, AlertCircle, Sparkles, GraduationCap, Layers, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import { CheckoutModal } from '../components/cuotas/CheckoutModal';
@@ -44,6 +44,137 @@ interface Slot {
 }
 
 type SlotStatus = 'available' | 'booked' | 'class';
+
+const WEEKDAYS_ES = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do'];
+const MONTHS_ES = [
+  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+];
+
+const formatDateLabel = (iso: string) =>
+  new Date(`${iso}T12:00:00`).toLocaleDateString('es-AR', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
+
+interface CalendarPickerProps {
+  value: string;
+  min: string;
+  onChange: (date: string) => void;
+}
+
+function CalendarPicker({ value, min, onChange }: CalendarPickerProps) {
+  const [open, setOpen] = useState(false);
+  const [viewMonth, setViewMonth] = useState(() => {
+    const d = new Date(`${value}T12:00:00`);
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+
+  const year = viewMonth.getFullYear();
+  const month = viewMonth.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const leadingBlanks = (new Date(year, month, 1).getDay() + 6) % 7;
+  const todayIso = toDateInput(new Date());
+
+  const cells: { day: number; iso: string }[] = [];
+  for (let d = 1; d <= daysInMonth; d += 1) {
+    cells.push({ day: d, iso: toDateInput(new Date(year, month, d)) });
+  }
+
+  const openCalendar = () => {
+    const d = new Date(`${value}T12:00:00`);
+    setViewMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+    setOpen(true);
+  };
+
+  const prevMonth = () => setViewMonth(new Date(year, month - 1, 1));
+  const nextMonth = () => setViewMonth(new Date(year, month + 1, 1));
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={openCalendar}
+        className="w-full flex items-center justify-between gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-emerald-500 hover:border-slate-700 transition-colors"
+      >
+        <span className="flex items-center gap-2">
+          <Calendar size={15} className="text-emerald-400" />
+          <span className="capitalize">{formatDateLabel(value)}</span>
+        </span>
+        <ChevronDown size={15} className={`text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute z-50 left-0 mt-2 w-70 rounded-2xl border border-emerald-500/40 bg-slate-900 p-3 shadow-2xl">
+            <div className="flex items-center justify-between mb-2">
+              <button
+                type="button"
+                onClick={prevMonth}
+                aria-label="Mes anterior"
+                className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span className="text-sm font-bold text-white capitalize">{MONTHS_ES[month]} {year}</span>
+              <button
+                type="button"
+                onClick={nextMonth}
+                aria-label="Mes siguiente"
+                className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-7 text-center mb-1">
+              {WEEKDAYS_ES.map((wd) => (
+                <span key={wd} className="text-[10px] uppercase font-semibold text-slate-500 py-1">
+                  {wd}
+                </span>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-7 gap-1">
+              {Array.from({ length: leadingBlanks }).map((_, i) => (
+                <span key={`blank-${i}`} />
+              ))}
+              {cells.map(({ day, iso }) => {
+                const isDisabled = iso < min;
+                const isSelected = iso === value;
+                const isToday = iso === todayIso;
+                return (
+                  <button
+                    key={iso}
+                    type="button"
+                    disabled={isDisabled}
+                    onClick={() => {
+                      onChange(iso);
+                      setOpen(false);
+                    }}
+                    className={`h-9 rounded-lg text-sm font-semibold transition-colors ${
+                      isSelected
+                        ? 'bg-emerald-400 text-slate-950'
+                        : isDisabled
+                          ? 'text-slate-600 cursor-not-allowed'
+                          : isToday
+                            ? 'border border-emerald-500/50 text-emerald-300 hover:bg-slate-800'
+                            : 'text-slate-200 hover:bg-slate-800'
+                    }`}
+                  >
+                    {day}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function ReservaCanchas() {
   const today = useMemo(() => new Date(), []);
@@ -112,15 +243,9 @@ export default function ReservaCanchas() {
   );
 
   const filteredSpaces = useMemo(
-    () => (selectedCategory === '' ? activeSpaces : activeSpaces.filter((s) => s.sportCategory === selectedCategory)),
+    () => (selectedCategory === '' ? [] : activeSpaces.filter((s) => s.sportCategory === selectedCategory)),
     [activeSpaces, selectedCategory],
   );
-
-  // Mantiene una selección válida al cambiar de categoría o al cargar los espacios.
-  useEffect(() => {
-    if (selectedSpaceId != null && filteredSpaces.some((s) => s.id === selectedSpaceId)) return;
-    setSelectedSpaceId(filteredSpaces[0]?.id ?? null);
-  }, [filteredSpaces, selectedSpaceId]);
 
   const selectedSpace = useMemo(
     () => spaces.find((s) => s.id === selectedSpaceId) ?? null,
@@ -280,10 +405,19 @@ export default function ReservaCanchas() {
                   </label>
                   <select
                     value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    onChange={(e) => {
+                      const category = e.target.value;
+                      setSelectedCategory(category);
+                      if (category === '') {
+                        setSelectedSpaceId(null);
+                        return;
+                      }
+                      const matches = activeSpaces.filter((s) => s.sportCategory === category);
+                      setSelectedSpaceId(matches.length === 1 ? matches[0].id : null);
+                    }}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-emerald-500"
                   >
-                    <option value="">Todas</option>
+                    <option value="">Seleccioná un deporte</option>
                     {categories.map((c) => (
                       <option key={c} value={c}>{c}</option>
                     ))}
@@ -297,16 +431,13 @@ export default function ReservaCanchas() {
                   <select
                     value={selectedSpaceId ?? ''}
                     onChange={(e) => setSelectedSpaceId(e.target.value ? Number(e.target.value) : null)}
-                    disabled={filteredSpaces.length === 0}
+                    disabled={selectedCategory === '' || filteredSpaces.length === 0}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-emerald-500 disabled:opacity-50"
                   >
-                    {filteredSpaces.length === 0 ? (
-                      <option value="">Sin espacios disponibles</option>
-                    ) : (
-                      filteredSpaces.map((s) => (
-                        <option key={s.id} value={s.id}>{s.sportCategory} · {s.name}</option>
-                      ))
-                    )}
+                    <option value="">Seleccioná un espacio / cancha</option>
+                    {filteredSpaces.map((s) => (
+                      <option key={s.id} value={s.id}>{s.sportCategory} · {s.name}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -314,13 +445,7 @@ export default function ReservaCanchas() {
                   <label className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold flex items-center gap-1.5">
                     <Calendar size={12} /> Fecha
                   </label>
-                  <input
-                    type="date"
-                    value={selectedDate}
-                    min={toDateInput(today)}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-emerald-500"
-                  />
+                  <CalendarPicker value={selectedDate} min={toDateInput(today)} onChange={setSelectedDate} />
                 </div>
               </div>
             </div>
@@ -369,8 +494,12 @@ export default function ReservaCanchas() {
                 </div>
               ) : !selectedSpace ? (
                 <div className="flex items-center justify-center h-40 text-slate-400 gap-3">
-                  <MapPin size={20} />
-                  <span className="text-sm font-medium">No hay espacios disponibles para esta selección.</span>
+                  <Calendar size={20} />
+                  <span className="text-sm font-medium">
+                    {selectedCategory === ''
+                      ? 'Seleccioná un deporte y un espacio para ver los turnos disponibles.'
+                      : 'Seleccioná un espacio para ver los turnos disponibles.'}
+                  </span>
                 </div>
               ) : (
                 <>

@@ -12,15 +12,21 @@ import { buildNavigationLinks } from '../utils/navigation';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 
+// Limpia ceros a la izquierda en inputs numéricos (ej. "046456" -> "46456").
+const parseNumericInput = (raw: string): number => {
+  const cleaned = raw.replace(/^0+(?=\d)/, '');
+  return cleaned === '' ? 0 : Number(cleaned);
+};
+
 // Define local defaultRequest since it's no longer exported
 const getNewSpaceData = (): SaveSpaceRequest => ({
   name: '',
-  sportCategory: SPORT_CATEGORIES[0],
+  sportCategory: '',
   location: '',
   lat: -34.6037, // Default to Buenos Aires
   lng: -58.3816,
   isActive: true,
-  allowReservations: !shouldDisableReservationsByDefault(SPORT_CATEGORIES[0]),
+  allowReservations: true,
   requiresApproval: false,
   permitir_superposicion: false,
   pricePerHour: 0,
@@ -599,63 +605,67 @@ export default function EspaciosConfig() {
                   initial={{ scale: 0.95 }}
                   animate={{ scale: 1 }}
                   exit={{ scale: 0.95 }}
-                  className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl"
+                  className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl max-h-[85vh] flex flex-col overflow-hidden"
                 >
-                  <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center justify-between p-6 pb-4 shrink-0">
                     <h3 className="text-lg font-bold">{modalMode === 'create' ? 'Nuevo Espacio' : 'Editar Espacio'}</h3>
                     <button onClick={() => setModalMode(null)} className="text-slate-400 hover:text-white">
                       <X size={20} />
                     </button>
                   </div>
 
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 mb-1">Nombre del Espacio</label>
-                      <input
-                        type="text"
-                        required
-                        value={formData.name}
-                        onChange={(e) => setFormData({...formData, name: e.target.value})}
-                        className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
-                      />
-                    </div>
+                  <form id="space-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 pt-6 pb-6 space-y-4 scrollbar-thin">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 mb-1">Nombre del Espacio</label>
+                        <input
+                          type="text"
+                          required
+                          value={formData.name}
+                          onChange={(e) => setFormData({...formData, name: e.target.value})}
+                          className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                        />
+                      </div>
 
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 mb-1">Deporte / Categoría</label>
-                      <div className="relative">
-                        <button
-                          type="button"
-                          onClick={toggleDropdown}
-                          className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none flex items-center justify-between"
-                        >
-                          {formData.sportCategory}
-                          <ChevronDown size={16} />
-                        </button>
-                        {isDropdownOpen && (
-                          <div className="absolute z-50 w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg shadow-xl max-h-48 overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-500/30 scrollbar-track-slate-800">
-                            <div className="p-2 border-b border-slate-800">
-                              <input
-                                type="text"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder="Buscar deporte..."
-                                className="w-full bg-slate-900 text-slate-100 placeholder:text-slate-500 outline-none border border-slate-700 rounded-md p-2 text-sm focus:border-emerald-500"
-                              />
-                            </div>
-                            {filteredCategories.map((cat: string) => (
-                              <div
-                                key={cat}
-                                onClick={() => selectCategory(cat)}
-                                className="hover:bg-emerald-500/20 hover:text-emerald-400 cursor-pointer p-2.5 text-sm transition-colors text-slate-100"
-                              >
-                                {cat}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 mb-1">Deporte / Categoría</label>
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={toggleDropdown}
+                            className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none flex items-center justify-between"
+                          >
+                            <span className={formData.sportCategory ? '' : 'text-slate-500'}>
+                              {formData.sportCategory || 'Seleccioná un deporte...'}
+                            </span>
+                            <ChevronDown size={16} className="shrink-0" />
+                          </button>
+                          {isDropdownOpen && (
+                            <div className="absolute z-50 w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg shadow-xl max-h-48 overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-500/30 scrollbar-track-slate-800">
+                              <div className="p-2 border-b border-slate-800">
+                                <input
+                                  type="text"
+                                  value={searchTerm}
+                                  onChange={(e) => setSearchTerm(e.target.value)}
+                                  placeholder="Buscar deporte..."
+                                  className="w-full bg-slate-900 text-slate-100 placeholder:text-slate-500 outline-none border border-slate-700 rounded-md p-2 text-sm focus:border-emerald-500"
+                                />
                               </div>
-                            ))}
-                            {filteredCategories.length === 0 && (
-                              <div className="p-2.5 text-sm text-slate-400">Sin resultados</div>
-                            )}
-                          </div>
-                        )}
+                              {filteredCategories.map((cat: string) => (
+                                <div
+                                  key={cat}
+                                  onClick={() => selectCategory(cat)}
+                                  className="hover:bg-emerald-500/20 hover:text-emerald-400 cursor-pointer p-2.5 text-sm transition-colors text-slate-100"
+                                >
+                                  {cat}
+                                </div>
+                              ))}
+                              {filteredCategories.length === 0 && (
+                                <div className="p-2.5 text-sm text-slate-400">Sin resultados</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
 
@@ -721,7 +731,7 @@ export default function EspaciosConfig() {
                           transition={{ duration: 0.25, ease: 'easeInOut' }}
                           className="overflow-hidden"
                         >
-                          <div className="rounded-xl border border-slate-800 bg-slate-950/50 px-3 py-1 space-y-3">
+                          <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-5 space-y-4">
                             <Toggle
                               label="Requiere Aprobación Manual"
                               description="Las reservas quedarán pendientes de confirmación por un administrador."
@@ -740,8 +750,8 @@ export default function EspaciosConfig() {
                                   type="number"
                                   min="0"
                                   step="0.01"
-                                  value={formData.pricePerHour}
-                                  onChange={(e) => setFormData({...formData, pricePerHour: Number(e.target.value)})}
+                                  value={formData.pricePerHour === 0 ? '' : formData.pricePerHour}
+                                  onChange={(e) => setFormData({...formData, pricePerHour: parseNumericInput(e.target.value)})}
                                   className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
                                 />
                               </div>
@@ -812,13 +822,24 @@ export default function EspaciosConfig() {
                       </p>
                     </div>
 
+                  </form>
+
+                  <div className="p-4 border-t border-slate-800 bg-slate-900 shrink-0 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setModalMode(null)}
+                      className="flex-1 py-2.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 text-sm font-bold transition-all"
+                    >
+                      Cancelar
+                    </button>
                     <button
                       type="submit"
-                      className="w-full mt-4 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-2.5 rounded-lg flex items-center justify-center gap-2"
+                      form="space-form"
+                      className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-2.5 rounded-lg flex items-center justify-center gap-2"
                     >
                       <Save size={16} /> Guardar Cambios
                     </button>
-                  </form>
+                  </div>
                 </motion.div>
               </motion.div>
             )}

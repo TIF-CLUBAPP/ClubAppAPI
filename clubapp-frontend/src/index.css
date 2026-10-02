@@ -266,3 +266,11 @@
 .leaflet-tile-pane {
   filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
 }
+
+/* Calendario / selector de hora nativos en modo oscuro:
+   evita que el popover del <input type="date"> / <input type="time">
+   se muestre en blanco y desentone con la paleta dark. */
+input[type='date'],
+input[type='time'] {
+  color-scheme: dark;
+}

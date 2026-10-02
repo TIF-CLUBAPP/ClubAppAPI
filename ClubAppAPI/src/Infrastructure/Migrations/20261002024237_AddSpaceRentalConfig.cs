@@ -1,35 +1,20 @@
-using ClubApp.Infrastructure.Data;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
+﻿using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace Infrastructure.Migrations
 {
-    /// <summary>
-    /// Agrega la configuración de alquiler privado al modelo Space:
-    /// precio por turno, duración del turno, disponibilidad 24hs y rango horario.
-    /// </summary>
-    [DbContext(typeof(ApplicationContext))]
-    [Migration("20261001120000_AddSpaceRentalConfig")]
+    /// <inheritdoc />
     public partial class AddSpaceRentalConfig : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<decimal>(
-                name: "PricePerHour",
+            migrationBuilder.AddColumn<string>(
+                name: "CloseTime",
                 table: "Spaces",
-                type: "decimal(18,2)",
-                nullable: false,
-                defaultValue: 0m);
-
-            migrationBuilder.AddColumn<int>(
-                name: "SlotDurationMinutes",
-                table: "Spaces",
-                type: "INTEGER",
-                nullable: false,
-                defaultValue: 60);
+                type: "TEXT",
+                nullable: true);
 
             migrationBuilder.AddColumn<bool>(
                 name: "Is24Hours",
@@ -44,22 +29,26 @@ namespace Infrastructure.Migrations
                 type: "TEXT",
                 nullable: true);
 
-            migrationBuilder.AddColumn<string>(
-                name: "CloseTime",
+            migrationBuilder.AddColumn<decimal>(
+                name: "PricePerHour",
                 table: "Spaces",
                 type: "TEXT",
-                nullable: true);
+                nullable: false,
+                defaultValue: 0m);
+
+            migrationBuilder.AddColumn<int>(
+                name: "SlotDurationMinutes",
+                table: "Spaces",
+                type: "INTEGER",
+                nullable: false,
+                defaultValue: 0);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "PricePerHour",
-                table: "Spaces");
-
-            migrationBuilder.DropColumn(
-                name: "SlotDurationMinutes",
+                name: "CloseTime",
                 table: "Spaces");
 
             migrationBuilder.DropColumn(
@@ -71,7 +60,11 @@ namespace Infrastructure.Migrations
                 table: "Spaces");
 
             migrationBuilder.DropColumn(
-                name: "CloseTime",
+                name: "PricePerHour",
+                table: "Spaces");
+
+            migrationBuilder.DropColumn(
+                name: "SlotDurationMinutes",
                 table: "Spaces");
         }
     }

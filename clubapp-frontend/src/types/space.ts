@@ -56,8 +56,39 @@ export interface ConflictResolutionPayload {
 export type ModalMode = 'create' | 'edit';
 
 export const SPORT_CATEGORIES = [
-  "Fútbol 11", "Fútbol 7", "Fútbol 5", "Pádel", "Pelota Paleta", "Bochas", "Tenis", "Básquet", "Vóley", "Hockey", "Rugby", "Squash",
-  "Gimnasio / Musculación", "Natación / Pileta", "Fitness / Funcional", "Artes Marciales / Boxeo",
+  // Fútbol / Cancha
+  "Fútbol 11", "Fútbol 5", "Fútbol 7", "Fútbol playa", "Fútbol para ciegos",
+  // Básquet
+  "Básquet (5vs5)", "Básquet 3x3",
+  // Vóley
+  "Vóley (indoor)", "Vóley de playa", "Newcom",
+  // Rugby
+  "Rugby union (15 jugadores)", "Rugby sevens (7 jugadores)", "Rugby tag",
+  // Handball
+  "Handball", "Beach handball", "Minihandball",
+  // Hockey
+  "Hockey sobre césped", "Hockey pista (indoor)", "Hockey sobre patines",
+  // Cestoball
+  "Cestoball", "Cestoball de playa",
+  // Raqueta / Pala
+  "Tenis", "Pádel", "Tenis de mesa", "Pickleball", "Pelota Paleta", "Paleta cuero y Frontón",
+  // Ecuestres / Tradicionales
+  "Pato", "Polo", "Jineteada gaucha",
+  // Combate / Artes Marciales
+  "Boxeo", "Taekwondo ITF", "Taekwondo WT", "Karate (Kumite / Kata)", "Artes Marciales Mixtas (MMA)", "Judo", "Lucha Olímpica",
+  // Ciclismo
+  "Ciclismo de ruta", "Ciclismo de pista", "Mountain Bike (MTB)", "BMX (Freestyle y Race)",
+  // Atletismo
+  "Atletismo (Pista / Velocidad / Fondo)", "Running / Maratón", "Trail running", "Pruebas de campo (Saltos / Lanzamientos)",
+  // Acuáticos / Náuticos
+  "Natación (Piscina)", "Aguas abiertas", "Yachting / Vela (Optimist / Laser)", "Windsurf", "Canotaje / Kayak", "Slalom", "Remo tradicional",
+  // Patinaje
+  "Patín artístico", "Patín carrera", "Roller derby",
+  // Nieve
+  "Esquí alpino / de fondo", "Snowboard / Freestyle",
+  // Otros deportes e instalaciones (compatibilidad)
+  "Bochas", "Squash",
+  "Gimnasio / Musculación", "Fitness / Funcional",
   "SUM / Salón de Eventos", "Quincho / Parrilla", "Multideporte / General",
   "Espacio Cubierto (Comodín)", "Espacio al Aire Libre (Comodín)"
 ];
@@ -66,7 +97,7 @@ export const SPORT_CATEGORIES = [
 export const shouldDisableReservationsByDefault = (category: string): boolean => {
   const restrictedCategories = [
     "Gimnasio / Musculación",
-    "Natación / Pileta",
+    "Natación (Piscina)",
     "SUM / Salón de Eventos",
     "Quincho / Parrilla"
   ];
