@@ -480,6 +480,17 @@ export default function EspaciosConfig() {
 
                     <div className="flex items-start gap-3">
                       <span className="mt-0.5 text-emerald-400 font-bold">•</span>
+                      <p>
+                        <strong className="text-white">Espacios Compartidos:</strong> Si dos o más deportes comparten la
+                        misma instalación física (por ejemplo, Hockey y Fútbol en la misma cancha sintética),{' '}
+                        <strong className="text-white">no crees un espacio duplicado</strong>. Esto evitará problemas de
+                        sobreturnos y solapamiento de horarios. Al crear la actividad (ej. Hockey), simplemente
+                        selecciona el espacio físico ya existente.
+                      </p>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 text-emerald-400 font-bold">•</span>
                       <div>
                         <p className="mb-2"><strong className="text-white">Superposición de Horarios:</strong></p>
                         <ul className="space-y-2 pl-1">
