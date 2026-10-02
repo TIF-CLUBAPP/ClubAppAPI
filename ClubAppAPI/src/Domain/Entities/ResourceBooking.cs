@@ -6,6 +6,7 @@ namespace ClubApp.Domain.Entities;
 public enum BookingStatus
 {
     PendingPayment,
+    PendingApproval,
     Confirmed,
     Cancelled
 }

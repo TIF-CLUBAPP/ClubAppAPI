@@ -121,7 +121,9 @@ public class BookingService : IBookingService
             UserId = userId,
             StartTime = dto.StartTime,
             EndTime = dto.EndTime,
-            Status = BookingStatus.PendingPayment,
+            Status = space?.RequiresApproval == true
+                ? BookingStatus.PendingApproval
+                : BookingStatus.PendingPayment,
             CreatedAt = DateTime.UtcNow
         };
         _context.ResourceBookings.Add(booking);

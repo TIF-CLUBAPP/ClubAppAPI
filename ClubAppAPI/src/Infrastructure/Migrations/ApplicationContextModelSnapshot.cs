@@ -472,13 +472,31 @@ namespace Infrastructure.Migrations
                     b.Property<bool>("AllowReservationsDuringClasses")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("CloseTime")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("Is24Hours")
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("OpenTime")
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("PermitirSuperposicion")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("PricePerHour")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("RequiresApproval")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SlotDurationMinutes")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Location")

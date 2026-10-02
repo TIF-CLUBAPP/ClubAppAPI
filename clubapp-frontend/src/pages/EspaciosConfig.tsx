@@ -21,16 +21,27 @@ const getNewSpaceData = (): SaveSpaceRequest => ({
   lng: -58.3816,
   isActive: true,
   allowReservations: !shouldDisableReservationsByDefault(SPORT_CATEGORIES[0]),
+  requiresApproval: false,
   permitir_superposicion: false,
+  pricePerHour: 0,
+  slotDurationMinutes: 60,
+  is24Hours: false,
+  openTime: '08:00',
+  closeTime: '23:00',
 });
 
-const Toggle = ({ checked, onChange, label }: { checked: boolean, onChange: (val: boolean) => void, label: string }) => (
-  <div className="flex items-center justify-between py-2">
-    <span className="text-sm text-slate-400">{label}</span>
+const Toggle = ({ checked, onChange, label, description }: { checked: boolean, onChange: (val: boolean) => void, label: string, description?: string }) => (
+  <div className="flex items-center justify-between gap-3 py-2">
+    <div className="min-w-0">
+      <span className="text-sm text-slate-400">{label}</span>
+      {description && (
+        <p className="text-xs text-slate-500 mt-0.5 leading-5">{description}</p>
+      )}
+    </div>
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className={`w-11 h-6 rounded-full p-1 transition-all duration-200 ${checked ? 'bg-emerald-500' : 'bg-slate-700/80'}`}
+      className={`w-11 h-6 rounded-full p-1 transition-all duration-200 shrink-0 ${checked ? 'bg-emerald-500' : 'bg-slate-700/80'}`}
     >
       <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-200 ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
     </button>
@@ -198,7 +209,13 @@ export default function EspaciosConfig() {
         lng: space.lng,
         isActive: space.isActive,
         allowReservations: space.allowReservations,
+        requiresApproval: space.requiresApproval,
         permitir_superposicion: space.permitir_superposicion,
+        pricePerHour: space.pricePerHour,
+        slotDurationMinutes: space.slotDurationMinutes,
+        is24Hours: space.is24Hours,
+        openTime: space.openTime ?? '08:00',
+        closeTime: space.closeTime ?? '23:00',
       });
     } else {
       setFormData(getNewSpaceData());
@@ -382,7 +399,13 @@ export default function EspaciosConfig() {
         lng: space.lng,
         isActive: nextActive,
         allowReservations: space.allowReservations,
+        requiresApproval: space.requiresApproval,
         permitir_superposicion: space.permitir_superposicion,
+        pricePerHour: space.pricePerHour,
+        slotDurationMinutes: space.slotDurationMinutes,
+        is24Hours: space.is24Hours,
+        openTime: space.openTime ?? '08:00',
+        closeTime: space.closeTime ?? '23:00',
       });
       showToast(nextActive ? 'Espacio activado' : 'Espacio desactivado (mantenimiento)');
     } catch (err) {
@@ -455,7 +478,7 @@ export default function EspaciosConfig() {
                         <p className="mb-2"><strong className="text-white">Superposición de Horarios:</strong></p>
                         <ul className="space-y-2 pl-1">
                           <li className="flex items-start gap-2">
-                            <span className="text-red-400 font-bold">–</span>
+                            <span className="text-emerald-400 font-bold">–</span>
                             <span>
                               <strong className="text-emerald-300">Deshabilitada (Recomendado):</strong> Evita que dos
                               actividades compartan espacio y hora. Los bloques ocupados se marcarán en{' '}
@@ -686,8 +709,91 @@ export default function EspaciosConfig() {
                     <Toggle
                       label="Permitir Alquileres Privados (Socios)"
                       checked={formData.allowReservations}
-                      onChange={(val) => setFormData({...formData, allowReservations: val})}
+                      onChange={(val) => setFormData({...formData, allowReservations: val, requiresApproval: val ? formData.requiresApproval : false})}
                     />
+
+                    <AnimatePresence initial={false}>
+                      {formData.allowReservations && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.25, ease: 'easeInOut' }}
+                          className="overflow-hidden"
+                        >
+                          <div className="rounded-xl border border-slate-800 bg-slate-950/50 px-3 py-1 space-y-3">
+                            <Toggle
+                              label="Requiere Aprobación Manual"
+                              description="Las reservas quedarán pendientes de confirmación por un administrador."
+                              checked={formData.requiresApproval}
+                              onChange={(val) => setFormData({...formData, requiresApproval: val})}
+                            />
+
+                            <div className="border-t border-slate-800 pt-3">
+                              <span className="text-xs font-bold text-emerald-400 uppercase tracking-wide">Configuración de Alquiler</span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-xs font-bold text-slate-400 mb-1">Precio por Hora ($)</label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={formData.pricePerHour}
+                                  onChange={(e) => setFormData({...formData, pricePerHour: Number(e.target.value)})}
+                                  className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-bold text-slate-400 mb-1">Duración del Turno</label>
+                                <select
+                                  value={formData.slotDurationMinutes}
+                                  onChange={(e) => setFormData({...formData, slotDurationMinutes: Number(e.target.value)})}
+                                  className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                                >
+                                  <option value={30}>30 min</option>
+                                  <option value={45}>45 min</option>
+                                  <option value={60}>60 min</option>
+                                  <option value={90}>90 min</option>
+                                  <option value={120}>120 min</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            <Toggle
+                              label="Abierto 24 Horas"
+                              description="Ignora el rango horario y permite reservar a cualquier hora del día."
+                              checked={formData.is24Hours}
+                              onChange={(val) => setFormData({...formData, is24Hours: val})}
+                            />
+
+                            {!formData.is24Hours && (
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-xs font-bold text-slate-400 mb-1">Hora de Apertura</label>
+                                  <input
+                                    type="time"
+                                    value={formData.openTime ?? '08:00'}
+                                    onChange={(e) => setFormData({...formData, openTime: e.target.value})}
+                                    className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-bold text-slate-400 mb-1">Hora de Cierre</label>
+                                  <input
+                                    type="time"
+                                    value={formData.closeTime ?? '23:00'}
+                                    onChange={(e) => setFormData({...formData, closeTime: e.target.value})}
+                                    className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
                     <Toggle
                       label="Espacio Activo"

@@ -15,8 +15,26 @@ public class SpaceDto
     [JsonPropertyName("allowReservations")]
     public bool AllowReservationsDuringClasses { get; set; }
 
+    [JsonPropertyName("requiresApproval")]
+    public bool RequiresApproval { get; set; }
+
     [JsonPropertyName("permitir_superposicion")]
     public bool PermitirSuperposicion { get; set; }
+
+    [JsonPropertyName("pricePerHour")]
+    public decimal PricePerHour { get; set; }
+
+    [JsonPropertyName("slotDurationMinutes")]
+    public int SlotDurationMinutes { get; set; }
+
+    [JsonPropertyName("is24Hours")]
+    public bool Is24Hours { get; set; }
+
+    [JsonPropertyName("openTime")]
+    public string? OpenTime { get; set; }
+
+    [JsonPropertyName("closeTime")]
+    public string? CloseTime { get; set; }
 }
 
 /// <summary>Entrada para crear/actualizar un espacio (POST/PUT /api/spaces).</summary>
@@ -30,8 +48,26 @@ public class SaveSpaceRequest
     [JsonPropertyName("allowReservations")]
     public bool AllowReservationsDuringClasses { get; set; } = false;
 
+    [JsonPropertyName("requiresApproval")]
+    public bool RequiresApproval { get; set; } = false;
+
     [JsonPropertyName("permitir_superposicion")]
     public bool PermitirSuperposicion { get; set; }
+
+    [JsonPropertyName("pricePerHour")]
+    public decimal PricePerHour { get; set; }
+
+    [JsonPropertyName("slotDurationMinutes")]
+    public int SlotDurationMinutes { get; set; } = 60;
+
+    [JsonPropertyName("is24Hours")]
+    public bool Is24Hours { get; set; } = false;
+
+    [JsonPropertyName("openTime")]
+    public string? OpenTime { get; set; }
+
+    [JsonPropertyName("closeTime")]
+    public string? CloseTime { get; set; }
 }
 
 /// <summary>Turno bloqueado de una cancha por una clase/actividad del club.</summary>

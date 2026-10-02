@@ -8,7 +8,7 @@ export interface Booking {
   userName: string;
   startTime: string;
   endTime: string;
-  status: string; // PendingPayment | Confirmed | Cancelled
+  status: string; // PendingPayment | PendingApproval | Confirmed | Cancelled
   paymentId?: number | null;
   amount: number;
   marketplaceFee: number;
@@ -20,6 +20,7 @@ export interface Booking {
 // Entrada para crear una reserva (POST /api/bookings)
 export interface CreateBookingRequest {
   resourceName: string;
+  spaceId?: number | null;
   startTime: string;
   endTime: string;
   amount: number;

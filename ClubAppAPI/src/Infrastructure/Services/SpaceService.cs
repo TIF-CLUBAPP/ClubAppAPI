@@ -42,7 +42,13 @@ public class SpaceService : ISpaceService
             Location = dto.Location?.Trim() ?? string.Empty,
             IsActive = dto.IsActive,
             AllowReservationsDuringClasses = dto.AllowReservationsDuringClasses,
+            RequiresApproval = dto.RequiresApproval,
             PermitirSuperposicion = dto.PermitirSuperposicion,
+            PricePerHour = dto.PricePerHour,
+            SlotDurationMinutes = dto.SlotDurationMinutes <= 0 ? 60 : dto.SlotDurationMinutes,
+            Is24Hours = dto.Is24Hours,
+            OpenTime = dto.OpenTime,
+            CloseTime = dto.CloseTime,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -64,7 +70,13 @@ public class SpaceService : ISpaceService
         space.Location = dto.Location?.Trim() ?? string.Empty;
         space.IsActive = dto.IsActive;
         space.AllowReservationsDuringClasses = dto.AllowReservationsDuringClasses;
+        space.RequiresApproval = dto.RequiresApproval;
         space.PermitirSuperposicion = dto.PermitirSuperposicion;
+        space.PricePerHour = dto.PricePerHour;
+        space.SlotDurationMinutes = dto.SlotDurationMinutes <= 0 ? 60 : dto.SlotDurationMinutes;
+        space.Is24Hours = dto.Is24Hours;
+        space.OpenTime = dto.OpenTime;
+        space.CloseTime = dto.CloseTime;
 
         await _context.SaveChangesAsync();
 
@@ -118,6 +130,12 @@ public class SpaceService : ISpaceService
         Location = s.Location,
         IsActive = s.IsActive,
         AllowReservationsDuringClasses = s.AllowReservationsDuringClasses,
-        PermitirSuperposicion = s.PermitirSuperposicion
+        RequiresApproval = s.RequiresApproval,
+        PermitirSuperposicion = s.PermitirSuperposicion,
+        PricePerHour = s.PricePerHour,
+        SlotDurationMinutes = s.SlotDurationMinutes,
+        Is24Hours = s.Is24Hours,
+        OpenTime = s.OpenTime,
+        CloseTime = s.CloseTime
     };
 }

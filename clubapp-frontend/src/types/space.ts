@@ -7,7 +7,13 @@ export interface Space {
   lng?: number; // Added
   isActive: boolean;
   allowReservations: boolean;
+  requiresApproval: boolean;
   permitir_superposicion: boolean;
+  pricePerHour: number;
+  slotDurationMinutes: number;
+  is24Hours: boolean;
+  openTime?: string | null;
+  closeTime?: string | null;
 }
 
 export interface SaveSpaceRequest {
@@ -18,7 +24,13 @@ export interface SaveSpaceRequest {
   lng?: number; // Added
   isActive: boolean;
   allowReservations: boolean;
+  requiresApproval: boolean;
   permitir_superposicion: boolean;
+  pricePerHour: number;
+  slotDurationMinutes: number;
+  is24Hours: boolean;
+  openTime?: string | null;
+  closeTime?: string | null;
 }
 
 export interface SpaceBlock {
