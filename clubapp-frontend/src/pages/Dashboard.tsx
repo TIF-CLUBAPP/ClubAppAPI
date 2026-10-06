@@ -32,17 +32,17 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex selection:bg-emerald-500 selection:text-slate-950">
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-slate-950 text-slate-100 flex selection:bg-emerald-500 selection:text-slate-950">
       {/* 1. Sidebar persiste a la izquierda */}
       <Sidebar />
 
       {/* 2. Área principal de contenido */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-64">
         {/* Header superior */}
         <Header />
 
         {/* 3. Vista dinámica según el Rol (incluye los widgets y las métricas) */}
-        <main className="flex-1 p-6 md:p-8 overflow-y-auto">
+        <main className="flex-1 w-full max-w-full p-6 md:p-8 overflow-y-auto overflow-x-hidden">
           {isAuthenticated ? (
             <div className="space-y-6">
               <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6">

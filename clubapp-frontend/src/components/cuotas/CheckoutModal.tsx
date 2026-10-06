@@ -1,4 +1,4 @@
-﻿import React, { useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CreditCard, X, RefreshCw, Copy, Check, ShieldCheck, Building2, Lock, Clock } from 'lucide-react';
 import type { MemberCuota } from '../../types/cuotas';
@@ -7,6 +7,14 @@ import { PaymentSummaryBox } from './PaymentSummaryBox';
 import { paymentsService } from '../../services/paymentsService';
 import { getMercadoPagoInstance } from '../../config/mercadopago';
 import { computeDigitalServiceFee } from '../../config/fees';
+import { GroupPaymentPanel } from './GroupPaymentPanel';
+import { groupPaymentService } from '../../services/groupPaymentService';
+import { useAuth } from '../../context/AuthContext';
+import type {
+  GroupBookingDto,
+  GroupParticipant,
+  GroupPaymentState,
+} from '../../types/groupPayment';
 
 interface CheckoutModalProps {
   cuota: MemberCuota | null;
@@ -14,6 +22,11 @@ interface CheckoutModalProps {
   onPaymentSuccess: (paidCuota: MemberCuota) => void;
   onViewReceipt: (cuota: MemberCuota) => void;
   formatCurrency: (val: number) => string;
+  /** Habilita la opción "Dividir con Amigos" (pago grupal de reserva). */
+  enableGroupPayment?: boolean;
+  /** Crea la reserva (Pago Total) al confirmar y devuelve el Payment.Id a cobrar.
+   *  Se usa cuando la reserva no se pre-crea al abrir el modal (evita la doble reserva). */
+  prepareBookingForTotal?: () => Promise<{ paymentId: number }>;
 }
 
 /** Resuelve el ID numÃ©rico primario de la cuota (Payment.Id) a partir del objeto cuota. */
@@ -30,12 +43,40 @@ const resolveCuotaId = (cuota: MemberCuota): number | null => {
   return Number.isNaN(parsed) || parsed <= 0 ? null : parsed;
 };
 
+/** Estado inicial (vacío) del pago grupal. */
+const createEmptyGroup = (): GroupPaymentState => ({
+  totalParticipants: 2,
+  token: '',
+  deadline: '',
+  participants: [],
+});
+
+/** Convierte el DTO del backend (GroupBookingDto) al estado local del panel. */
+const mapBookingToState = (b: GroupBookingDto): GroupPaymentState => ({
+  totalParticipants: b.totalParticipants,
+  token: b.token,
+  deadline: b.expiresAt,
+  participants: b.participants.map((p) => ({
+    id: String(p.id),
+    userId: p.userId ?? null,
+    name: p.name,
+    email: p.email ?? undefined,
+    username: p.email ? p.email.split('@')[0] : undefined,
+    isOrganizer: p.isOrganizer,
+    shareAmount: p.amount,
+    status: p.status === 'PAID' ? 'PAID' : 'PENDING',
+    paidAt: p.paidAt ?? undefined,
+  })),
+});
+
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   cuota,
   onClose,
   onPaymentSuccess,
   onViewReceipt,
   formatCurrency,
+  enableGroupPayment = false,
+  prepareBookingForTotal,
 }) => {
   const [method, setMethod] = useState<'mercadopago' | 'card' | 'transfer'>('mercadopago');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -46,6 +87,39 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [transferPending, setTransferPending] = useState(false);
   const [transferProofFile, setTransferProofFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ========== Pago dividido / reserva grupal ==========
+  const { user } = useAuth();
+  const [payMode, setPayMode] = useState<'total' | 'split'>('total');
+  const [createdPaymentId, setCreatedPaymentId] = useState<number | null>(null);
+  const [group, setGroup] = useState<GroupPaymentState>(() => createEmptyGroup());
+  const [refreshingGroup, setRefreshingGroup] = useState(false);
+  const [groupMessage, setGroupMessage] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
+
+  // Al cambiar de cuota (nueva reserva), se reinicia el modo y el estado grupal.
+  useEffect(() => {
+    setPayMode('total');
+    setGroup(createEmptyGroup());
+    setGroupMessage(null);
+    setCreatedPaymentId(null);
+  }, [cuota?.id]);
+
+  // Polling del estado grupal: refleja los pagos de los amigos en tiempo real.
+  const groupFullyPaid =
+    payMode === 'split' &&
+    group.totalParticipants > 0 &&
+    group.participants.filter((p) => p.status === 'PAID').length >= group.totalParticipants;
+
+  useEffect(() => {
+    if (payMode !== 'split' || !group.token || groupFullyPaid) return;
+    const id = window.setInterval(() => {
+      groupPaymentService
+        .getGroupBooking(group.token)
+        .then((b) => setGroup(mapBookingToState(b)))
+        .catch(() => undefined);
+    }, 10000);
+    return () => window.clearInterval(id);
+  }, [payMode, group.token, groupFullyPaid]);
 
   // Campos de tarjeta: NO se guardan en el state de React. Se leen desde el DOM
   // (refs) Ãºnicamente al confirmar, para tokenizarlos en el cliente vÃ­a Mercado Pago.
@@ -58,19 +132,214 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   // Todos los mÃ©todos (Mercado Pago, Tarjeta y Transferencia) suman el costo
   // del servicio digital ATRIO al total (3.5% - mÃ¡x $1.500).
-  const digitalServiceFee = computeDigitalServiceFee(cuota.totalAmount);
-  const totalToPay = cuota.totalAmount + digitalServiceFee;
+  // En modo dividido, el organizador abona únicamente su cuota (total / participantes).
+  const perPersonAmount =
+    payMode === 'split' && group.totalParticipants > 0
+      ? cuota.totalAmount / group.totalParticipants
+      : cuota.totalAmount;
+
+  const digitalServiceFee = computeDigitalServiceFee(perPersonAmount);
+  const totalToPay = perPersonAmount + digitalServiceFee;
+
+  const organizer = group.participants.find((p) => p.isOrganizer);
+  const organizerHasPaid = payMode === 'split' && organizer?.status === 'PAID';
+  const paidCount = group.participants.filter((p) => p.status === 'PAID').length;
+  const allPaid = payMode === 'split' && group.totalParticipants > 0 && paidCount >= group.totalParticipants;
 
   // Alias del receptor final del cobro (Club o Profesor). Viene resuelto por el backend
   // desde GET /api/payments/mine; si no está disponible, se usa el alias por defecto.
   const transferAlias = cuota.transferAlias || 'CLUB.ATLETICO.MP';
   const payoutCollector = cuota.payoutCollector || 'Club';
 
+  const handleSetPayMode = (mode: 'total' | 'split') => {
+    setPayMode(mode);
+    setGroupMessage(null);
+    if (mode === 'split') {
+      setGroup((g) => {
+        const hasOrganizer = g.participants.some((p) => p.isOrganizer);
+        const participants = hasOrganizer
+          ? g.participants
+          : [
+              {
+                id: 'organizer',
+                userId: user?.id ? Number(user.id) : null,
+                name:
+                  user?.fullName ||
+                  `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim() ||
+                  'Organizador',
+                email: user?.email,
+                username: user?.email?.split('@')[0],
+                isOrganizer: true,
+                shareAmount: cuota.totalAmount / Math.max(1, g.totalParticipants),
+                status: 'PENDING' as const,
+                invitedAt: new Date().toISOString(),
+              },
+              ...g.participants,
+            ];
+        return { ...g, participants };
+      });
+    }
+  };
+
+  const handleTotalParticipantsChange = (n: number) => {
+    setGroup((g) => ({ ...g, totalParticipants: Math.max(1, n) }));
+  };
+
+  const handleAddParticipant = (p: GroupParticipant) => {
+    setGroup((g) => {
+      const exists = g.participants.some(
+        (x) =>
+          x.id === p.id ||
+          (p.userId != null && x.userId === p.userId) ||
+          (p.email && x.email === p.email),
+      );
+      if (exists) return g;
+      const share = cuota.totalAmount / Math.max(1, g.totalParticipants);
+      return {
+        ...g,
+        participants: [...g.participants, { ...p, shareAmount: share, invitedAt: new Date().toISOString() }],
+      };
+    });
+  };
+
+  const handleRemoveParticipant = (id: string) => {
+    setGroup((g) => ({ ...g, participants: g.participants.filter((p) => p.id !== id) }));
+  };
+
+  const handleRefreshGroup = async () => {
+    if (!group.token) return;
+    setRefreshingGroup(true);
+    try {
+      const booking = await groupPaymentService.getGroupBooking(group.token);
+      setGroup(mapBookingToState(booking));
+    } catch (err: any) {
+      setGroupMessage({
+        type: 'error',
+        text:
+          err?.response?.data?.message ??
+          err?.response?.data?.detail ??
+          err?.message ??
+          'No se pudo actualizar el estado del grupo.',
+      });
+    } finally {
+      setRefreshingGroup(false);
+    }
+  };
+
+  const handleConfirmAllPaid = async () => {
+    // Verifica el estado final contra el backend antes de confirmar la reserva.
+    if (group.token) {
+      try {
+        const booking = await groupPaymentService.getGroupBooking(group.token);
+        if (booking.status.toLowerCase() !== 'completed') {
+          setGroup(mapBookingToState(booking));
+          setGroupMessage({ type: 'error', text: 'Aún no se completaron todos los pagos.' });
+          return;
+        }
+      } catch (err: any) {
+        setGroupMessage({
+          type: 'error',
+          text:
+            err?.response?.data?.message ??
+            err?.response?.data?.detail ??
+            err?.message ??
+            'No se pudo verificar la reserva grupal.',
+        });
+        return;
+      }
+    }
+
+    onPaymentSuccess({
+      ...cuota,
+      status: 'PAGADA',
+      paidAt: new Date().toLocaleString('es-AR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      paymentMethod: 'Pago grupal (dividido)',
+      receiptNumber: `REC-2026-${Math.floor(10000 + Math.random() * 90000)}`,
+      isOverdue: false,
+    });
+  };
+
   const handleProcess = async () => {
+    // ========== Pago dividido: inicializa la reserva grupal en el backend ==========
+    if (payMode === 'split') {
+      setIsProcessing(true);
+      setGroupMessage(null);
+      try {
+        const reservation = cuota.reservation;
+        if (!reservation?.resourceName) {
+          throw new Error('No se pudo identificar el espacio a reservar.');
+        }
+
+        const booking = await groupPaymentService.initGroupBooking({
+          resourceName: reservation.resourceName,
+          spaceId: reservation.spaceId ?? null,
+          startTime: reservation.startTime,
+          endTime: reservation.endTime,
+          amount: cuota.totalAmount,
+          totalParticipants: Math.max(2, group.totalParticipants),
+          expiresInMinutes: 60,
+          participants: group.participants
+            .filter((p) => !p.isOrganizer)
+            .map((p) => ({
+              userId: p.userId ?? null,
+              name: p.name,
+              email: p.email ?? null,
+            })),
+        });
+
+        setGroup(mapBookingToState(booking));
+        setGroupMessage({
+          type: 'ok',
+          text: 'Reserva grupal creada. Compartí el link para que tus amigos paguen su parte.',
+        });
+      } catch (err: any) {
+        setGroupMessage({
+          type: 'error',
+          text:
+            err?.response?.data?.message ??
+            err?.response?.data?.detail ??
+            err?.message ??
+            'No se pudo iniciar la reserva grupal.',
+        });
+      } finally {
+        setIsProcessing(false);
+      }
+      return;
+    }
+
     console.log('--- INICIO HANDLE PAYMENT ---', cuota);
 
     try {
-      const cuotaId = resolveCuotaId(cuota);
+      // Para reservas de cancha, la reserva (y su Payment) se crea recién al
+      // confirmar el Pago Total. En ese caso no hay idReal y se usa
+      // prepareBookingForTotal para evitar la doble reserva al abrir el checkout.
+      const hasRealCuotaId = (cuota as any)?.idReal != null || (cuota as any)?.cuotaId != null;
+      let cuotaId: number | null = createdPaymentId ?? (hasRealCuotaId ? resolveCuotaId(cuota) : null);
+
+      if (cuotaId === null && prepareBookingForTotal) {
+        setIsProcessing(true);
+        try {
+          const created = await prepareBookingForTotal();
+          cuotaId = created.paymentId;
+          setCreatedPaymentId(created.paymentId);
+        } catch (err: any) {
+          setIsProcessing(false);
+          alert(
+            err?.response?.data?.detail ??
+              err?.response?.data?.message ??
+              err?.message ??
+              'No se pudo reservar el turno.',
+          );
+          return;
+        }
+        setIsProcessing(false);
+      }
       if (cuotaId === null) {
         console.error('[pago] cuotaId invÃ¡lido. No se enviarÃ¡ la peticiÃ³n.', {
           cuota,
@@ -252,7 +521,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-xl p-4 space-y-3 shadow-2xl text-base h-auto overflow-hidden"
+          className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-xl p-4 space-y-3 shadow-2xl text-base max-h-[85vh] overflow-y-auto"
         >
           <div className="flex items-center justify-between pb-3 border-b border-slate-800">
             <div className="flex items-center gap-3">
@@ -283,12 +552,59 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               <div className="py-12 text-center space-y-3"><RefreshCw className="w-9 h-9 animate-spin text-emerald-400 mx-auto" /><p className="text-sm font-bold text-white">Procesando pago seguro...</p></div>
             ) : (
               <>
-                <PaymentSummaryBox
-                  cuota={cuota}
-                  formatCurrency={formatCurrency}
-                  digitalServiceFee={digitalServiceFee}
-                  totalToPay={totalToPay}
-                />
+                {enableGroupPayment && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleSetPayMode('total')}
+                      className={`p-2.5 rounded-xl border text-sm font-bold transition ${payMode === 'total' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-300' : 'bg-slate-950 border-slate-800 text-slate-400'}`}
+                    >
+                      Pago Total
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSetPayMode('split')}
+                      className={`p-2.5 rounded-xl border text-sm font-bold transition ${payMode === 'split' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-300' : 'bg-slate-950 border-slate-800 text-slate-400'}`}
+                    >
+                      Dividir con Amigos
+                    </button>
+                  </div>
+                )}
+
+                {payMode === 'split' ? (
+                  <>
+                    {groupMessage && (
+                      <div
+                        className={`text-xs font-medium rounded-xl px-3 py-2.5 border ${
+                          groupMessage.type === 'ok'
+                            ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30'
+                            : 'text-rose-300 bg-rose-500/10 border-rose-500/30'
+                        }`}
+                      >
+                        {groupMessage.text}
+                      </div>
+                    )}
+                    <GroupPaymentPanel
+                      formatCurrency={formatCurrency}
+                      totalAmount={cuota.totalAmount}
+                      perPersonAmount={perPersonAmount}
+                      group={group}
+                      organizerHasPaid={organizerHasPaid}
+                      onTotalParticipantsChange={handleTotalParticipantsChange}
+                      onAddParticipant={handleAddParticipant}
+                      onRemoveParticipant={handleRemoveParticipant}
+                      refreshing={refreshingGroup}
+                      onRefresh={handleRefreshGroup}
+                    />
+                  </>
+                ) : (
+                  <PaymentSummaryBox
+                    cuota={cuota}
+                    formatCurrency={formatCurrency}
+                    digitalServiceFee={digitalServiceFee}
+                    totalToPay={totalToPay}
+                  />
+                )}
 
                 <div className="grid grid-cols-3 gap-2">
                   <button type="button" onClick={() => setMethod('mercadopago')} className={`p-2.5 rounded-xl border text-base font-medium flex flex-col items-center gap-1 ${method === 'mercadopago' ? 'bg-sky-500/10 border-sky-500 text-sky-400' : 'bg-slate-950 border-slate-800 text-slate-400'}`}><span className="font-extrabold text-sm">mp</span><span>Mercado Pago</span></button>
@@ -445,17 +761,32 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             )}
             {!transferPending && !isSuccess && !isProcessing && (
               <div className="border-t border-slate-800 pt-3">
-                <button
-                  onClick={handleProcess}
-                  disabled={
-                    isProcessing ||
-                    (method === 'transfer' && !transferReference.trim() && !transferProofFile)
-                  }
-                  className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 mb-1 rounded-2xl transition text-base disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <ShieldCheck className="w-5 h-5" />
-                  <span>Confirmar Pago {formatCurrency(totalToPay)}</span>
-                </button>
+                {payMode === 'split' && organizerHasPaid && !allPaid ? (
+                  <p className="text-center text-sm text-amber-300 font-semibold py-1">
+                    Tu cuota fue abonada. Esperando {Math.max(0, group.totalParticipants - paidCount)} pago(s) de tus amigos…
+                  </p>
+                ) : (
+                  <button
+                    onClick={allPaid ? handleConfirmAllPaid : handleProcess}
+                    disabled={
+                      isProcessing ||
+                      (payMode === 'total' &&
+                        method === 'transfer' &&
+                        !transferReference.trim() &&
+                        !transferProofFile)
+                    }
+                    className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 mb-1 rounded-2xl transition text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ShieldCheck className="w-5 h-5" />
+                    <span>
+                      {allPaid
+                        ? 'Confirmar Reserva Completa'
+                        : payMode === 'split'
+                          ? `Pagar mi cuota ${formatCurrency(totalToPay)}`
+                          : `Confirmar Pago ${formatCurrency(totalToPay)}`}
+                    </span>
+                  </button>
+                )}
               </div>
             )}
         </motion.div>

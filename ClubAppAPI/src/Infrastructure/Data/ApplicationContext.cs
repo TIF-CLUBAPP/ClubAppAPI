@@ -23,6 +23,9 @@ namespace ClubApp.Infrastructure.Data
         public DbSet<ResourceBooking> ResourceBookings { get; set; }
         public DbSet<AttendanceRecord> AttendanceRecords { get; set; }
         public DbSet<Space> Spaces { get; set; }
+        public DbSet<GroupBooking> GroupBookings { get; set; }
+        public DbSet<GroupParticipant> GroupParticipants { get; set; }
+        public DbSet<Friendship> Friendships { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -121,6 +124,66 @@ namespace ClubApp.Infrastructure.Data
 
             modelBuilder.Entity<AttendanceRecord>()
                 .HasIndex(r => new { r.ActivityScheduleId, r.UserId, r.Date })
+                .IsUnique();
+
+            // Reserva grupal -> token único público.
+            modelBuilder.Entity<GroupBooking>()
+                .HasIndex(g => g.Token)
+                .IsUnique();
+
+            modelBuilder.Entity<GroupBooking>()
+                .HasOne(g => g.Organizer)
+                .WithMany()
+                .HasForeignKey(g => g.OrganizerUserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<GroupBooking>()
+                .HasOne(g => g.ResourceBooking)
+                .WithMany()
+                .HasForeignKey(g => g.ResourceBookingId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<GroupBooking>()
+                .HasOne(g => g.Space)
+                .WithMany()
+                .HasForeignKey(g => g.SpaceId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Participante -> reserva grupal (se eliminan en cascada con la reserva).
+            modelBuilder.Entity<GroupParticipant>()
+                .HasOne(p => p.GroupBooking)
+                .WithMany(g => g.Participants)
+                .HasForeignKey(p => p.GroupBookingId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<GroupParticipant>()
+                .HasOne(p => p.User)
+                .WithMany()
+                .HasForeignKey(p => p.UserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<GroupParticipant>()
+                .HasOne(p => p.Payment)
+                .WithMany()
+                .HasForeignKey(p => p.PaymentId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Amistades: dos FKs hacia User. Se restringe el borrado para evitar cascadas múltiples.
+            modelBuilder.Entity<Friendship>()
+                .HasOne(f => f.Requester)
+                .WithMany()
+                .HasForeignKey(f => f.RequesterId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Friendship>()
+                .HasOne(f => f.Addressee)
+                .WithMany()
+                .HasForeignKey(f => f.AddresseeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Un solo registro por par (remitente, destinatario).
+            modelBuilder.Entity<Friendship>()
+                .HasIndex(f => new { f.RequesterId, f.AddresseeId })
                 .IsUnique();
         }
     }

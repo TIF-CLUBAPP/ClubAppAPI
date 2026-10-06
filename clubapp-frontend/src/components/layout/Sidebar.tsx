@@ -45,7 +45,7 @@ export default function Sidebar() {
         };
 
   return (
-    <aside className="w-64 border-r border-slate-800 bg-slate-900/50 p-6 flex-col justify-between hidden md:flex shrink-0 h-screen sticky top-0">
+    <aside className="fixed top-0 left-0 z-40 h-screen w-64 overflow-y-auto border-r border-slate-800 bg-slate-900/50 p-6 flex-col justify-between hidden md:flex">
       <div>
         {/* Logo ClubApp */}
         <div className="flex items-center gap-3 mb-8 px-2">
@@ -211,7 +211,10 @@ export default function Sidebar() {
       <div className="pt-4 border-t border-slate-800/80">
         {isAuthenticated ? (
             <>
-              <div className="flex items-center gap-3 px-2 mb-3">
+              <Link
+                to="/cuenta"
+                className="flex items-center gap-3 px-2 py-1.5 mb-3 rounded-xl transition cursor-pointer hover:bg-slate-800/60"
+              >
                 <div className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-emerald-400 font-bold text-xs shrink-0">
                   {initials || 'US'}
                 </div>
@@ -221,7 +224,7 @@ export default function Sidebar() {
                     {roleBadge.label}
                   </span>
                 </div>
-              </div>
+              </Link>
 
               <button
                 onClick={logout}

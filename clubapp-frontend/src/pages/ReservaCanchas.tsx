@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, MapPin, RefreshCw, CheckCircle2, AlertCircle, Sparkles, GraduationCap, Layers, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
+import { Calendar, MapPin, RefreshCw, CheckCircle2, AlertCircle, Sparkles, GraduationCap, Layers, ChevronLeft, ChevronRight, ChevronDown, Check, X, ArrowRight } from 'lucide-react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import { CheckoutModal } from '../components/cuotas/CheckoutModal';
@@ -186,8 +186,10 @@ export default function ReservaCanchas() {
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
-  const [creatingSlot, setCreatingSlot] = useState<string | null>(null);
-  const [pendingBooking, setPendingBooking] = useState<Booking | null>(null);
+  const [selectedSlots, setSelectedSlots] = useState<Slot[]>([]);
+  const [pendingBookings, setPendingBookings] = useState<Booking[]>([]);
+  const [pendingSlots, setPendingSlots] = useState<Slot[]>([]);
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
   const [toast, setToast] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
   const [checkoutCuota, setCheckoutCuota] = useState<MemberCuota | null>(null);
 
@@ -230,6 +232,11 @@ export default function ReservaCanchas() {
     const t = setTimeout(() => setToast(null), 3500);
     return () => clearTimeout(t);
   }, [toast]);
+
+  // Limpia la selección múltiple al cambiar de fecha o de espacio/cancha.
+  useEffect(() => {
+    setSelectedSlots([]);
+  }, [selectedSpaceId, selectedDate]);
 
   const activeSpaces = useMemo(
     () => spaces.filter((s) => s.isActive && s.allowReservations).sort((a, b) => a.name.localeCompare(b.name)),
@@ -332,56 +339,92 @@ export default function ReservaCanchas() {
     return 'available';
   };
 
-  const handleSelectSlot = async (slot: Slot) => {
+  const handleToggleSlot = (slot: Slot) => {
     if (!selectedSpace) return;
-    const { start, end } = slotRange(slot);
-    setCreatingSlot(slot.key);
+    setSelectedSlots((prev) =>
+      prev.some((s) => s.key === slot.key)
+        ? prev.filter((s) => s.key !== slot.key)
+        : [...prev, slot],
+    );
+  };
+
+  const handleCheckout = () => {
+    if (!selectedSpace || selectedSlots.length === 0) return;
+
+    // Abre el checkout SIN crear la reserva: la creación se difiere al confirmar
+    // (Pago Total) o al inicializar la reserva grupal (Dividir con Amigos).
+    // Los slots quedan en el estado local para poder crear la reserva al confirmar.
+    setPendingSlots(selectedSlots);
+    setPendingBookings([]);
+    setCheckoutCuota(buildBatchCheckoutCuota(selectedSlots, selectedSpace, selectedDate));
+    setSelectedSlots([]);
+  };
+
+  // Crea la reserva (y su pago asociado) recién al confirmar el Pago Total.
+  // Devuelve el Payment.Id a cobrar; los bookings creados se guardan en
+  // pendingBookings para confirmarlos en handlePaymentSuccess.
+  const prepareBookingForTotal = async (): Promise<{ paymentId: number }> => {
+    if (!selectedSpace || pendingSlots.length === 0) {
+      throw new Error('No hay turnos seleccionados para reservar.');
+    }
+
+    setIsBatchProcessing(true);
     try {
-      const booking = await bookingService.createBooking({
-        resourceName: selectedSpace.name,
-        spaceId: selectedSpace.id,
-        startTime: start.toISOString(),
-        endTime: end.toISOString(),
-        amount: selectedSpace.pricePerHour,
-      });
-      setPendingBooking(booking);
-      setCheckoutCuota(buildCheckoutCuota(booking, selectedSpace));
-      await loadBookings();
-    } catch (err: any) {
-      setToast({
-        type: 'error',
-        text: err?.response?.data?.detail ?? err?.response?.data?.message ?? 'No se pudo reservar el turno.',
-      });
-      await loadBookings();
+      const created = await Promise.all(
+        pendingSlots.map((slot) => {
+          const { start, end } = slotRange(slot);
+          return bookingService.createBooking({
+            resourceName: selectedSpace.name,
+            spaceId: selectedSpace.id,
+            startTime: start.toISOString(),
+            endTime: end.toISOString(),
+            amount: selectedSpace.pricePerHour,
+          });
+        }),
+      );
+
+      setPendingBookings(created);
+
+      const paymentId = created[0]?.paymentId ?? null;
+      if (paymentId === null) {
+        throw new Error('No se pudo generar el pago de la reserva.');
+      }
+
+      return { paymentId };
     } finally {
-      setCreatingSlot(null);
+      setIsBatchProcessing(false);
     }
   };
 
   const handlePaymentSuccess = async () => {
-    if (pendingBooking) {
-      try {
-        await bookingService.confirmBooking(pendingBooking.id);
-      } catch {
-        /* el pago ya quedó registrado */
+    if (pendingBookings.length > 0) {
+      for (const booking of pendingBookings) {
+        try {
+          await bookingService.confirmBooking(booking.id);
+        } catch {
+          /* el pago ya quedó registrado */
+        }
       }
     }
-    setToast({ type: 'ok', text: '¡Reserva confirmada y pagada!' });
+    setToast({ type: 'ok', text: '¡Reservas confirmadas y pagadas!' });
     setCheckoutCuota(null);
-    setPendingBooking(null);
+    setPendingBookings([]);
+    setPendingSlots([]);
+    setSelectedSlots([]);
     await loadBookings();
   };
 
   const handleCloseCheckout = async () => {
     setCheckoutCuota(null);
-    setPendingBooking(null);
+    setPendingBookings([]);
+    setPendingSlots([]);
     await loadBookings();
   };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex selection:bg-emerald-500 selection:text-slate-950">
       <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-64">
         <Header />
         <main className="flex-1 p-6 md:p-8 overflow-y-auto scrollbar-thin">
           <div className="space-y-6 max-w-5xl mx-auto">
@@ -520,7 +563,7 @@ export default function ReservaCanchas() {
                   <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 pt-4">
                     {slots.map((slot) => {
                       const status = slotStatus(slot);
-                      const isCreating = creatingSlot === slot.key;
+                      const isSelected = selectedSlots.some((s) => s.key === slot.key);
 
                       if (status === 'class') {
                         return (
@@ -554,17 +597,22 @@ export default function ReservaCanchas() {
                         <button
                           key={slot.key}
                           type="button"
-                          onClick={() => handleSelectSlot(slot)}
-                          disabled={!!creatingSlot}
-                          className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3 flex flex-col items-center justify-center gap-1 text-center transition-all hover:bg-emerald-500 hover:text-slate-950 group disabled:opacity-50"
+                          onClick={() => handleToggleSlot(slot)}
+                          className={`rounded-2xl border p-3 flex flex-col items-center justify-center gap-1 text-center transition-all group ${
+                            isSelected
+                              ? 'border-emerald-400 bg-emerald-600/30 ring-2 ring-emerald-400/70 shadow-[0_0_16px_rgba(16,185,129,0.45)]'
+                              : 'border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500 hover:text-slate-950'
+                          }`}
                         >
-                          <span className="text-sm font-bold text-white group-hover:text-slate-950">
+                          <span className={`text-sm font-bold ${isSelected ? 'text-white' : 'text-white group-hover:text-slate-950'}`}>
                             {slot.start} – {slot.end}
                           </span>
-                          <span className="text-xs font-semibold text-emerald-300 group-hover:text-slate-900">{fmt(selectedSpace.pricePerHour)}</span>
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-300 group-hover:text-slate-900">
-                            {isCreating ? <RefreshCw size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
-                            {isCreating ? 'Reservando…' : 'Reservar'}
+                          <span className={`text-xs font-semibold ${isSelected ? 'text-emerald-200' : 'text-emerald-300 group-hover:text-slate-900'}`}>
+                            {fmt(selectedSpace.pricePerHour)}
+                          </span>
+                          <span className={`inline-flex items-center gap-1 text-[11px] font-bold ${isSelected ? 'text-emerald-200' : 'text-emerald-300 group-hover:text-slate-900'}`}>
+                            {isSelected ? <CheckCircle2 size={12} /> : <Check size={12} />}
+                            {isSelected ? 'Seleccionado' : 'Seleccionar'}
                           </span>
                         </button>
                       );
@@ -577,35 +625,78 @@ export default function ReservaCanchas() {
         </main>
       </div>
 
+      {selectedSlots.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-slate-900/95 backdrop-blur-md border border-slate-700/60 rounded-full px-6 py-3 shadow-2xl shadow-emerald-950/40">
+          <span className="text-sm text-slate-300 whitespace-nowrap">
+            <span className="font-bold text-white">{selectedSlots.length}</span>{' '}
+            {selectedSlots.length === 1 ? 'turno seleccionado' : 'turnos seleccionados'}
+          </span>
+          <span className="h-6 w-px bg-slate-700/60" />
+          <span className="text-sm font-black text-emerald-400 whitespace-nowrap">
+            {fmt(selectedSlots.length * (selectedSpace?.pricePerHour ?? 0))}
+          </span>
+          <button
+            type="button"
+            onClick={handleCheckout}
+            disabled={isBatchProcessing}
+            className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-5 py-2.5 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isBatchProcessing ? <RefreshCw size={16} className="animate-spin" /> : <ArrowRight size={16} />}
+            Ir a Pagar
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedSlots([])}
+            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition"
+            aria-label="Limpiar selección"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       <CheckoutModal
         cuota={checkoutCuota}
         onClose={handleCloseCheckout}
         onPaymentSuccess={handlePaymentSuccess}
         onViewReceipt={() => setCheckoutCuota(null)}
         formatCurrency={fmt}
+        enableGroupPayment
+        prepareBookingForTotal={prepareBookingForTotal}
       />
     </div>
   );
 }
 
-function buildCheckoutCuota(booking: Booking, space: Space): MemberCuota {
+function buildBatchCheckoutCuota(slots: Slot[], space: Space, selectedDate: string): MemberCuota {
+  const sorted = [...slots].sort((a, b) => a.startMin - b.startMin);
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+  const totalBase = sorted.length * space.pricePerHour;
+
+  const base = new Date(`${selectedDate}T00:00:00`).getTime();
+  const startTime = new Date(base + first.startMin * 60000).toISOString();
+  const endTime = new Date(base + last.endMin * 60000).toISOString();
+
   return {
-    id: `booking-${booking.id}`,
-    idReal: booking.paymentId ?? undefined,
-    periodo: `Reserva - ${space.name}`,
+    id: `booking-batch-${selectedDate}-${first.start}`,
+    idReal: undefined,
+    periodo: `Reserva - ${space.name} (${slots.length} turnos)`,
     mesAno: '',
-    fechaVencimiento: new Date(booking.startTime).toLocaleDateString('es-AR'),
-    baseAmount: booking.amount,
+    fechaVencimiento: new Date(startTime).toLocaleDateString('es-AR'),
+    baseAmount: totalBase,
     discountPercentage: 0,
     isOverdue: false,
     lateFeeAmount: 0,
-    totalAmount: booking.amount,
+    totalAmount: totalBase,
     status: 'PENDIENTE',
-    transferAlias: booking.transferAlias || 'CLUB.ATLETICO.MP',
-    payoutCollector: booking.payoutCollector || 'Club',
+    transferAlias: 'CLUB.ATLETICO.MP',
+    payoutCollector: 'Club',
+    reservation: {
+      resourceName: space.name,
+      spaceId: space.id,
+      startTime,
+      endTime,
+    },
   };
 }
-
-
-
-

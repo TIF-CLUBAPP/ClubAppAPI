@@ -2,6 +2,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Bell, Sparkles } from 'lucide-react';
 import { useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
+import FriendSearch from './FriendSearch';
 
 const greetings = [
   '¡Hola de nuevo! 👋',
@@ -33,15 +34,16 @@ export default function Header() {
     '/deudores': 'Deudores & Cuotas',
     '/espacios': 'Espacios & Canchas',
     '/socios': 'Socios',
-    '/asistencia': 'Asistencia'
+    '/asistencia': 'Asistencia',
+    '/cuenta': 'Mi Cuenta'
   };
   
   const pageTitle = pageTitles[location.pathname] || '';
 
   return (
-    <header className="h-20 border-b border-slate-800/80 bg-slate-950/50 backdrop-blur-md px-6 md:px-8 flex items-center justify-between shrink-0">
-      <div>
-        <h2 className="text-xl md:text-2xl font-extrabold text-white flex items-center gap-2">
+    <header className="h-20 border-b border-slate-800/80 bg-slate-950/50 backdrop-blur-md px-6 md:px-8 flex items-center justify-between gap-4 shrink-0 relative z-10">
+      <div className="flex-1 min-w-0">
+        <h2 className="text-xl md:text-2xl font-extrabold text-white flex items-center gap-2 truncate">
           {isDashboard ? randomGreeting : pageTitle}
         </h2>
         <p className="text-xs text-slate-400 hidden sm:block">
@@ -49,7 +51,8 @@ export default function Header() {
         </p>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 shrink-0">
+        <FriendSearch />
         {/* Badge del sistema */}
         <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs text-slate-400">
           <Sparkles size={14} className="text-emerald-400" />

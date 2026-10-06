@@ -155,6 +155,13 @@ export interface MemberCuota {
   transferAlias?: string;
   /** Receptor final del cobro (para mostrar en el checkout). */
   payoutCollector?: string;
+  /** Metadata de la reserva asociada (para el pago dividido / reserva grupal). */
+  reservation?: {
+    resourceName: string;
+    spaceId?: number;
+    startTime: string;
+    endTime: string;
+  };
 }
 
 // Cuota del usuario devuelta por el backend (GET /api/payments/mine)

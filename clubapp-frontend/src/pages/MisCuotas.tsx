@@ -45,7 +45,7 @@ export const MisCuotas: React.FC = () => {
       <div data-print-hide className="print-hidden">
         <Sidebar />
       </div>
-      <div className="app-main flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="app-main flex-1 flex flex-col min-w-0 overflow-hidden md:pl-64">
         <div data-print-hide className="print-hidden">
           <Header />
         </div>

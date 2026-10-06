@@ -3,6 +3,7 @@ using System;
 using ClubApp.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationContext))]
-    partial class ApplicationContextModelSnapshot : ModelSnapshot
+    [Migration("20261005214151_AddGroupPayment")]
+    partial class AddGroupPayment
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.7");
@@ -272,37 +275,6 @@ namespace Infrastructure.Migrations
                     b.HasIndex("EffectiveFromDate");
 
                     b.ToTable("FeeSettingsHistory");
-                });
-
-            modelBuilder.Entity("ClubApp.Domain.Entities.Friendship", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("AddresseeId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("RequesterId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AddresseeId");
-
-                    b.HasIndex("RequesterId", "AddresseeId")
-                        .IsUnique();
-
-                    b.ToTable("Friendships");
                 });
 
             modelBuilder.Entity("ClubApp.Domain.Entities.GroupBooking", b =>
@@ -811,25 +783,6 @@ namespace Infrastructure.Migrations
                     b.Navigation("Activity");
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("ClubApp.Domain.Entities.Friendship", b =>
-                {
-                    b.HasOne("ClubApp.Domain.Entities.User", "Addressee")
-                        .WithMany()
-                        .HasForeignKey("AddresseeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("ClubApp.Domain.Entities.User", "Requester")
-                        .WithMany()
-                        .HasForeignKey("RequesterId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Addressee");
-
-                    b.Navigation("Requester");
                 });
 
             modelBuilder.Entity("ClubApp.Domain.Entities.GroupBooking", b =>
