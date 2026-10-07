@@ -9,12 +9,13 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.OpenApi;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using ClubApp.Infrastructure.Services;
 using Microsoft.Data.Sqlite;
 using ClubApp.Domain.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
-using ClubApp.API.Middlewares; 
+using ClubApp.API.Middlewares;
+using ClubApp.API.Hubs;
+using ClubApp.API.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,6 +42,7 @@ builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
 builder.Services.AddScoped<ICustomAuthenticationService, AutenticacionService>(); 
 
 builder.Services.AddControllers();
+builder.Services.AddSignalR();
 
 // ------------------------------------------
 // CONFIGURACION DE CORS
@@ -73,6 +75,21 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidIssuer = issuer,
             ValidAudience = audience,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey))
+        };
+
+        // Permite la autenticación por query param para la conexión WebSocket de SignalR
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/notifications"))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            }
         };
     });
 
@@ -141,6 +158,7 @@ builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<INotificationDispatcher, SignalRNotificationDispatcher>();
 builder.Services.AddScoped<IMembershipService, MembershipService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
@@ -191,5 +209,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<NotificationHub>("/hubs/notifications");
 
 app.Run();

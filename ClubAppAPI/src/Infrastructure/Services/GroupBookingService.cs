@@ -13,11 +13,13 @@ public class GroupBookingService : IGroupBookingService
 {
     private readonly ApplicationContext _context;
     private readonly IPaymentService _paymentService;
+    private readonly INotificationService _notificationService;
 
-    public GroupBookingService(ApplicationContext context, IPaymentService paymentService)
+    public GroupBookingService(ApplicationContext context, IPaymentService paymentService, INotificationService notificationService)
     {
         _context = context;
         _paymentService = paymentService;
+        _notificationService = notificationService;
     }
 
     public async Task<GroupBookingDto> InitAsync(int organizerUserId, InitGroupBookingRequest dto)
@@ -167,6 +169,22 @@ public class GroupBookingService : IGroupBookingService
         }
 
         await _context.SaveChangesAsync();
+
+        // Notificar a los socios invitados a participar de la reserva grupal.
+        if (dto.Participants != null)
+        {
+            foreach (var invitedUserId in dto.Participants
+                         .Where(p => p.UserId.HasValue && !string.IsNullOrWhiteSpace(p.Name))
+                         .Select(p => p.UserId!.Value)
+                         .Distinct())
+            {
+                await TryNotifyAsync(invitedUserId,
+                    "Invitación a reserva grupal",
+                    $"{organizer.FullName} te invitó a una reserva de {resourceName}.",
+                    NotificationCategory.Booking,
+                    group.Id.ToString());
+            }
+        }
 
         var alias = ResolveAlias(config.BankAlias);
         return BuildDto(group, alias);
@@ -332,6 +350,18 @@ public class GroupBookingService : IGroupBookingService
         return string.IsNullOrWhiteSpace(configured)
             ? ClubConfigDefaults.DefaultBankAlias
             : configured.Trim();
+    }
+
+    private async Task TryNotifyAsync(int? userId, string title, string message, NotificationCategory category, string? referenceId = null)
+    {
+        try
+        {
+            await _notificationService.NotifyAsync(userId, title, message, category, referenceId);
+        }
+        catch
+        {
+            // La notificación es accesoria: no debe impedir la reserva.
+        }
     }
 
     private static GroupBookingDto BuildDto(GroupBooking group, string transferAlias)

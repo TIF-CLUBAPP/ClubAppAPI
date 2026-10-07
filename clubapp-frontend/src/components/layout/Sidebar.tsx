@@ -48,7 +48,10 @@ export default function Sidebar() {
     <aside className="fixed top-0 left-0 z-40 h-screen w-64 overflow-y-auto border-r border-slate-800 bg-slate-900/50 p-6 flex-col justify-between hidden md:flex">
       <div>
         {/* Logo ClubApp */}
-        <div className="flex items-center gap-3 mb-8 px-2">
+        <Link 
+          to="/dashboard"
+          className="flex items-center gap-3 mb-8 px-2 cursor-pointer hover:opacity-90 transition-opacity"
+        >
           <div className="w-9 h-9 rounded-xl bg-linear-to-tr from-emerald-500 to-teal-400 flex items-center justify-center font-black text-slate-950 text-lg shadow-lg shadow-emerald-500/20">
             C
           </div>
@@ -56,7 +59,7 @@ export default function Sidebar() {
             <h1 className="font-extrabold text-white leading-none">ClubApp</h1>
             <span className="text-[10px] text-slate-500 font-semibold tracking-wider uppercase">Gestión Deportiva</span>
           </div>
-        </div>
+        </Link>
 
         {/* Menú de Navegación con Links de React Router */}
         <nav className="space-y-1 text-sm font-medium">

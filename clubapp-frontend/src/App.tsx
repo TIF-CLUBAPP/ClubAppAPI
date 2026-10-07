@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { NotificationProvider } from './context/NotificationContext';
 import ProtectedRoute from './routes/ProtectedRoute';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -33,54 +34,56 @@ import ErrorTestMenu from './pages/ErrorTestMenu';
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* Redirección de la raíz */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <NotificationProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* Redirección de la raíz */}
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-          {/* Rutas Públicas */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+            {/* Rutas Públicas */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/dashboard" element={<Dashboard />} />
 
-          {/* Rutas de Error - Acceso directo para pruebas */}
-          <Route path="/404" element={<NotFound404 />} />
-          <Route path="/403" element={<Forbidden403 />} />
-          <Route path="/401" element={<Unauthorized401 />} />
-          <Route path="/500" element={<ServerError500 />} />
-          <Route path="/503" element={<Maintenance503 />} />
+            {/* Rutas de Error - Acceso directo para pruebas */}
+            <Route path="/404" element={<NotFound404 />} />
+            <Route path="/403" element={<Forbidden403 />} />
+            <Route path="/401" element={<Unauthorized401 />} />
+            <Route path="/500" element={<ServerError500 />} />
+            <Route path="/503" element={<Maintenance503 />} />
 
-          {/* Rutas de resultado de pago (redirección Mercado Pago) */}
-          <Route path="/pago-exitoso" element={<PagoExitoso />} />
-          <Route path="/pago-fallido" element={<PagoFallido />} />
-          <Route path="/pago-pendiente" element={<PagoPendiente />} />
+            {/* Rutas de resultado de pago (redirección Mercado Pago) */}
+            <Route path="/pago-exitoso" element={<PagoExitoso />} />
+            <Route path="/pago-fallido" element={<PagoFallido />} />
+            <Route path="/pago-pendiente" element={<PagoPendiente />} />
 
-          {/* Página de pruebas de errores (solo desarrollo) */}
-          <Route path="/test-errors" element={<ErrorTestMenu />} />
+            {/* Página de pruebas de errores (solo desarrollo) */}
+            <Route path="/test-errors" element={<ErrorTestMenu />} />
 
-          {/* Rutas Protegidas (Requieren Token) */}
-          <Route element={<ProtectedRoute />}>
-            <Route path="/espacios" element={<EspaciosConfig />} />
-            <Route path="/reservas" element={<Reservations />} /> 
-            <Route path="/actividades" element={<InscripcionActividades />} />
-            <Route path="/gestion-actividades" element={<GestionActividades />} />
-            <Route path="/canchas" element={<ReservaCanchas />} />
-            <Route path="/asistencia" element={<PanelAsistencia />} />
-            <Route path="/deudores" element={<Deudores />} />
-            <Route path="/socios" element={<Socios />} />
-            <Route path="/pagos" element={<PagosCuotas />} />
-            <Route path="/mis-cuotas" element={<MisCuotas />} />
-            <Route path="/cuenta" element={<Cuenta />} />
-          </Route>
+            {/* Rutas Protegidas (Requieren Token) */}
+            <Route element={<ProtectedRoute />}>
+              <Route path="/espacios" element={<EspaciosConfig />} />
+              <Route path="/reservas" element={<Reservations />} /> 
+              <Route path="/actividades" element={<InscripcionActividades />} />
+              <Route path="/gestion-actividades" element={<GestionActividades />} />
+              <Route path="/canchas" element={<ReservaCanchas />} />
+              <Route path="/asistencia" element={<PanelAsistencia />} />
+              <Route path="/deudores" element={<Deudores />} />
+              <Route path="/socios" element={<Socios />} />
+              <Route path="/pagos" element={<PagosCuotas />} />
+              <Route path="/mis-cuotas" element={<MisCuotas />} />
+              <Route path="/cuenta" element={<Cuenta />} />
+            </Route>
 
-          {/* 404 - Página no encontrada (comodín) */}
-          <Route path="*" element={<NotFound404 />} />
-        </Routes>
-        {/* Menú de pruebas flotante - controlado por guard clause en el componente */}
-        <ErrorTestMenu />
-      </BrowserRouter>
+            {/* 404 - Página no encontrada (comodín) */}
+            <Route path="*" element={<NotFound404 />} />
+          </Routes>
+          {/* Menú de pruebas flotante - controlado por guard clause en el componente */}
+          <ErrorTestMenu />
+        </BrowserRouter>
+      </NotificationProvider>
     </AuthProvider>
   );
 }

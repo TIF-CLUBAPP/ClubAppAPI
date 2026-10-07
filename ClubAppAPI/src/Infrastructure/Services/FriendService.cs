@@ -10,10 +10,12 @@ namespace ClubApp.Infrastructure.Services;
 public class FriendService : IFriendService
 {
     private readonly ApplicationContext _context;
+    private readonly INotificationService _notificationService;
 
-    public FriendService(ApplicationContext context)
+    public FriendService(ApplicationContext context, INotificationService notificationService)
     {
         _context = context;
+        _notificationService = notificationService;
     }
 
     public async Task<List<FriendDto>> GetFriendsAsync(int userId)
@@ -131,6 +133,10 @@ public class FriendService : IFriendService
         if (target == null)
             throw new NotFoundException("User", targetUserId);
 
+        var requester = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == userId && !u.IsDeleted);
+        var requesterName = requester?.FullName ?? "Un socio";
+
         var existing = await _context.Friendships.FirstOrDefaultAsync(f =>
             (f.RequesterId == userId && f.AddresseeId == targetUserId) ||
             (f.RequesterId == targetUserId && f.AddresseeId == userId));
@@ -156,6 +162,8 @@ public class FriendService : IFriendService
             existing.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
+            await TryNotifyFriendRequestAsync(targetUserId, requesterName, existing.Id);
+
             return BuildRequestDto(existing, "sent", target);
         }
 
@@ -170,6 +178,8 @@ public class FriendService : IFriendService
 
         _context.Friendships.Add(friendship);
         await _context.SaveChangesAsync();
+
+        await TryNotifyFriendRequestAsync(targetUserId, requesterName, friendship.Id);
 
         return BuildRequestDto(friendship, "sent", target);
     }
@@ -240,6 +250,25 @@ public class FriendService : IFriendService
 
         _context.Friendships.Remove(friendship);
         await _context.SaveChangesAsync();
+    }
+
+    // ============ Notificaciones ============
+
+    private async Task TryNotifyFriendRequestAsync(int addresseeId, string requesterName, int friendshipId)
+    {
+        try
+        {
+            await _notificationService.NotifyAsync(
+                addresseeId,
+                "Nueva solicitud de amistad",
+                $"{requesterName} quiere agregarte como amigo.",
+                NotificationCategory.FriendRequest,
+                friendshipId.ToString());
+        }
+        catch
+        {
+            // La notificación es accesoria: no debe impedir el envío de la solicitud.
+        }
     }
 
     // ============ Helpers ============

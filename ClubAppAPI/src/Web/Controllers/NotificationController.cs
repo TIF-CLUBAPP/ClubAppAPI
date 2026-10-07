@@ -72,12 +72,16 @@ public class NotificationsController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = "ADMIN,SUPERADMIN")]
     public async Task<IActionResult> Delete(int id)
     {
-        var deleted = await _notificationService.DeleteNotificationAsync(id);
-        if (!deleted) return NotFound("No se encontró el registro para eliminar.");
-        return Ok(new { message = "Notificación eliminada del sistema." });
+        var notification = await _notificationService.GetByIdAsync(id);
+        if (notification == null) return NotFound("No se encontró el registro para eliminar.");
+
+        if (!IsAdmin() && notification.UserId != GetUserId())
+            return StatusCode(403, "No te pertenece esta notificación.");
+
+        await _notificationService.DeleteNotificationAsync(id);
+        return Ok(new { message = "Notificación eliminada." });
     }
 
     [HttpGet("user/{userId:int}")]
@@ -88,15 +92,38 @@ public class NotificationsController : ControllerBase
     }
 
     [HttpPatch("{id:int}/read")]
-    public async Task<IActionResult> MarkAsRead(int id)
-    {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (!int.TryParse(userIdClaim, out int loggedInUserId)) return Unauthorized();
+    public async Task<IActionResult> MarkAsRead(int id) => await MarkAsReadInternalAsync(id);
 
-        var result = await _notificationService.MarkAsReadAsync(id, loggedInUserId);
+    [HttpPost("{id:int}/read")]
+    public async Task<IActionResult> MarkAsReadPost(int id) => await MarkAsReadInternalAsync(id);
+
+    [HttpPost("read-all")]
+    public async Task<IActionResult> MarkAllAsRead()
+    {
+        await _notificationService.MarkAllAsReadAsync(GetUserId());
+        return Ok(new { message = "Todas las notificaciones fueron marcadas como leídas." });
+    }
+
+    private async Task<IActionResult> MarkAsReadInternalAsync(int id)
+    {
+        var result = await _notificationService.MarkAsReadAsync(id, GetUserId());
         if (result == "NOT_FOUND") return NotFound();
         if (result == "NOT_AUTHORIZED") return StatusCode(403, "No te pertenece esta alerta.");
 
         return Ok(new { message = "Marcada como leída." });
+    }
+
+    private int GetUserId()
+    {
+        var raw = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                  ?? User.FindFirst("sub")?.Value;
+        if (int.TryParse(raw, out var id)) return id;
+        throw new UnauthorizedAccessException("Token inválido.");
+    }
+
+    private bool IsAdmin()
+    {
+        var role = User.FindFirst(ClaimTypes.Role)?.Value;
+        return role == "ADMIN" || role == "SUPERADMIN";
     }
 }

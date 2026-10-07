@@ -12,11 +12,13 @@ public class BookingService : IBookingService
 {
     private readonly ApplicationContext _context;
     private readonly IPaymentService _paymentService;
+    private readonly INotificationService _notificationService;
 
-    public BookingService(ApplicationContext context, IPaymentService paymentService)
+    public BookingService(ApplicationContext context, IPaymentService paymentService, INotificationService notificationService)
     {
         _context = context;
         _paymentService = paymentService;
+        _notificationService = notificationService;
     }
 
     public async Task<List<BookingDto>> GetBookingsByDateAsync(DateTime date)
@@ -166,6 +168,13 @@ public class BookingService : IBookingService
 
         booking.Status = BookingStatus.Confirmed;
         await _context.SaveChangesAsync();
+
+        await TryNotifyAsync(booking.UserId,
+            "Reserva confirmada",
+            $"Tu reserva de {booking.ResourceName} fue confirmada.",
+            NotificationCategory.Booking,
+            booking.Id.ToString());
+
         return true;
     }
 
@@ -199,6 +208,18 @@ public class BookingService : IBookingService
 
         if (conflict)
             throw new AppValidationException("El turno seleccionado está ocupado por una Clase / Actividad del Club.");
+    }
+
+    private async Task TryNotifyAsync(int? userId, string title, string message, NotificationCategory category, string? referenceId = null)
+    {
+        try
+        {
+            await _notificationService.NotifyAsync(userId, title, message, category, referenceId);
+        }
+        catch
+        {
+            // La notificación es accesoria: no debe impedir la confirmación de la reserva.
+        }
     }
 
     private static BookingDto Map(ResourceBooking b)

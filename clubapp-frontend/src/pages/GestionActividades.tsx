@@ -11,6 +11,16 @@ import { spaceService } from '../services/spaceService';
 import type { Activity, ActivityScheduleInput, SaveActivityRequest } from '../types/activity';
 import type { Space } from '../types/space';
 import { SPORT_CATEGORIES } from '../types/space';
+import {
+  WeeklyScheduleSelector,
+  type RowConflict,
+  type RowStatus,
+  type ScheduleRow,
+  type WeeklyScheduleBlock,
+  schedulesToBlocks,
+  blocksToSchedules,
+  maskTimeInput,
+} from '../components/activities/WeeklyScheduleSelector';
 
 const DAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
@@ -38,7 +48,7 @@ const emptyForm = (): SaveActivityRequest => ({
   requiresBooking: false,
   isActive: true,
   schedule: '',
-  schedules: [{ dayOfWeek: 1, startTime: '18:00', endTime: '19:00' }],
+  schedules: [{ dayOfWeek: 1, startTime: '08:00', endTime: '20:00' }],
 });
 
 const Toggle = ({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) => (
@@ -54,20 +64,6 @@ const Toggle = ({ checked, onChange, label }: { checked: boolean; onChange: (v: 
   </div>
 );
 
-interface RowConflict {
-  activityName: string;
-  category: string;
-  sameSport: boolean;
-}
-
-type RowStatus = 'free' | 'blocked' | 'shared';
-
-interface ScheduleRow extends ActivityScheduleInput {
-  status: RowStatus;
-  blockedBy: RowConflict[];
-  sharedWith: RowConflict[];
-}
-
 export default function GestionActividades() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [spaces, setSpaces] = useState<Space[]>([]);
@@ -79,6 +75,10 @@ export default function GestionActividades() {
   const [deleteTarget, setDeleteTarget] = useState<Activity | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [scheduleMode, setScheduleMode] = useState<'detailed' | 'massive'>('detailed');
+  const [massiveBlocks, setMassiveBlocks] = useState<WeeklyScheduleBlock[]>([
+    { id: '1', days: [1, 2, 3, 4, 5], startTime: '08:00', endTime: '20:00' },
+  ]);
 
   const load = async () => {
     try {
@@ -155,11 +155,17 @@ export default function GestionActividades() {
   const openCreate = () => {
     setEditing(null);
     setForm(emptyForm());
+    setScheduleMode('detailed');
+    setMassiveBlocks([{ id: '1', days: [1, 2, 3, 4, 5], startTime: '08:00', endTime: '20:00' }]);
     setModalOpen(true);
   };
 
   const openEdit = (a: Activity) => {
     setEditing(a);
+    const initialSchedules =
+      a.schedules.length > 0
+        ? a.schedules.map((s) => ({ dayOfWeek: s.dayOfWeek, startTime: s.startTime, endTime: s.endTime }))
+        : [{ dayOfWeek: 1, startTime: '08:00', endTime: '20:00' }];
     setForm({
       name: a.name,
       description: a.description,
@@ -171,18 +177,31 @@ export default function GestionActividades() {
       requiresBooking: a.requiresBooking,
       isActive: a.isActive,
       schedule: a.schedule,
-      schedules:
-        a.schedules.length > 0
-          ? a.schedules.map((s) => ({ dayOfWeek: s.dayOfWeek, startTime: s.startTime, endTime: s.endTime }))
-          : [{ dayOfWeek: 1, startTime: '18:00', endTime: '19:00' }],
+      schedules: initialSchedules,
     });
+    setScheduleMode('detailed');
+    setMassiveBlocks(schedulesToBlocks(initialSchedules));
     setModalOpen(true);
+  };
+
+  const handleMassiveBlocksChange = (newBlocks: WeeklyScheduleBlock[]) => {
+    setMassiveBlocks(newBlocks);
+    setForm((f) => ({ ...f, schedules: blocksToSchedules(newBlocks) }));
+  };
+
+  const handleTabSwitch = (mode: 'detailed' | 'massive') => {
+    if (mode === 'massive') {
+      const blocks = schedulesToBlocks(form.schedules);
+      setMassiveBlocks(blocks);
+      setForm((f) => ({ ...f, schedules: blocksToSchedules(blocks) }));
+    }
+    setScheduleMode(mode);
   };
 
   const addScheduleRow = () => {
     setForm((f) => ({
       ...f,
-      schedules: [...f.schedules, { dayOfWeek: 1, startTime: '18:00', endTime: '19:00' }],
+      schedules: [...f.schedules, { dayOfWeek: 1, startTime: '08:00', endTime: '20:00' }],
     }));
   };
 
@@ -456,86 +475,137 @@ export default function GestionActividades() {
                   </div>
                 </div>
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-xs font-bold text-slate-400">Días y horarios</label>
-                    <button
-                      type="button"
-                      onClick={addScheduleRow}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-semibold"
-                    >
-                      <Plus size={13} /> Agregar horario
-                    </button>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-2 border-b border-slate-800">
+                    <label className="block text-xs font-bold text-slate-300">Días y horarios</label>
+                    <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 self-start sm:self-auto">
+                      <button
+                        type="button"
+                        onClick={() => handleTabSwitch('detailed')}
+                        className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                          scheduleMode === 'detailed'
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Día por día
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleTabSwitch('massive')}
+                        className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                          scheduleMode === 'massive'
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Horario semanal / Masivo
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    {scheduleRows.map((row, index) => {
-                      const badge = rowBadge(row.status);
-                      return (
-                        <div key={index} className={`rounded-xl border p-3 ${rowStyle(row.status)}`}>
-                          <div className="flex flex-wrap items-end gap-2">
-                            <div className="flex-1 min-w-30">
-                              <label className="block text-[10px] font-bold text-slate-500 mb-1">Día</label>
-                              <select
-                                value={row.dayOfWeek}
-                                onChange={(e) => updateScheduleRow(index, { dayOfWeek: Number(e.target.value) })}
-                                className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2 text-xs focus:border-emerald-500 outline-none"
-                              >
-                                {DAYS.map((d, i) => (
-                                  <option key={d} value={i}>{d}</option>
-                                ))}
-                              </select>
+                  {scheduleMode === 'massive' ? (
+                    <WeeklyScheduleSelector
+                      blocks={massiveBlocks}
+                      onBlocksChange={handleMassiveBlocksChange}
+                      scheduleRows={scheduleRows}
+                    />
+                  ) : (
+                    <div>
+                      <div className="flex items-center justify-end mb-2">
+                        <button
+                          type="button"
+                          onClick={addScheduleRow}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-semibold border border-slate-700 transition"
+                        >
+                          <Plus size={13} /> Agregar horario
+                        </button>
+                      </div>
+
+                      <div className="space-y-2">
+                        {scheduleRows.map((row, index) => {
+                          const badge = rowBadge(row.status);
+                          return (
+                            <div key={index} className={`rounded-xl border p-3 ${rowStyle(row.status)}`}>
+                              <div className="flex flex-wrap items-end gap-2">
+                                <div className="flex-1 min-w-30">
+                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Día</label>
+                                  <select
+                                    value={row.dayOfWeek}
+                                    onChange={(e) => updateScheduleRow(index, { dayOfWeek: Number(e.target.value) })}
+                                    className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2 text-xs focus:border-emerald-500 outline-none"
+                                  >
+                                    {DAYS.map((d, i) => (
+                                      <option key={d} value={i}>{d}</option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Inicio</label>
+                                  <div className="relative">
+                                    <input
+                                      type="text"
+                                      value={row.startTime}
+                                      onChange={(e) => updateScheduleRow(index, { startTime: maskTimeInput(e.target.value) })}
+                                      placeholder="08:00"
+                                      maxLength={5}
+                                      inputMode="numeric"
+                                      autoComplete="off"
+                                      className="w-28 pl-3 pr-8 py-2 bg-slate-900/80 border border-slate-700 text-slate-100 rounded-lg text-sm text-center focus:border-emerald-500 focus:outline-none"
+                                    />
+                                    <Clock className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Fin</label>
+                                  <div className="relative">
+                                    <input
+                                      type="text"
+                                      value={row.endTime}
+                                      onChange={(e) => updateScheduleRow(index, { endTime: maskTimeInput(e.target.value) })}
+                                      placeholder="20:00"
+                                      maxLength={5}
+                                      inputMode="numeric"
+                                      autoComplete="off"
+                                      className="w-28 pl-3 pr-8 py-2 bg-slate-900/80 border border-slate-700 text-slate-100 rounded-lg text-sm text-center focus:border-emerald-500 focus:outline-none"
+                                    />
+                                    <Clock className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                  </div>
+                                </div>
+
+                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold border ${badge.cls}`}>
+                                  {row.status === 'blocked' ? <AlertCircle size={11} /> : row.status === 'shared' ? <AlertTriangle size={11} /> : <CheckCircle2 size={11} />}
+                                  {badge.label}
+                                </span>
+
+                                <button
+                                  type="button"
+                                  onClick={() => removeScheduleRow(index)}
+                                  className="p-2 bg-slate-800 text-slate-400 rounded-lg hover:bg-red-900/30 hover:text-red-400 border border-slate-700"
+                                  title="Quitar"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+
+                              {row.blockedBy.length > 0 && (
+                                <p className="mt-2 text-[11px] text-red-400 flex items-start gap-1">
+                                  <AlertCircle size={12} className="shrink-0 mt-0.5" />
+                                  <span>
+                                    Bloqueado: colisiona con {row.blockedBy.map((c) => c.activityName).join(', ')}.
+                                    {!selectedSpace?.permitir_superposicion
+                                      ? ' Este espacio no permite superposiciones.'
+                                      : ' Son deportes distintos, incompatibles.'}
+                                  </span>
+                                </p>
+                              )}
                             </div>
-
-                            <div>
-                              <label className="block text-[10px] font-bold text-slate-500 mb-1">Inicio</label>
-                              <input
-                                type="time"
-                                value={row.startTime}
-                                onChange={(e) => updateScheduleRow(index, { startTime: e.target.value })}
-                                className="bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2 text-xs focus:border-emerald-500 outline-none"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-[10px] font-bold text-slate-500 mb-1">Fin</label>
-                              <input
-                                type="time"
-                                value={row.endTime}
-                                onChange={(e) => updateScheduleRow(index, { endTime: e.target.value })}
-                                className="bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2 text-xs focus:border-emerald-500 outline-none"
-                              />
-                            </div>
-
-                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold border ${badge.cls}`}>
-                              {row.status === 'blocked' ? <AlertCircle size={11} /> : row.status === 'shared' ? <AlertTriangle size={11} /> : <CheckCircle2 size={11} />}
-                              {badge.label}
-                            </span>
-
-                            <button
-                              type="button"
-                              onClick={() => removeScheduleRow(index)}
-                              className="p-2 bg-slate-800 text-slate-400 rounded-lg hover:bg-red-900/30 hover:text-red-400 border border-slate-700"
-                              title="Quitar"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          </div>
-
-                          {row.blockedBy.length > 0 && (
-                            <p className="mt-2 text-[11px] text-red-400 flex items-start gap-1">
-                              <AlertCircle size={12} className="shrink-0 mt-0.5" />
-                              <span>
-                                Bloqueado: colisiona con {row.blockedBy.map((c) => c.activityName).join(', ')}.
-                                {!selectedSpace?.permitir_superposicion
-                                  ? ' Este espacio no permite superposiciones.'
-                                  : ' Son deportes distintos, incompatibles.'}
-                              </span>
-                            </p>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                   {sharedWarnings.length > 0 && (
                     <div className="mt-3 flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs">
                       <AlertTriangle size={15} className="shrink-0 mt-0.5" />

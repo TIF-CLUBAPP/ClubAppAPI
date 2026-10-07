@@ -185,6 +185,13 @@ namespace ClubApp.Infrastructure.Data
             modelBuilder.Entity<Friendship>()
                 .HasIndex(f => new { f.RequesterId, f.AddresseeId })
                 .IsUnique();
+
+            // Notificación -> Usuario (opcional; null = aviso global visible para todos).
+            modelBuilder.Entity<Notification>()
+                .HasOne(n => n.User)
+                .WithMany()
+                .HasForeignKey(n => n.UserId)
+                .OnDelete(DeleteBehavior.SetNull);
         }
     }
 }

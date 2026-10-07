@@ -1,8 +1,8 @@
 import { useAuth } from '../../context/AuthContext';
-import { Bell, Sparkles } from 'lucide-react';
 import { useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import FriendSearch from './FriendSearch';
+import NotificationDropdown from './NotificationDropdown';
 
 const greetings = [
   '¡Hola de nuevo! 👋',
@@ -53,20 +53,8 @@ export default function Header() {
 
       <div className="flex items-center gap-3 shrink-0">
         <FriendSearch />
-        {/* Badge del sistema */}
-        <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs text-slate-400">
-          <Sparkles size={14} className="text-emerald-400" />
-          <span>Sistema Conectado</span>
-        </div>
-
-        {/* Botón Notificaciones */}
-        <button 
-          aria-label="Notificaciones"
-          className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-all relative"
-        >
-          <Bell size={18} />
-          <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-        </button>
+        {/* Centro de Notificaciones */}
+        <NotificationDropdown />
       </div>
     </header>
   );
