@@ -8,6 +8,14 @@ export interface GetUsersParams {
   status?: string;
 }
 
+export interface UpdateProfilePayload {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  dni: string;
+}
+
 export const userService = {
   /** Lista de socios con búsqueda/filtros opcionales (solo ADMIN/SUPERADMIN). */
   getUsers: async (params?: GetUsersParams): Promise<UserListItem[]> => {
@@ -18,6 +26,12 @@ export const userService = {
   /** Actualiza el rol de un usuario. `newRole` es el valor numérico del enum backend. */
   updateRole: async (id: number, newRole: number): Promise<{ message: string }> => {
     const response = await api.patch(`/users/${id}/role`, { newRole });
+    return response.data;
+  },
+
+  /** Actualiza los datos personales del usuario logueado (PATCH /api/users/{id}/basic-info). */
+  updateProfile: async (id: string | number, data: UpdateProfilePayload): Promise<{ message: string }> => {
+    const response = await api.patch<{ message: string }>(`/users/${id}/basic-info`, data);
     return response.data;
   },
 

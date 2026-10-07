@@ -159,6 +159,15 @@ public class UserService : IUserService
         user.FirstName = request.FirstName ?? user.FirstName;
         user.LastName = request.LastName ?? user.LastName;
 
+        if (!string.IsNullOrWhiteSpace(request.Email))
+            user.Email = request.Email.Trim();
+
+        if (!string.IsNullOrWhiteSpace(request.Phone))
+            user.Phone = request.Phone.Trim();
+
+        if (!string.IsNullOrWhiteSpace(request.Dni))
+            user.Dni = request.Dni.Trim();
+
         await _userRepository.UpdateAsync(user);
         return true;
     }
