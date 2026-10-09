@@ -601,6 +601,12 @@ namespace ClubApp.Infrastructure.Data
                     Description = "Clases de tenis para adultos, nivel inicial y avanzado.",
                     Category = "Deportes",
                     Price = 8000m,
+                    PriceMember = 8000m,
+                    PriceNonMember = 12000m,
+                    PaymentCollector = PaymentCollectorType.PROFESSOR_DIRECT,
+                    ProfessorFacilityFeeMember = 1500m,
+                    ProfessorFacilityFeeNonMember = 3000m,
+                    ProfessorMercadoPagoPublicKey = "APP_USR-test-public-key",
                     MaxCapacity = 8,
                     TeacherId = teacherDemo.Id,
                     RequiresBooking = false,
@@ -623,7 +629,12 @@ namespace ClubApp.Infrastructure.Data
 
             if (teacherActivity != null)
             {
-                foreach (var email in new[] { "usuario1@clubapp.com", "usuario2@clubapp.com", "usuario3@clubapp.com" })
+                var emails = new[] { 
+                    "usuario1@clubapp.com", "usuario2@clubapp.com", "usuario3@clubapp.com",
+                    "usuario4@clubapp.com", "usuario5@clubapp.com", "usuario6@clubapp.com",
+                    "usuario7@clubapp.com", "usuario8@clubapp.com"
+                };
+                foreach (var email in emails)
                 {
                     var socio = context.Users.FirstOrDefault(u => u.Email == email);
                     if (socio == null) continue;

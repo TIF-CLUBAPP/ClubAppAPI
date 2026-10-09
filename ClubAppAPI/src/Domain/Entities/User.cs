@@ -61,6 +61,9 @@ public class User : BaseEntity
     // Relación con membresías
     public virtual ICollection<Membership> Memberships { get; set; } = new List<Membership>();
 
+    // Relación con las actividades que dicta (profesor a cargo).
+    public virtual ICollection<ActivityInstructor> ActivityInstructors { get; set; } = new List<ActivityInstructor>();
+
     public string FullName => string.IsNullOrWhiteSpace($"{FirstName} {LastName}") 
         ? Email 
         : $"{FirstName} {LastName}".Trim();

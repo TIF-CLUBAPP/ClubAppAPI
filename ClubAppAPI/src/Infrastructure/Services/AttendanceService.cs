@@ -22,9 +22,15 @@ public class AttendanceService : IAttendanceService
 
         var schedules = await _context.ActivitySchedules
             .Include(s => s.Activity)
-            .Where(s => s.DayOfWeek == dayOfWeek && s.Activity.TeacherId == teacherId && s.Activity.IsActive)
-            .OrderBy(s => s.StartTime)
+                .ThenInclude(a => a.Instructors)
+            .Where(s => s.DayOfWeek == dayOfWeek
+                && s.Activity.IsActive
+                && (s.Activity.TeacherId == teacherId
+                    || s.Activity.Instructors.Any(i => i.UserId == teacherId)))
             .ToListAsync();
+
+        // SQLite no soporta ORDER BY sobre columnas TimeSpan; se ordena en memoria.
+        schedules = schedules.OrderBy(s => s.StartTime).ToList();
 
         var result = new List<TeacherClassDto>();
         foreach (var schedule in schedules)
@@ -68,11 +74,13 @@ public class AttendanceService : IAttendanceService
     {
         var schedule = await _context.ActivitySchedules
             .Include(s => s.Activity)
+                .ThenInclude(a => a.Instructors)
             .FirstOrDefaultAsync(s => s.Id == request.ActivityScheduleId);
 
         if (schedule == null) throw new NotFoundException("ActivitySchedule", request.ActivityScheduleId);
 
-        if (schedule.Activity.TeacherId != teacherId)
+        if (schedule.Activity.TeacherId != teacherId
+            && !schedule.Activity.Instructors.Any(i => i.UserId == teacherId))
             throw new NotAllowedException("No tenés permisos para registrar asistencia en esta clase.");
 
         var date = request.Date.Date;

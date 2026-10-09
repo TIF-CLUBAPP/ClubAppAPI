@@ -14,4 +14,6 @@ public class DashboardService : IDashboardService
     }
 
     public Task<DashboardStatsDto> GetStatsAsync() => _dashboardRepository.GetStatsAsync();
+
+    public Task<List<SectorStatusDto>> GetSectorsAsync() => _dashboardRepository.GetSectorsAsync();
 }

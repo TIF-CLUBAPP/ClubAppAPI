@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   AlertCircle,
@@ -548,6 +548,7 @@ function ConfirmModal({
 export default function Socios() {
   const { user: currentUser } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const isStaff = currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPERADMIN';
   const isSuperAdmin = currentUser?.role === 'SUPERADMIN';
 
@@ -555,7 +556,7 @@ export default function Socios() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(searchParams.get('q') ?? '');
   const [roleFilter, setRoleFilter] = useState<'ALL' | UserRole>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'BLOCKED'>('ALL');
 

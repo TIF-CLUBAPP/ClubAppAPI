@@ -3,14 +3,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Edit2, Trash2, X, Save, Clock, MapPin,
   CheckCircle2, AlertCircle, AlertTriangle, Dumbbell, RefreshCw, Users,
+  GraduationCap, UserPlus, ChevronDown,
 } from 'lucide-react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
+import { useAuth } from '../context/AuthContext';
 import { activityService } from '../services/activityService';
 import { spaceService } from '../services/spaceService';
+import { userService } from '../services/userService';
 import type { Activity, ActivityScheduleInput, SaveActivityRequest } from '../types/activity';
 import type { Space } from '../types/space';
 import { SPORT_CATEGORIES } from '../types/space';
+import type { UserListItem } from '../types/user';
 import {
   WeeklyScheduleSelector,
   type RowConflict,
@@ -44,6 +48,7 @@ const emptyForm = (): SaveActivityRequest => ({
   price: 0,
   maxCapacity: 10,
   teacherId: null,
+  instructorIds: [],
   spaceId: null,
   requiresBooking: false,
   isActive: true,
@@ -65,8 +70,13 @@ const Toggle = ({ checked, onChange, label }: { checked: boolean; onChange: (v: 
 );
 
 export default function GestionActividades() {
+  const { user: currentUser } = useAuth();
+  const isStaff = currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPERADMIN';
+
   const [activities, setActivities] = useState<Activity[]>([]);
   const [spaces, setSpaces] = useState<Space[]>([]);
+  const [professors, setProfessors] = useState<UserListItem[]>([]);
+  const [instructorsOpen, setInstructorsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Activity | null>(null);
@@ -93,7 +103,30 @@ export default function GestionActividades() {
     }
   };
 
+  const loadProfessors = async () => {
+    try {
+      const [teachers, admins, superAdmins] = await Promise.all([
+        userService.getUsers({ role: 'TEACHER' }),
+        userService.getUsers({ role: 'ADMIN' }),
+        userService.getUsers({ role: 'SUPERADMIN' }),
+      ]);
+      const unique = Array.from(
+        new Map([...teachers, ...admins, ...superAdmins].map((u) => [u.id, u])).values(),
+      );
+      setProfessors(unique);
+    } catch {
+      // Si un TEACHER abre la página no puede listar /users; no debe bloquear la carga.
+      setProfessors([]);
+    }
+  };
+
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    if (!isStaff) return;
+    loadProfessors();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isStaff]);
 
   useEffect(() => {
     if (!toast) return;
@@ -173,6 +206,7 @@ export default function GestionActividades() {
       price: a.price,
       maxCapacity: a.maxCapacity,
       teacherId: a.teacherId ?? null,
+      instructorIds: (a.instructors ?? []).map((i) => i.id),
       spaceId: a.spaceId ?? null,
       requiresBooking: a.requiresBooking,
       isActive: a.isActive,
@@ -182,6 +216,43 @@ export default function GestionActividades() {
     setScheduleMode('detailed');
     setMassiveBlocks(schedulesToBlocks(initialSchedules));
     setModalOpen(true);
+  };
+
+  const instructorLabel = (id: number): string => {
+    const p = professors.find((x) => x.id === id);
+    if (p) return p.fullName;
+    const e = editing?.instructors?.find((x) => x.id === id);
+    if (e) return e.fullName;
+    if (currentUser && Number(currentUser.id) === id) {
+      return `${currentUser.firstName ?? ''} ${currentUser.lastName ?? ''}`.trim() || currentUser.email || `#${id}`;
+    }
+    return `#${id}`;
+  };
+
+  const handleAssignMe = () => {
+    const myId = currentUser?.id ? Number(currentUser.id) : null;
+    if (!myId || Number.isNaN(myId)) {
+      setToast({ type: 'error', message: 'No se pudo identificar tu usuario para asignarte.' });
+      return;
+    }
+    setForm((f) => ({
+      ...f,
+      instructorIds: (f.instructorIds ?? []).includes(myId)
+        ? f.instructorIds
+        : [...(f.instructorIds ?? []), myId],
+    }));
+  };
+
+  const toggleInstructor = (id: number) => {
+    setForm((f) => {
+      const current = f.instructorIds ?? [];
+      const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
+      return { ...f, instructorIds: next };
+    });
+  };
+
+  const removeInstructor = (id: number) => {
+    setForm((f) => ({ ...f, instructorIds: (f.instructorIds ?? []).filter((x) => x !== id) }));
   };
 
   const handleMassiveBlocksChange = (newBlocks: WeeklyScheduleBlock[]) => {
@@ -359,6 +430,23 @@ export default function GestionActividades() {
                       )}
                     </div>
 
+                    {(a.instructors ?? []).length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                          <GraduationCap size={11} /> Profesores:
+                        </span>
+                        {(a.instructors ?? []).map((i) => (
+                          <span
+                            key={i.id}
+                            className="inline-flex items-center gap-1 text-[10px] font-semibold text-sky-300 bg-sky-500/10 border border-sky-500/20 rounded-lg px-2 py-0.5"
+                          >
+                            <GraduationCap size={11} />
+                            {i.fullName}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
                     <div className="flex items-center justify-between text-xs text-slate-400">
                       <span className="flex items-center gap-1">
                         <Users size={12} className="text-violet-400" /> Cupo: {a.maxCapacity}
@@ -474,6 +562,82 @@ export default function GestionActividades() {
                     />
                   </div>
                 </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-slate-400">Profesores a cargo</label>
+                    <button
+                      type="button"
+                      onClick={handleAssignMe}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-300 text-[11px] font-semibold hover:bg-sky-500/20 transition"
+                    >
+                      <UserPlus size={12} /> Asignarme a mí
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {(form.instructorIds ?? []).length === 0 ? (
+                      <span className="text-[11px] text-slate-500">Sin profesores asignados.</span>
+                    ) : (
+                      (form.instructorIds ?? []).map((id) => (
+                        <span
+                          key={id}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-200 text-[11px] font-semibold"
+                        >
+                          <GraduationCap size={12} />
+                          {instructorLabel(id)}
+                          <button
+                            type="button"
+                            onClick={() => removeInstructor(id)}
+                            className="text-sky-400 hover:text-white ml-0.5"
+                            title="Quitar"
+                          >
+                            <X size={12} />
+                          </button>
+                        </span>
+                      ))
+                    )}
+                  </div>
+
+                  {isStaff && (
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setInstructorsOpen((v) => !v)}
+                        className="w-full flex items-center justify-between gap-2 bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                      >
+                        <span className="text-slate-400">Seleccionar profesores…</span>
+                        <ChevronDown size={16} className={`transition-transform ${instructorsOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      {instructorsOpen && (
+                        <div className="absolute z-10 mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg shadow-2xl max-h-48 overflow-y-auto scrollbar-thin">
+                          {professors.length === 0 ? (
+                            <p className="px-3 py-2 text-xs text-slate-500">No hay profesores disponibles.</p>
+                          ) : (
+                            professors.map((p) => {
+                              const checked = (form.instructorIds ?? []).includes(p.id);
+                              return (
+                                <label
+                                  key={p.id}
+                                  className="flex items-center gap-2 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700/60 cursor-pointer"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => toggleInstructor(p.id)}
+                                    className="accent-emerald-500"
+                                  />
+                                  <span className="flex-1 truncate">{p.fullName}</span>
+                                  <span className="text-[10px] text-slate-500">{p.email}</span>
+                                </label>
+                              );
+                            })
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 <div>
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-2 border-b border-slate-800">
                     <label className="block text-xs font-bold text-slate-300">Días y horarios</label>

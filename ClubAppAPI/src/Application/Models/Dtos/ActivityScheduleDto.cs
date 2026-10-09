@@ -33,8 +33,19 @@ public class SaveActivityRequest
     public string Description { get; set; } = string.Empty;
     public string Category { get; set; } = string.Empty;
     public decimal Price { get; set; }
+    public decimal PriceMember { get; set; }
+    public decimal PriceNonMember { get; set; }
+    public string PaymentCollector { get; set; } = "CLUB";
+    public decimal ProfessorFacilityFeeMember { get; set; }
+    public decimal ProfessorFacilityFeeNonMember { get; set; }
+    public string? ProfessorMercadoPagoPublicKey { get; set; }
+    public string? ProfessorMercadoPagoAccessToken { get; set; }
     public int MaxCapacity { get; set; }
     public int? TeacherId { get; set; }
+
+    /// <summary>IDs de los profesores/administradores a cargo de la actividad.</summary>
+    public List<int> InstructorIds { get; set; } = new();
+
     public int? SpaceId { get; set; }
     public bool RequiresBooking { get; set; }
     public bool IsActive { get; set; } = true;

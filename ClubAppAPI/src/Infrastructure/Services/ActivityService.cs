@@ -23,6 +23,8 @@ public class ActivityService : IActivityService
             .Include(a => a.Teacher)
             .Include(a => a.Space)
             .Include(a => a.Schedules)
+            .Include(a => a.Instructors)
+                .ThenInclude(i => i.User)
             .ToListAsync();
 
         var result = new List<ActivityDto>();
@@ -39,6 +41,8 @@ public class ActivityService : IActivityService
             .Include(a => a.Teacher)
             .Include(a => a.Space)
             .Include(a => a.Schedules)
+            .Include(a => a.Instructors)
+                .ThenInclude(i => i.User)
             .FirstOrDefaultAsync(a => a.Id == activityId);
 
         if (activity == null) return null;
@@ -49,11 +53,16 @@ public class ActivityService : IActivityService
     {
         Validate(dto);
 
-        // Un profesor solo puede crear actividades a su cargo.
-        int? teacherId = actorRole == UserRole.TEACHER ? actorId : dto.TeacherId;
-
+        var instructorIds = ResolveInstructorIds(dto, actorId, actorRole);
+        await EnsureInstructorsExistAsync(instructorIds);
         await EnsureSpaceExistsAsync(dto.SpaceId);
         await ValidateScheduleOverlapsAsync(dto, null);
+
+        // Un profesor solo puede crear actividades a su cargo; para el resto,
+        // el "profesor primario" es el TeacherId explícito o el primer instructor.
+        int? teacherId = actorRole == UserRole.TEACHER
+            ? actorId
+            : dto.TeacherId ?? (instructorIds.Count > 0 ? instructorIds[0] : (int?)null);
 
         var activity = new Activity
         {
@@ -61,12 +70,20 @@ public class ActivityService : IActivityService
             Description = dto.Description?.Trim() ?? string.Empty,
             Category = dto.Category?.Trim() ?? string.Empty,
             Price = dto.Price,
+            PriceMember = dto.PriceMember,
+            PriceNonMember = dto.PriceNonMember,
+            PaymentCollector = Enum.TryParse<PaymentCollectorType>(dto.PaymentCollector, true, out var pc) ? pc : PaymentCollectorType.CLUB,
+            ProfessorFacilityFeeMember = dto.ProfessorFacilityFeeMember,
+            ProfessorFacilityFeeNonMember = dto.ProfessorFacilityFeeNonMember,
+            ProfessorMercadoPagoPublicKey = dto.ProfessorMercadoPagoPublicKey,
+            ProfessorMercadoPagoAccessToken = dto.ProfessorMercadoPagoAccessToken,
             MaxCapacity = dto.MaxCapacity,
             TeacherId = teacherId,
             SpaceId = dto.SpaceId,
             RequiresBooking = dto.RequiresBooking,
             Schedule = dto.Schedule?.Trim() ?? string.Empty,
             IsActive = dto.IsActive,
+            Instructors = instructorIds.Select(id => new ActivityInstructor { UserId = id }).ToList(),
             Schedules = BuildSchedules(dto.Schedules)
         };
 
@@ -80,6 +97,7 @@ public class ActivityService : IActivityService
     {
         var existing = await _context.Activities
             .Include(a => a.Schedules)
+            .Include(a => a.Instructors)
             .FirstOrDefaultAsync(a => a.Id == activityId);
 
         if (existing == null) throw new NotFoundException("Activity", activityId);
@@ -93,6 +111,19 @@ public class ActivityService : IActivityService
         existing.Description = dto.Description?.Trim() ?? string.Empty;
         existing.Category = dto.Category?.Trim() ?? string.Empty;
         existing.Price = dto.Price;
+        existing.PriceMember = dto.PriceMember;
+        existing.PriceNonMember = dto.PriceNonMember;
+        existing.PaymentCollector = Enum.TryParse<PaymentCollectorType>(dto.PaymentCollector, true, out var pc) ? pc : PaymentCollectorType.CLUB;
+        existing.ProfessorFacilityFeeMember = dto.ProfessorFacilityFeeMember;
+        existing.ProfessorFacilityFeeNonMember = dto.ProfessorFacilityFeeNonMember;
+        existing.ProfessorMercadoPagoPublicKey = dto.ProfessorMercadoPagoPublicKey;
+        
+        // Solo actualizamos el token si se proporciona uno nuevo (para no pisar con vacío en un edit normal si el front no lo manda)
+        if (!string.IsNullOrWhiteSpace(dto.ProfessorMercadoPagoAccessToken))
+        {
+            existing.ProfessorMercadoPagoAccessToken = dto.ProfessorMercadoPagoAccessToken;
+        }
+
         existing.MaxCapacity = dto.MaxCapacity;
         existing.RequiresBooking = dto.RequiresBooking;
         existing.Schedule = dto.Schedule?.Trim() ?? string.Empty;
@@ -102,6 +133,14 @@ public class ActivityService : IActivityService
         if (actorRole != UserRole.TEACHER)
         {
             existing.TeacherId = dto.TeacherId;
+
+            var instructorIds = ResolveInstructorIds(dto, actorId, actorRole);
+            await EnsureInstructorsExistAsync(instructorIds);
+
+            if (existing.TeacherId == null && instructorIds.Count > 0)
+                existing.TeacherId = instructorIds[0];
+
+            ReplaceInstructors(existing, instructorIds);
         }
 
         _context.ActivitySchedules.RemoveRange(existing.Schedules);
@@ -120,6 +159,7 @@ public class ActivityService : IActivityService
     {
         var existing = await _context.Activities
             .Include(a => a.Schedules)
+            .Include(a => a.Instructors)
             .FirstOrDefaultAsync(a => a.Id == activityId);
 
         if (existing == null) throw new NotFoundException("Activity", activityId);
@@ -158,10 +198,49 @@ public class ActivityService : IActivityService
         return true;
     }
 
+    public async Task<ActivityDto?> AssignInstructorAsync(int activityId, int userId)
+    {
+        var activity = await _context.Activities
+            .Include(a => a.Teacher)
+            .Include(a => a.Space)
+            .Include(a => a.Schedules)
+            .Include(a => a.Instructors)
+            .FirstOrDefaultAsync(a => a.Id == activityId);
+
+        if (activity == null) return null;
+
+        var userExists = await _context.Users.AnyAsync(u => u.Id == userId && !u.IsDeleted);
+        if (!userExists)
+            throw new AppValidationException("El usuario a asignar no existe.");
+
+        if (activity.Instructors.All(i => i.UserId != userId))
+        {
+            activity.Instructors.Add(new ActivityInstructor
+            {
+                ActivityId = activity.Id,
+                UserId = userId
+            });
+
+            // Backward compat: si no había un profesor primario, este lo pasa a ser.
+            activity.TeacherId ??= userId;
+
+            await _context.SaveChangesAsync();
+        }
+
+        return await MapAsync(activity);
+    }
+
     private async Task<ActivityDto> MapAsync(Activity activity)
     {
         var enrolledCount = await _context.Enrollments
             .CountAsync(e => e.ActivityId == activity.Id && e.Status == EnrollmentStatus.ACTIVE);
+
+        var instructorIds = activity.Instructors.Select(i => i.UserId).Distinct().ToList();
+        var instructorUsers = instructorIds.Count == 0
+            ? new List<User>()
+            : await _context.Users
+                .Where(u => instructorIds.Contains(u.Id))
+                .ToListAsync();
 
         return new ActivityDto
         {
@@ -170,9 +249,24 @@ public class ActivityService : IActivityService
             Description = activity.Description,
             Category = activity.Category,
             Price = activity.Price,
+            PriceMember = activity.PriceMember,
+            PriceNonMember = activity.PriceNonMember,
+            PaymentCollector = activity.PaymentCollector.ToString(),
+            ProfessorFacilityFeeMember = activity.ProfessorFacilityFeeMember,
+            ProfessorFacilityFeeNonMember = activity.ProfessorFacilityFeeNonMember,
+            ProfessorMercadoPagoPublicKey = activity.ProfessorMercadoPagoPublicKey,
             MaxCapacity = activity.MaxCapacity,
             TeacherId = activity.TeacherId,
             TeacherName = activity.Teacher?.FullName,
+            Instructors = instructorUsers
+                .OrderBy(u => u.FullName)
+                .Select(u => new InstructorDto
+                {
+                    Id = u.Id,
+                    FullName = u.FullName,
+                    Email = u.Email
+                })
+                .ToList(),
             SpaceId = activity.SpaceId,
             SpaceName = activity.Space?.Name,
             RequiresBooking = activity.RequiresBooking,
@@ -274,10 +368,54 @@ public class ActivityService : IActivityService
         if (actorRole == UserRole.ADMIN || actorRole == UserRole.SUPERADMIN)
             return;
 
-        if (actorRole == UserRole.TEACHER && activity.TeacherId == actorId)
+        if (actorRole == UserRole.TEACHER
+            && (activity.TeacherId == actorId
+                || activity.Instructors.Any(i => i.UserId == actorId)))
             return;
 
         throw new NotAllowedException("No tenés permisos para gestionar esta actividad.");
+    }
+
+    private static List<int> ResolveInstructorIds(SaveActivityRequest dto, int actorId, UserRole actorRole)
+    {
+        var ids = (dto.InstructorIds ?? new List<int>())
+            .Where(id => id > 0)
+            .Distinct()
+            .ToList();
+
+        // Un profesor siempre queda a cargo de las actividades que crea.
+        if (actorRole == UserRole.TEACHER && !ids.Contains(actorId))
+            ids.Insert(0, actorId);
+
+        return ids;
+    }
+
+    private static void ReplaceInstructors(Activity activity, List<int> instructorIds)
+    {
+        activity.Instructors.Clear();
+        foreach (var id in instructorIds)
+        {
+            activity.Instructors.Add(new ActivityInstructor
+            {
+                ActivityId = activity.Id,
+                UserId = id
+            });
+        }
+    }
+
+    private async Task EnsureInstructorsExistAsync(List<int> instructorIds)
+    {
+        if (instructorIds.Count == 0)
+            return;
+
+        var existingIds = await _context.Users
+            .Where(u => instructorIds.Contains(u.Id) && !u.IsDeleted)
+            .Select(u => u.Id)
+            .ToListAsync();
+
+        var missing = instructorIds.Where(id => !existingIds.Contains(id)).ToList();
+        if (missing.Count > 0)
+            throw new AppValidationException($"Los profesores asignados no existen: {string.Join(", ", missing)}.");
     }
 
     private static List<ActivitySchedule> BuildSchedules(List<ActivityScheduleInputDto> inputs)
@@ -287,6 +425,7 @@ public class ActivityService : IActivityService
         {
             if (item.DayOfWeek < 0 || item.DayOfWeek > 6)
                 throw new AppValidationException("El día de la semana debe estar entre 0 (Domingo) y 6 (Sábado).");
+
 
             var start = ParseTime(item.StartTime, "inicio");
             var end = ParseTime(item.EndTime, "fin");
@@ -313,5 +452,42 @@ public class ActivityService : IActivityService
             return time;
 
         throw new AppValidationException($"La hora de {field} no es válida. Usá el formato HH:mm.");
+    }
+
+    public async Task<ActivitySettlementDto> GetActivitySettlementAsync(int activityId)
+    {
+        var activity = await _context.Activities
+            .FirstOrDefaultAsync(a => a.Id == activityId);
+
+        if (activity == null) throw new NotFoundException("Activity", activityId);
+
+        var activeEnrollments = await _context.Enrollments
+            .Where(e => e.ActivityId == activityId && e.Status == EnrollmentStatus.ACTIVE)
+            .Select(e => e.UserId)
+            .ToListAsync();
+
+        var usersWithActiveMembership = await _context.Memberships
+            .Where(m => m.Status == MembershipStatus.ACTIVE && activeEnrollments.Contains(m.UserId))
+            .Select(m => m.UserId)
+            .Distinct()
+            .ToListAsync();
+
+        int memberCount = usersWithActiveMembership.Count;
+        int nonMemberCount = activeEnrollments.Count - memberCount;
+
+        decimal totalSettlement = (memberCount * activity.ProfessorFacilityFeeMember) +
+                                 (nonMemberCount * activity.ProfessorFacilityFeeNonMember);
+
+        return new ActivitySettlementDto
+        {
+            ActivityId = activity.Id,
+            ActivityName = activity.Name,
+            TotalEnrollments = activeEnrollments.Count,
+            MemberEnrollments = memberCount,
+            NonMemberEnrollments = nonMemberCount,
+            MemberFee = activity.ProfessorFacilityFeeMember,
+            NonMemberFee = activity.ProfessorFacilityFeeNonMember,
+            TotalSettlement = totalSettlement
+        };
     }
 }

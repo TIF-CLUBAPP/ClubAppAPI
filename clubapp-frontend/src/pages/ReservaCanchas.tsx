@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Calendar, MapPin, RefreshCw, CheckCircle2, AlertCircle, Sparkles, GraduationCap, Layers, ChevronLeft, ChevronRight, ChevronDown, Check, X, ArrowRight } from 'lucide-react';
 import Sidebar from '../components/layout/Sidebar';
@@ -178,6 +179,8 @@ function CalendarPicker({ value, min, onChange }: CalendarPickerProps) {
 
 export default function ReservaCanchas() {
   const today = useMemo(() => new Date(), []);
+  const location = useLocation();
+  const appliedPreSelection = useRef(false);
   const [selectedDate, setSelectedDate] = useState<string>(toDateInput(today));
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedSpaceId, setSelectedSpaceId] = useState<number | null>(null);
@@ -248,6 +251,21 @@ export default function ReservaCanchas() {
     () => Array.from(new Set(activeSpaces.map((s) => s.sportCategory))).sort((a, b) => a.localeCompare(b)),
     [activeSpaces],
   );
+
+  // Aplica la pre-selección recibida desde el Dashboard (navegación con estado).
+  useEffect(() => {
+    if (appliedPreSelection.current || spaces.length === 0) return;
+    appliedPreSelection.current = true;
+
+    const state = location.state as { spaceId?: number; sportCategory?: string } | null;
+    if (!state) return;
+
+    if (state.sportCategory) setSelectedCategory(state.sportCategory);
+    if (state.spaceId != null && spaces.some((s) => s.id === state.spaceId)) {
+      setSelectedSpaceId(state.spaceId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spaces, location.state]);
 
   const filteredSpaces = useMemo(
     () => (selectedCategory === '' ? [] : activeSpaces.filter((s) => s.sportCategory === selectedCategory)),

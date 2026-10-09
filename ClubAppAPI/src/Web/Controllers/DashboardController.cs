@@ -28,4 +28,17 @@ public class DashboardController : ControllerBase
         var stats = await _dashboardService.GetStatsAsync();
         return Ok(stats);
     }
+
+    /// <summary>
+    /// Estado en tiempo real de los espacios físicos del club (widget "Sectores del Club").
+    /// Devuelve por cada espacio su estado actual, ocupación y próximo turno.
+    /// </summary>
+    [HttpGet("sectors")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetSectors()
+    {
+        var sectors = await _dashboardService.GetSectorsAsync();
+        return Ok(sectors);
+    }
 }

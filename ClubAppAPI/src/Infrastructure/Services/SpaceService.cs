@@ -103,8 +103,10 @@ public class SpaceService : ISpaceService
             .Where(s => s.Activity.SpaceId == spaceId
                         && s.Activity.IsActive
                         && s.DayOfWeek == dayOfWeek)
-            .OrderBy(s => s.StartTime)
             .ToListAsync();
+
+        // SQLite no soporta ORDER BY sobre columnas TimeSpan; se ordena en memoria.
+        schedules = schedules.OrderBy(s => s.StartTime).ToList();
 
         return schedules.Select(s => new BlockedSlotDto
         {

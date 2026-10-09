@@ -64,6 +64,19 @@ public class ActivitiesController : ControllerBase
         return Ok(new { message = "Actividad modificada con éxito" });
     }
 
+    /// <summary>Permite que el usuario autenticado (Profesor/Admin) se auto-asigne a una actividad.</summary>
+    [HttpPost("{activityId:int}/assign-me")]
+    [Authorize(Roles = "TEACHER,ADMIN,SUPERADMIN")]
+    public async Task<IActionResult> AssignMe(int activityId)
+    {
+        var (actorId, _) = GetActorIdentity();
+        var updated = await _activityService.AssignInstructorAsync(activityId, actorId);
+
+        if (updated == null) return NotFound(new { message = $"No se encontró la actividad con ID {activityId}" });
+
+        return Ok(updated);
+    }
+
     [HttpDelete("{activityId:int}")]
     [Authorize(Roles = "ADMIN,SUPERADMIN,TEACHER")]
     public async Task<IActionResult> Delete(int activityId)
@@ -75,6 +88,28 @@ public class ActivitiesController : ControllerBase
 
         return Ok(new { message = $"Actividad {activityId} eliminada" });
     }
+
+    [HttpGet("{activityId:int}/settlement")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN,TEACHER")]
+    public async Task<IActionResult> GetSettlement(int activityId)
+    {
+        var (actorId, actorRole) = GetActorIdentity();
+        
+        // Si es profesor, verificar que sea el encargado de la actividad antes de mostrar liquidación
+        if (actorRole == UserRole.TEACHER)
+        {
+            var activity = await _activityService.GetActivityByIdAsync(activityId);
+            if (activity == null) return NotFound();
+            if (activity.TeacherId != actorId && activity.Instructors.All(i => i.Id != actorId))
+            {
+                return Forbid();
+            }
+        }
+
+        var settlement = await _activityService.GetActivitySettlementAsync(activityId);
+        return Ok(settlement);
+    }
+
 
     private (int Id, UserRole Role) GetActorIdentity()
     {

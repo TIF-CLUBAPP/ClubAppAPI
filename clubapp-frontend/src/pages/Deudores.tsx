@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   AlertCircle,
@@ -351,6 +351,7 @@ function DebtorCard({
 export default function Deudores() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const isStaff = user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
 
   const [debtors, setDebtors] = useState<CuotaVencida[]>([]);
@@ -358,7 +359,7 @@ export default function Deudores() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(searchParams.get('q') ?? '');
   const [sort, setSort] = useState<SortKey>('deuda-desc');
 
   const [paymentTarget, setPaymentTarget] = useState<CuotaVencida | null>(null);

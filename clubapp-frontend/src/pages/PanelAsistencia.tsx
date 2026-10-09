@@ -27,16 +27,26 @@ export default function PanelAsistencia() {
     setLoading(true);
     try {
       const data = await attendanceService.getClasses(date);
-      setClasses(data);
-      if (data.length > 0) {
-        setSelectedId(data[0].activityScheduleId);
-        setAttendance(Object.fromEntries(data[0].students.map((s) => [s.userId, s.present])));
+      const list = Array.isArray(data) ? data : [];
+      setClasses(list);
+      if (list.length > 0) {
+        setSelectedId(list[0].activityScheduleId);
+        setAttendance(Object.fromEntries(list[0].students.map((s) => [s.userId, s.present])));
       } else {
         setSelectedId(null);
         setAttendance({});
       }
     } catch (err: any) {
-      setToast({ type: 'error', text: err?.response?.data?.detail ?? 'No se pudieron cargar las clases.' });
+      // Una respuesta vacía (404/204) o "sin clases para la fecha" NO es un error real:
+      // se muestra únicamente el contenedor "No tenés clases programadas".
+      const status = err?.response?.status;
+      if (status === 404 || status === 204) {
+        setClasses([]);
+        setSelectedId(null);
+        setAttendance({});
+      } else {
+        setToast({ type: 'error', text: err?.response?.data?.detail ?? 'No se pudieron cargar las clases.' });
+      }
     } finally {
       setLoading(false);
     }

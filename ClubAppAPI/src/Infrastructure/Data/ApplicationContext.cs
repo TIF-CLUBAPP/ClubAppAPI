@@ -10,6 +10,7 @@ namespace ClubApp.Infrastructure.Data
         }
 
         public DbSet<Activity> Activities { get; set; }
+        public DbSet<ActivityInstructor> ActivityInstructors { get; set; }
         public DbSet<User> Users { get; set; }
         public DbSet<Enrollment> Enrollments { get; set; }
         public DbSet<Membership> Memberships { get; set; }
@@ -73,6 +74,22 @@ namespace ClubApp.Infrastructure.Data
                 .WithMany()
                 .HasForeignKey(a => a.TeacherId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // Actividad <-> Usuario (profesores a cargo). Muchos-a-muchos con clave compuesta.
+            modelBuilder.Entity<ActivityInstructor>()
+                .HasKey(ai => new { ai.ActivityId, ai.UserId });
+
+            modelBuilder.Entity<ActivityInstructor>()
+                .HasOne(ai => ai.Activity)
+                .WithMany(a => a.Instructors)
+                .HasForeignKey(ai => ai.ActivityId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ActivityInstructor>()
+                .HasOne(ai => ai.User)
+                .WithMany(u => u.ActivityInstructors)
+                .HasForeignKey(ai => ai.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             // Horarios de actividad (se eliminan en cascada con la actividad).
             modelBuilder.Entity<ActivitySchedule>()

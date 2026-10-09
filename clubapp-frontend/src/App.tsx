@@ -10,6 +10,7 @@ import Dashboard from './pages/Dashboard';
 import Reservations from './pages/Reservations'; 
 import Deudores from './pages/Deudores';
 import Socios from './pages/Socios';
+import SocioFicha from './pages/SocioFicha';
 import InscripcionActividades from './pages/InscripcionActividades';
 import GestionActividades from './pages/GestionActividades';
 import ReservaCanchas from './pages/ReservaCanchas';
@@ -72,6 +73,7 @@ export default function App() {
               <Route path="/asistencia" element={<PanelAsistencia />} />
               <Route path="/deudores" element={<Deudores />} />
               <Route path="/socios" element={<Socios />} />
+              <Route path="/socios/:id" element={<SocioFicha />} />
               <Route path="/pagos" element={<PagosCuotas />} />
               <Route path="/mis-cuotas" element={<MisCuotas />} />
               <Route path="/cuenta" element={<Cuenta />} />

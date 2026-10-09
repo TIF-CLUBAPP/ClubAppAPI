@@ -11,4 +11,7 @@ public interface IActivityService
     Task<bool> UpdateActivityAsync(int activityId, SaveActivityRequest dto, int actorId, UserRole actorRole);
     Task<bool> DeleteActivityAsync(int activityId, int actorId, UserRole actorRole);
     Task<bool> EnrollMemberAsync(int userId, int activityId);
+    Task<ActivityDto?> AssignInstructorAsync(int activityId, int userId);
+    Task<ActivitySettlementDto> GetActivitySettlementAsync(int activityId);
+
 }

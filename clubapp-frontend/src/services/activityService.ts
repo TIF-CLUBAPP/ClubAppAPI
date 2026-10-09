@@ -1,5 +1,5 @@
 import { api } from './api';
-import type { Activity, SaveActivityRequest } from '../types/activity';
+import type { Activity, SaveActivityRequest, ActivitySettlement } from '../types/activity';
 
 export const activityService = {
   /** Catálogo de actividades (GET /api/activities). */
@@ -31,4 +31,17 @@ export const activityService = {
     const response = await api.delete<{ message: string }>(`/activities/${id}`);
     return response.data;
   },
+
+  /** Auto-asigna al usuario autenticado como profesor a cargo (POST /api/activities/{id}/assign-me). */
+  assignMe: async (activityId: number): Promise<Activity> => {
+    const response = await api.post<Activity>(`/activities/${activityId}/assign-me`);
+    return response.data;
+  },
+
+  /** Obtiene la liquidación de una actividad (GET /api/activities/{id}/settlement). */
+  getSettlement: async (activityId: number): Promise<ActivitySettlement> => {
+    const response = await api.get<ActivitySettlement>(`/activities/${activityId}/settlement`);
+    return response.data;
+  },
+
 };

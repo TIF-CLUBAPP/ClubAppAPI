@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import ClubMapWidget from '../ClubMapWidget';
 import { useNavigate } from 'react-router-dom';
-import { Users, DollarSign, AlertCircle, ArrowRight, UserPlus, Search, RefreshCw } from 'lucide-react';
+import { Users, DollarSign, AlertCircle, ArrowRight, UserPlus, RefreshCw, Wallet, ClipboardCheck, X } from 'lucide-react';
 import { useDashboardStats } from '../../../hooks/useDashboardStats';
 import type { DashboardStats } from '../../../types/dashboard';
+import MemberQuickSearch from '../MemberQuickSearch';
 
 // Formato de números locales (ej: 1.240)
 const formatNumber = (value: number) => value.toLocaleString('es-AR');
@@ -171,8 +173,38 @@ function OverdueFeesCard({ stats }: { stats: DashboardStats | null }) {
   );
 }
 
+function QuickActionButton({
+  icon,
+  title,
+  description,
+  onClick,
+  wide = false,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  onClick: () => void;
+  wide?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`${wide ? 'col-span-2' : ''} group flex flex-col items-start gap-1.5 rounded-2xl border border-slate-800 bg-slate-950/60 p-4 text-left transition-all hover:border-emerald-500/40 hover:bg-slate-900`}
+    >
+      <span className="inline-flex items-center justify-center p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+        {icon}
+      </span>
+      <span className="text-sm font-bold text-white">{title}</span>
+      <span className="text-[11px] leading-tight text-slate-400">{description}</span>
+    </button>
+  );
+}
+
 export default function SuperAdminDashboard() {
   const { stats, loading, refreshing, error, lastUpdated, refresh } = useDashboardStats();
+  const navigate = useNavigate();
+  const [showNewSocioModal, setShowNewSocioModal] = useState(false);
 
   return (
     <div className="space-y-6">
@@ -255,14 +287,30 @@ export default function SuperAdminDashboard() {
           <div>
             <h3 className="text-base font-bold text-white mb-4">Acciones de Gestión</h3>
 
-            <div className="space-y-3">
-              <button className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-2xl text-xs transition-all flex items-center justify-center gap-2">
-                <UserPlus size={16} /> Registrar Nuevo Socio
-              </button>
+            {/* Buscador rápido de socio (Nombre / DNI) */}
+            <MemberQuickSearch />
 
-              <button className="w-full py-3 px-4 bg-slate-950 hover:bg-slate-800 text-white border border-slate-800 font-semibold rounded-2xl text-xs transition-all flex items-center justify-center gap-2">
-                <Search size={16} /> Buscar Ficha de Socio
-              </button>
+            {/* Acciones rápidas */}
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <QuickActionButton
+                icon={<UserPlus size={18} />}
+                title="Registrar Socio"
+                description="Alta titular o menor"
+                onClick={() => setShowNewSocioModal(true)}
+              />
+              <QuickActionButton
+                icon={<Wallet size={18} />}
+                title="Cobro Express"
+                description="Cobro de cuota en caja"
+                onClick={() => navigate('/pagos')}
+              />
+              <QuickActionButton
+                icon={<ClipboardCheck size={18} />}
+                title="Tomar Asistencia"
+                description="Lista o control de molinete"
+                onClick={() => navigate('/asistencia')}
+                wide
+              />
             </div>
           </div>
 
@@ -271,6 +319,70 @@ export default function SuperAdminDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Modal: tipo de alta de socio */}
+      {showNewSocioModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4"
+          onClick={() => setShowNewSocioModal(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-bold text-white">Nueva Alta de Socio</h3>
+                <p className="text-xs text-slate-400 mt-1">Elegí el tipo de alta para continuar.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNewSocioModal(false)}
+                className="p-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 hover:text-white transition"
+                aria-label="Cerrar"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNewSocioModal(false);
+                  navigate('/register?alta=titular');
+                }}
+                className="flex items-start gap-3 rounded-2xl border border-slate-800 bg-slate-950/60 p-4 text-left transition-all hover:border-emerald-500/40 hover:bg-slate-900"
+              >
+                <span className="inline-flex items-center justify-center p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <UserPlus size={18} />
+                </span>
+                <span>
+                  <span className="block text-sm font-bold text-white">Titular Independiente</span>
+                  <span className="block text-[11px] text-slate-400 mt-0.5">Alta de socio mayor de edad sin vínculo familiar.</span>
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNewSocioModal(false);
+                  navigate('/register?alta=vinculado');
+                }}
+                className="flex items-start gap-3 rounded-2xl border border-slate-800 bg-slate-950/60 p-4 text-left transition-all hover:border-emerald-500/40 hover:bg-slate-900"
+              >
+                <span className="inline-flex items-center justify-center p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <Users size={18} />
+                </span>
+                <span>
+                  <span className="block text-sm font-bold text-white">Vinculado / Menor / Adulto Mayor</span>
+                  <span className="block text-[11px] text-slate-400 mt-0.5">Alta asociada a un titular existente.</span>
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
