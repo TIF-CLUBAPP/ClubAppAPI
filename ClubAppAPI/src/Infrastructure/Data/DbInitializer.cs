@@ -375,6 +375,7 @@ namespace ClubApp.Infrastructure.Data
             // No destructivo: solo agrega los socios que falten (chequeo por Email/DNI).
             // No toca ni borra los usuarios existentes (SuperAdmin, Profesores, Usuario1-8, etc.).
             SeedTestSocios(context);
+            SeedCommercialActivities(context);
 
         }
 
@@ -566,98 +567,272 @@ namespace ClubApp.Infrastructure.Data
 
             context.SaveChanges();
 
-            // ==========================================
-            // 7. SEEDING PROFESOR DEMO + ACTIVIDAD CON HORARIOS + INSCRIPCIONES
-            // ==========================================
-            // Provee datos para el módulo de Actividades / Asistencia: un profesor
-            // TEACHER, una actividad a su cargo con horarios estructurados y algunos
-            // alumnos inscriptos para poder registrar asistencia desde el panel.
-            var teacherDemo = context.Users.FirstOrDefault(u => u.Email == "profesor.tenis@clubapp.com");
-            if (teacherDemo == null)
+
+
+
+        }
+
+        // ==========================================
+        // 8. SEEDING DE ACTIVIDADES COMERCIALES + INSCRIPCIONES + LIQUIDACIÓN DE CANON
+        // ==========================================
+        // Idempotente: verifica por Email/DNI (usuarios) y por Name (actividades) antes
+        // de insertar, y rellena la configuración comercial de actividades ya existentes.
+        private static void SeedCommercialActivities(ApplicationContext context)
+        {
+            string hashedPassword = BCrypt.Net.BCrypt.HashPassword("1234");
+
+            User EnsureUser(User seed)
             {
-                teacherDemo = new User
-                {
-                    BadgeNum = "P-001",
-                    FirstName = "Juan",
-                    LastName = "Pérez",
-                    Email = "profesor.tenis@clubapp.com",
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("1234"),
-                    Role = UserRole.TEACHER,
-                    Dni = "40000001",
-                    Phone = "+54900000001",
-                    BirthDate = new DateTime(1988, 5, 20),
-                    CreatedAt = DateTime.UtcNow
-                };
-                context.Users.Add(teacherDemo);
+                var existing = context.Users.FirstOrDefault(u => u.Email == seed.Email);
+                if (existing == null && !string.IsNullOrWhiteSpace(seed.Dni))
+                    existing = context.Users.FirstOrDefault(u => u.Dni == seed.Dni);
+
+                if (existing != null) return existing;
+
+                context.Users.Add(seed);
                 context.SaveChanges();
+                return seed;
             }
 
-            var teacherActivity = context.Activities.FirstOrDefault(a => a.Name == "Clases de Tenis");
-            if (teacherActivity == null)
+            Activity EnsureActivity(Activity desired)
             {
-                teacherActivity = new Activity
+                var existing = context.Activities.FirstOrDefault(a => a.Name == desired.Name);
+                if (existing == null)
                 {
-                    Name = "Clases de Tenis",
-                    Description = "Clases de tenis para adultos, nivel inicial y avanzado.",
-                    Category = "Deportes",
-                    Price = 8000m,
-                    PriceMember = 8000m,
-                    PriceNonMember = 12000m,
-                    PaymentCollector = PaymentCollectorType.PROFESSOR_DIRECT,
-                    ProfessorFacilityFeeMember = 1500m,
-                    ProfessorFacilityFeeNonMember = 3000m,
-                    ProfessorMercadoPagoPublicKey = "APP_USR-test-public-key",
-                    MaxCapacity = 8,
-                    TeacherId = teacherDemo.Id,
-                    RequiresBooking = false,
-                    Schedule = "Lunes y Miércoles 18:00 hs",
-                    IsActive = true,
-                    CreatedAt = DateTime.UtcNow
-                };
-                context.Activities.Add(teacherActivity);
-                context.SaveChanges();
-            }
-
-            if (teacherActivity != null && !context.ActivitySchedules.Any(s => s.ActivityId == teacherActivity.Id))
-            {
-                context.ActivitySchedules.AddRange(
-                    new ActivitySchedule { ActivityId = teacherActivity.Id, DayOfWeek = 1, StartTime = new TimeSpan(18, 0, 0), EndTime = new TimeSpan(19, 0, 0), CreatedAt = DateTime.UtcNow },
-                    new ActivitySchedule { ActivityId = teacherActivity.Id, DayOfWeek = 3, StartTime = new TimeSpan(18, 0, 0), EndTime = new TimeSpan(19, 0, 0), CreatedAt = DateTime.UtcNow }
-                );
-                context.SaveChanges();
-            }
-
-            if (teacherActivity != null)
-            {
-                var emails = new[] { 
-                    "usuario1@clubapp.com", "usuario2@clubapp.com", "usuario3@clubapp.com",
-                    "usuario4@clubapp.com", "usuario5@clubapp.com", "usuario6@clubapp.com",
-                    "usuario7@clubapp.com", "usuario8@clubapp.com"
-                };
-                foreach (var email in emails)
-                {
-                    var socio = context.Users.FirstOrDefault(u => u.Email == email);
-                    if (socio == null) continue;
-
-                    bool exists = context.Enrollments.Any(e =>
-                        e.ActivityId == teacherActivity.Id && e.UserId == socio.Id && e.Status == EnrollmentStatus.ACTIVE);
-
-                    if (!exists)
-                    {
-                        context.Enrollments.Add(new Enrollment
-                        {
-                            UserId = socio.Id,
-                            ActivityId = teacherActivity.Id,
-                            EnrollmentDate = DateTime.UtcNow,
-                            Status = EnrollmentStatus.ACTIVE,
-                            CreatedAt = DateTime.UtcNow
-                        });
-                    }
+                    context.Activities.Add(desired);
+                    context.SaveChanges();
+                    return desired;
                 }
+
+                var changed = false;
+                if (existing.Category != desired.Category) { existing.Category = desired.Category; changed = true; }
+                if (existing.PriceMember != desired.PriceMember) { existing.PriceMember = desired.PriceMember; changed = true; }
+                if (existing.PriceNonMember != desired.PriceNonMember) { existing.PriceNonMember = desired.PriceNonMember; changed = true; }
+                if (existing.PaymentCollector != desired.PaymentCollector) { existing.PaymentCollector = desired.PaymentCollector; changed = true; }
+                if (existing.ProfessorFacilityFeeMember != desired.ProfessorFacilityFeeMember) { existing.ProfessorFacilityFeeMember = desired.ProfessorFacilityFeeMember; changed = true; }
+                if (existing.ProfessorFacilityFeeNonMember != desired.ProfessorFacilityFeeNonMember) { existing.ProfessorFacilityFeeNonMember = desired.ProfessorFacilityFeeNonMember; changed = true; }
+                if (existing.ProfessorMercadoPagoPublicKey != desired.ProfessorMercadoPagoPublicKey) { existing.ProfessorMercadoPagoPublicKey = desired.ProfessorMercadoPagoPublicKey; changed = true; }
+                if (existing.ProfessorMercadoPagoAccessToken != desired.ProfessorMercadoPagoAccessToken) { existing.ProfessorMercadoPagoAccessToken = desired.ProfessorMercadoPagoAccessToken; changed = true; }
+                if (existing.MaxCapacity != desired.MaxCapacity) { existing.MaxCapacity = desired.MaxCapacity; changed = true; }
+                if (existing.TeacherId != desired.TeacherId) { existing.TeacherId = desired.TeacherId; changed = true; }
+                if (existing.Schedule != desired.Schedule) { existing.Schedule = desired.Schedule; changed = true; }
+                if (existing.IsActive != desired.IsActive) { existing.IsActive = desired.IsActive; changed = true; }
+
+                if (changed)
+                {
+                    context.Activities.Update(existing);
+                    context.SaveChanges();
+                }
+
+                return existing;
+            }
+
+            void EnsureSchedules(int activityId, params (int DayOfWeek, string Start, string End)[] rows)
+            {
+                if (context.ActivitySchedules.Any(s => s.ActivityId == activityId))
+                    return;
+
+                context.ActivitySchedules.AddRange(rows.Select(r => new ActivitySchedule
+                {
+                    ActivityId = activityId,
+                    DayOfWeek = r.DayOfWeek,
+                    StartTime = TimeSpan.Parse(r.Start),
+                    EndTime = TimeSpan.Parse(r.End),
+                    CreatedAt = DateTime.UtcNow
+                }));
                 context.SaveChanges();
             }
 
+            void EnsureEnrollment(int userId, int activityId)
+            {
+                if (context.Enrollments.Any(e => e.UserId == userId && e.ActivityId == activityId && e.Status == EnrollmentStatus.ACTIVE))
+                    return;
 
+                context.Enrollments.Add(new Enrollment
+                {
+                    UserId = userId,
+                    ActivityId = activityId,
+                    EnrollmentDate = DateTime.UtcNow,
+                    Status = EnrollmentStatus.ACTIVE,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
+            // 8.1 Profesores de prueba (2, con credenciales de acceso)
+            var teacherTenis = EnsureUser(new User
+            {
+                BadgeNum = "P-001",
+                FirstName = "Juan",
+                LastName = "Pérez",
+                Email = "profesor.tenis@clubapp.com",
+                PasswordHash = hashedPassword,
+                Role = UserRole.TEACHER,
+                Dni = "40000001",
+                Phone = "+54900000001",
+                BirthDate = new DateTime(1988, 5, 20),
+                CreatedAt = DateTime.UtcNow
+            });
+
+            var teacherPadel = EnsureUser(new User
+            {
+                BadgeNum = "P-002",
+                FirstName = "María",
+                LastName = "García",
+                Email = "profesor.padel@clubapp.com",
+                PasswordHash = hashedPassword,
+                Role = UserRole.TEACHER,
+                Dni = "40000002",
+                Phone = "+54900000002",
+                BirthDate = new DateTime(1990, 9, 12),
+                CreatedAt = DateTime.UtcNow
+            });
+
+            // 8.2 Alumnos: 6 socios (membresía activa) + 6 no socios (sin membresía)
+            var socios = new List<User>();
+            var noSocios = new List<User>();
+
+            for (int i = 1; i <= 6; i++)
+            {
+                socios.Add(EnsureUser(new User
+                {
+                    BadgeNum = $"S-{i:000}",
+                    FirstName = $"Socio{i}",
+                    LastName = "Prueba",
+                    Email = $"socio{i}@clubapp.com",
+                    PasswordHash = hashedPassword,
+                    Role = UserRole.MEMBER,
+                    Dni = $"450000{i:00}",
+                    Phone = $"+549555000{i:000}",
+                    BirthDate = new DateTime(1990, 1, 1).AddDays(i),
+                    CreatedAt = DateTime.UtcNow
+                }));
+
+                noSocios.Add(EnsureUser(new User
+                {
+                    BadgeNum = $"NS-{i:000}",
+                    FirstName = $"NoSocio{i}",
+                    LastName = "Prueba",
+                    Email = $"nosocio{i}@clubapp.com",
+                    PasswordHash = hashedPassword,
+                    Role = UserRole.MEMBER,
+                    Dni = $"460000{i:00}",
+                    Phone = $"+549666000{i:000}",
+                    BirthDate = new DateTime(1992, 2, 1).AddDays(i),
+                    CreatedAt = DateTime.UtcNow
+                }));
+            }
+
+            // Membresía ACTIVA solo para los socios (los no socios no tienen membresía).
+            foreach (var socio in socios)
+            {
+                if (!context.Memberships.Any(m => m.UserId == socio.Id))
+                {
+                    context.Memberships.Add(new Membership
+                    {
+                        UserId = socio.Id,
+                        MonthlyPrice = 15000m,
+                        Status = MembershipStatus.ACTIVE,
+                        StartDate = DateTime.UtcNow.AddMonths(-1),
+                        EndDate = DateTime.UtcNow.AddMonths(11),
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+            }
+            context.SaveChanges();
+
+            // 8.3 Actividades comerciales
+            var tenis = EnsureActivity(new Activity
+            {
+                Name = "Clases de Tenis",
+                Description = "Clases de tenis para adultos, nivel inicial y avanzado.",
+                Category = "Deportes",
+                Price = 8000m,
+                PriceMember = 8000m,
+                PriceNonMember = 12000m,
+                PaymentCollector = PaymentCollectorType.PROFESSOR_DIRECT,
+                ProfessorFacilityFeeMember = 1500m,
+                ProfessorFacilityFeeNonMember = 3000m,
+                ProfessorMercadoPagoPublicKey = "APP_USR-tenis-public-key",
+                ProfessorMercadoPagoAccessToken = "APP_USR-1111111111111111-010101-aaaaaaaaaaaa",
+                MaxCapacity = 8,
+                TeacherId = teacherTenis.Id,
+                RequiresBooking = false,
+                Schedule = "Lunes y Miércoles 18:00 hs",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            });
+
+            var futbol = EnsureActivity(new Activity
+            {
+                Name = "Fútbol Sub 15",
+                Description = "Entrenamiento y partidos de fútbol juvenil.",
+                Category = "Deportes",
+                Price = 5000m,
+                PriceMember = 5000m,
+                PriceNonMember = 8000m,
+                PaymentCollector = PaymentCollectorType.CLUB,
+                ProfessorFacilityFeeMember = 0m,
+                ProfessorFacilityFeeNonMember = 0m,
+                ProfessorMercadoPagoPublicKey = null,
+                ProfessorMercadoPagoAccessToken = null,
+                MaxCapacity = 30,
+                TeacherId = null,
+                RequiresBooking = false,
+                Schedule = "Martes y Jueves 17:00 hs",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            });
+
+            var padel = EnsureActivity(new Activity
+            {
+                Name = "Pádel Avanzado",
+                Description = "Entrenamiento de pádel para jugadores avanzados.",
+                Category = "Deportes",
+                Price = 9000m,
+                PriceMember = 9000m,
+                PriceNonMember = 13000m,
+                PaymentCollector = PaymentCollectorType.PROFESSOR_DIRECT,
+                ProfessorFacilityFeeMember = 2000m,
+                ProfessorFacilityFeeNonMember = 3500m,
+                ProfessorMercadoPagoPublicKey = "APP_USR-padel-public-key",
+                ProfessorMercadoPagoAccessToken = "APP_USR-2222222222222222-020202-bbbbbbbbbbbb",
+                MaxCapacity = 12,
+                TeacherId = teacherPadel.Id,
+                RequiresBooking = false,
+                Schedule = "Viernes 19:00 hs",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            });
+
+            // 8.4 Horarios estructurados
+            EnsureSchedules(tenis.Id, (1, "18:00", "19:00"), (3, "18:00", "19:00"));
+            EnsureSchedules(futbol.Id, (2, "17:00", "18:30"), (4, "17:00", "18:30"));
+            EnsureSchedules(padel.Id, (5, "19:00", "20:00"));
+
+            // 8.5 Inscripciones
+            // Clases de Tenis: 8 inscripciones (cupo completo → "Sin Cupo"): 3 socios + 5 no socios.
+            EnsureEnrollment(socios[0].Id, tenis.Id);
+            EnsureEnrollment(socios[1].Id, tenis.Id);
+            EnsureEnrollment(socios[2].Id, tenis.Id);
+            EnsureEnrollment(noSocios[0].Id, tenis.Id);
+            EnsureEnrollment(noSocios[1].Id, tenis.Id);
+            EnsureEnrollment(noSocios[2].Id, tenis.Id);
+            EnsureEnrollment(noSocios[3].Id, tenis.Id);
+            EnsureEnrollment(noSocios[4].Id, tenis.Id);
+
+            // Fútbol Sub 15: 10 inscripciones (5 socios + 5 no socios).
+            for (int i = 0; i < 5; i++)
+            {
+                EnsureEnrollment(socios[i].Id, futbol.Id);
+                EnsureEnrollment(noSocios[i].Id, futbol.Id);
+            }
+
+            // Pádel Avanzado: 4 socios + 2 no socios.
+            for (int i = 0; i < 4; i++) EnsureEnrollment(socios[i].Id, padel.Id);
+            EnsureEnrollment(noSocios[0].Id, padel.Id);
+            EnsureEnrollment(noSocios[1].Id, padel.Id);
+
+            context.SaveChanges();
         }
 
     }

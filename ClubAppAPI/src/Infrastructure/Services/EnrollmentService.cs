@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Dtos;
@@ -33,7 +34,7 @@ public class EnrollmentService : IEnrollmentService
 
     public async Task<string> CreateEnrollmentAsync(int userId, CreateEnrollmentDto dto)
     {
-        // REGLA DE NEGOCIO (Módulo 3): Verificar si el usuario registra deudas o pagos vencidos
+        // REGLA DE NEGOCIO (Mï¿½dulo 3): Verificar si el usuario registra deudas o pagos vencidos
         bool hasOverdueDebt = await _context.Payments
             .AnyAsync(p => p.UserId == userId &&
                           (p.Status == PaymentStatus.Overdue || p.Status == PaymentStatus.Pending));
@@ -68,6 +69,58 @@ public class EnrollmentService : IEnrollmentService
         await _context.Enrollments.AddAsync(enrollment);
         await _context.SaveChangesAsync();
         return "OK";
+    }
+
+    public async Task<IEnumerable<MyEnrollmentDto>> GetMyEnrollmentsAsync(int userId)
+    {
+        var enrollments = await _context.Enrollments
+            .Include(e => e.Activity)
+                .ThenInclude(a => a.Teacher)
+            .Include(e => e.Activity)
+                .ThenInclude(a => a.Space)
+            .Include(e => e.Activity)
+                .ThenInclude(a => a.Schedules)
+            .Include(e => e.Activity)
+                .ThenInclude(a => a.Instructors)
+                .ThenInclude(i => i.User)
+            .Where(e => e.UserId == userId)
+            .OrderByDescending(e => e.EnrollmentDate)
+            .ToListAsync();
+
+        var result = new List<MyEnrollmentDto>();
+        foreach (var e in enrollments)
+        {
+            var instructorName = e.Activity.Teacher?.FullName
+                ?? e.Activity.Instructors
+                    .OrderBy(i => i.User.FullName)
+                    .Select(i => i.User.FullName)
+                    .FirstOrDefault();
+
+            result.Add(new MyEnrollmentDto
+            {
+                Id = e.Id,
+                ActivityId = e.ActivityId,
+                ActivityName = e.Activity.Name,
+                SpaceName = e.Activity.Space?.Name,
+                InstructorName = instructorName,
+                Status = e.Status.ToString(),
+                EnrollmentDate = e.EnrollmentDate,
+                Schedules = e.Activity.Schedules
+                    .OrderBy(s => s.DayOfWeek)
+                    .ThenBy(s => s.StartTime)
+                    .Select(s => new ActivityScheduleDto
+                    {
+                        Id = s.Id,
+                        DayOfWeek = s.DayOfWeek,
+                        DayName = CultureInfo.GetCultureInfo("es-AR").DateTimeFormat.GetDayName((DayOfWeek)s.DayOfWeek),
+                        StartTime = s.StartTime.ToString(@"hh\:mm"),
+                        EndTime = s.EndTime.ToString(@"hh\:mm")
+                    })
+                    .ToList()
+            });
+        }
+
+        return result;
     }
 
     public async Task<string> CancelEnrollmentAsync(int enrollmentId, int loggedInUserId, string loggedInUserRole)

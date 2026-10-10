@@ -182,7 +182,10 @@ export interface UserCuota {
 
 // DTO para registrar transferencia bancaria (POST /api/payments/register-transfer)
 export interface RegisterTransferRequest {
-  cuotaId: number;
+  /** ID de la cuota a abonar (pago individual). */
+  cuotaId?: number;
+  /** IDs de las cuotas a abonar en una misma operación (pago agrupado). */
+  cuotaIds?: number[];
   totalAmount: number;   // base + comisión
   netAmount: number;     // base + mora
   marketplaceFee: number; // comisión ATRIO

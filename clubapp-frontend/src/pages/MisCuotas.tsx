@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { CreditCard, RefreshCw, Sparkles } from 'lucide-react';
 import Sidebar from '../components/layout/Sidebar';
@@ -9,6 +9,7 @@ import { AccountStatusCard } from '../components/cuotas/AccountStatusCard';
 import { CuotasList } from '../components/cuotas/CuotasList';
 import { CheckoutModal } from '../components/cuotas/CheckoutModal';
 import { ReceiptModal } from '../components/cuotas/ReceiptModal';
+import { cuotaNumericId } from '../utils/cuotaIds';
 
 const fmt = (val: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(val);
@@ -35,9 +36,38 @@ export const MisCuotas: React.FC = () => {
   }, [searchParams]);
 
 
-  const { loading, settings, exemptionLabel, cuotas, totalPending, globalStatus, updateCuota } = useMisCuotas();
-  const [selectedPay, setSelectedPay] = useState<MemberCuota | null>(null);
+  const { loading, settings, exemptionLabel, cuotas, totalPending, globalStatus, updateCuota, updateCuotas } = useMisCuotas();
+  const [selectedCuotaIds, setSelectedCuotaIds] = useState<number[]>([]);
+  const [checkoutCuotas, setCheckoutCuotas] = useState<MemberCuota[] | null>(null);
   const [selectedReceipt, setSelectedReceipt] = useState<MemberCuota | null>(null);
+
+  // Cuotas abonables (Pendiente / En Mora) y sus IDs para la selección múltiple.
+  const selectableCuotas = useMemo(() => cuotas.filter((c) => c.status !== 'PAGADA'), [cuotas]);
+  const selectableIds = useMemo(() => selectableCuotas.map((c) => cuotaNumericId(c)), [selectableCuotas]);
+
+  const selectedCuotas = useMemo(
+    () => cuotas.filter((c) => c.status !== 'PAGADA' && selectedCuotaIds.includes(cuotaNumericId(c))),
+    [cuotas, selectedCuotaIds],
+  );
+  const selectedTotal = selectedCuotas.reduce((s, c) => s + c.totalAmount, 0);
+  const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedCuotaIds.includes(id));
+
+  const toggleCuota = (id: number) => {
+    setSelectedCuotaIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedCuotaIds(allSelected ? [] : [...selectableIds]);
+  };
+
+  const openCheckout = () => {
+    if (selectedCuotas.length === 0) return;
+    setCheckoutCuotas(selectedCuotas);
+  };
+
+  const handlePaymentSuccessMany = (paidCuotas: MemberCuota[]) => {
+    updateCuotas(paidCuotas);
+  };
 
   return (
     <div className="app-shell flex h-screen bg-slate-950 text-slate-100 overflow-hidden font-sans">
@@ -83,13 +113,18 @@ export const MisCuotas: React.FC = () => {
                 <AccountStatusCard
                   globalStatus={globalStatus}
                   totalPendingAmount={totalPending}
-                  onPayCurrent={() => { const c = cuotas.find(q => q.status !== 'PAGADA'); if (c) setSelectedPay(c); }}
+                  selectedCount={selectedCuotas.length}
+                  selectedTotal={selectedTotal}
+                  allSelected={allSelected}
+                  onPaySelected={openCheckout}
+                  onToggleSelectAll={toggleSelectAll}
                   formatCurrency={fmt}
                 />
                 <CuotasList
                   cuotas={cuotas}
                   settings={settings}
-                  onPay={setSelectedPay}
+                  selectedCuotaIds={selectedCuotaIds}
+                  onToggleCuota={toggleCuota}
                   onViewReceipt={setSelectedReceipt}
                   formatCurrency={fmt}
                 />
@@ -100,10 +135,12 @@ export const MisCuotas: React.FC = () => {
       </div>
 
       <CheckoutModal
-        cuota={selectedPay}
-        onClose={() => setSelectedPay(null)}
+        cuota={null}
+        cuotas={checkoutCuotas ?? undefined}
+        onClose={() => setCheckoutCuotas(null)}
         onPaymentSuccess={(updated) => { updateCuota(updated); }}
-        onViewReceipt={(c) => { setSelectedPay(null); const u = cuotas.find(q => q.id === c.id) || c; setSelectedReceipt(u); }}
+        onPaymentSuccessMany={handlePaymentSuccessMany}
+        onViewReceipt={(c) => { setCheckoutCuotas(null); const u = cuotas.find(q => q.id === c.id) || c; setSelectedReceipt(u); }}
         formatCurrency={fmt}
       />
 

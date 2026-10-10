@@ -16,16 +16,16 @@ public interface IPaymentService
 
     // ========== Mercado Pago - Órdenes ==========
     /// <summary>
-    /// Crea una orden en Mercado Pago a partir del pago de una Cuota (deuda adeudada).
+    /// Crea una orden en Mercado Pago a partir de una o varias cuotas (deuda adeudada).
     /// Retorna el init_point para que el frontend redirija al checkout seguro.
     /// </summary>
-    Task<string> CreateOrderAsync(int cuotaId);
+    Task<string> CreateOrderAsync(IEnumerable<int> cuotaIds);
 
     /// <summary>
     /// Procesa el pago con tarjeta tokenizada (Branded) usando el token devuelto por
-    /// Mercado Pago en el cliente. Si el pago es aprobado, registra la cuota como pagada.
+    /// Mercado Pago en el cliente. Si el pago es aprobado, registra las cuotas como pagadas.
     /// </summary>
-    Task<CardPaymentResult> ProcessCardPaymentAsync(int cuotaId, string token);
+    Task<CardPaymentResult> ProcessCardPaymentAsync(IEnumerable<int> cuotaIds, string token);
 
     /// <summary>
     /// Devuelve las cuotas del usuario autenticado con su ID numérico primario real.
@@ -46,6 +46,13 @@ public interface IPaymentService
 
     /// <summary>Guarda/víncula las credenciales y el alias de cobro del Club.</summary>
     Task<PayoutConfigDto> SavePayoutConfigAsync(SavePayoutConfigRequest dto);
+
+    // ========== Mercado Pago - OAuth (vinculación de cuenta) ==========
+    /// <summary>Construye la URL de autorización OAuth para vincular la cuenta MP del usuario.</summary>
+    Task<string?> BuildMercadoPagoConnectUrlAsync(int userId, string redirectUri);
+
+    /// <summary>Intercambia el código OAuth por credenciales y las guarda en el usuario.</summary>
+    Task<MercadoPagoConnectResult> ConnectMercadoPagoAsync(string code, string state, string redirectUri);
 
     // ========== Configuración de cuotas (FeeSettings) ==========
     Task<FeeSettingsDto> GetFeeSettingsAsync();

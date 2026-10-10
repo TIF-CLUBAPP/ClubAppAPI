@@ -1,10 +1,16 @@
 import { api } from './api';
-import type { Activity, SaveActivityRequest, ActivitySettlement } from '../types/activity';
+import type { Activity, SaveActivityRequest, ActivitySettlement, MyEnrollment } from '../types/activity';
 
 export const activityService = {
   /** Catálogo de actividades (GET /api/activities). */
   getActivities: async (): Promise<Activity[]> => {
     const response = await api.get<Activity[]>('/activities');
+    return response.data;
+  },
+
+  /** Inscripciones del usuario autenticado (GET /api/enrollments/my). */
+  getMyEnrollments: async (): Promise<MyEnrollment[]> => {
+    const response = await api.get<MyEnrollment[]>('/enrollments/my');
     return response.data;
   },
 

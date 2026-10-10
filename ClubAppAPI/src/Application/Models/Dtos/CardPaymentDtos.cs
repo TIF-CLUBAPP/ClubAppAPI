@@ -7,7 +7,12 @@ namespace ClubApp.Application.Dtos;
 /// </summary>
 public class PayWithCardRequest
 {
-    public int CuotaId { get; set; }
+    /// <summary>ID de la cuota (pago individual).</summary>
+    public int? CuotaId { get; set; }
+
+    /// <summary>IDs de las cuotas a abonar en una misma operación (pago agrupado).</summary>
+    public List<int>? CuotaIds { get; set; }
+
     public string Token { get; set; } = string.Empty;
 }
 

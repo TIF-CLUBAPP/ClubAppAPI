@@ -15,6 +15,8 @@ using MercadoPago.Resource.Preference;
 using MercadoPago.Error;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
+using System.Text;
+using System.Text.Json;
 
 namespace ClubApp.Infrastructure.Services;
 
@@ -72,16 +74,37 @@ public class PaymentService : IPaymentService
                 return "IGNORED";
             }
 
-            // ExternalReference: "cuota:{cuotaId}"
+            // ExternalReference: "cuota:{id}" (individual) o "cuotas:{id1,id2,...}" (agrupado).
             var externalRef = mpPayment.ExternalReference;
             if (string.IsNullOrWhiteSpace(externalRef))
                 return "NO_EXTERNAL_REFERENCE";
 
             var parts = externalRef.Split(':', StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length != 2 || !int.TryParse(parts[1], out var cuotaId))
+            if (parts.Length != 2)
                 return "BAD_EXTERNAL_REFERENCE";
 
-            return await RegistrarPagoAsync(cuotaId, "MERCADOPAGO");
+            var ids = parts[1]
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(x => int.TryParse(x.Trim(), out var id) ? id : 0)
+                .Where(id => id > 0)
+                .Distinct()
+                .ToList();
+
+            if (ids.Count == 0)
+                return "BAD_EXTERNAL_REFERENCE";
+
+            var anyOk = false;
+            var allAlreadyPaid = true;
+            foreach (var id in ids)
+            {
+                var result = await RegistrarPagoAsync(id, "MERCADOPAGO");
+                if (result == "OK") anyOk = true;
+                if (result != "ALREADY_PAID") allAlreadyPaid = false;
+            }
+
+            if (anyOk) return "OK";
+            if (allAlreadyPaid) return "ALREADY_PAID";
+            return "NOT_FOUND";
         }
         catch
         {
@@ -500,21 +523,26 @@ public class PaymentService : IPaymentService
 
     public async Task<TransferPaymentResult> RegisterTransferAsync(RegisterTransferRequest dto)
     {
-        var payment = await _context.Payments
+        var ids = (dto.CuotaIds != null && dto.CuotaIds.Count > 0)
+            ? dto.CuotaIds.Where(id => id > 0).Distinct().ToList()
+            : dto.CuotaId > 0 ? new List<int> { dto.CuotaId } : new List<int>();
+
+        if (ids.Count == 0)
+            return new TransferPaymentResult { Success = false, Status = "NOT_FOUND", Message = "No se identificaron cuotas a abonar." };
+
+        var payments = await _context.Payments
             .Include(p => p.User)
-            .FirstOrDefaultAsync(p => p.Id == dto.CuotaId);
+            .Where(p => ids.Contains(p.Id))
+            .ToListAsync();
 
-        if (payment == null)
-            return new TransferPaymentResult { Success = false, Status = "NOT_FOUND", Message = "No se encontró la cuota indicada." };
+        if (payments.Count == 0)
+            return new TransferPaymentResult { Success = false, Status = "NOT_FOUND", Message = "No se encontraron las cuotas indicadas." };
 
-        if (payment.Status == PaymentStatus.Paid)
-            return new TransferPaymentResult { Success = false, Status = "ALREADY_PAID", Message = "La cuota ya fue registrada como pagada." };
+        if (payments.Any(p => p.Status == PaymentStatus.Paid))
+            return new TransferPaymentResult { Success = false, Status = "ALREADY_PAID", Message = "Una de las cuotas ya fue registrada como pagada." };
 
-        // Monto neto que recibe el club: lo adeudado por la cuota + mora.
-        var netAmount = payment.Amount + payment.LateFeeApplied;
+        var netAmount = payments.Sum(p => p.Amount + p.LateFeeApplied);
 
-        // Comisión ATRIO recalculada de forma autoritativa en el servidor
-        // (min 3.5%, máx $1.500). El comprador abona netAmount + fee.
         var clubConfig = await GetOrCreateClubConfigAsync();
         var rawFee = netAmount * (clubConfig.ApplicationFeePercentage / 100m);
         var marketplaceFee = Math.Min(rawFee, clubConfig.MaxApplicationFeeAmount);
@@ -522,12 +550,19 @@ public class PaymentService : IPaymentService
         if (marketplaceFee < 0) marketplaceFee = 0;
         var totalAmount = Math.Round(netAmount + marketplaceFee, 2, MidpointRounding.AwayFromZero);
 
-        payment.PaymentMethod = "TRANSFER";
-        payment.Status = PaymentStatus.Pending; // pendiente de aprobación del administrador del club
-        payment.MarketplaceFee = marketplaceFee;
-        payment.TransferReference = string.IsNullOrWhiteSpace(dto.ReferenceNumber)
-            ? null
-            : dto.ReferenceNumber.Trim();
+        var reference = string.IsNullOrWhiteSpace(dto.ReferenceNumber) ? null : dto.ReferenceNumber.Trim();
+
+        foreach (var payment in payments)
+        {
+            payment.PaymentMethod = "TRANSFER";
+            payment.Status = PaymentStatus.Pending;
+            payment.MarketplaceFee = marketplaceFee;
+            payment.TransferReference = reference;
+            if (!string.IsNullOrWhiteSpace(dto.ReceiptUrl))
+            {
+                payment.ReceiptUrl = dto.ReceiptUrl;
+            }
+        }
 
         await _context.SaveChangesAsync();
 
@@ -535,8 +570,8 @@ public class PaymentService : IPaymentService
         {
             Success = true,
             Status = "PENDING",
-            Message = "Transferencia registrada. Queda pendiente de aprobación por el club.",
-            PaymentId = payment.Id,
+            Message = "Transferencia registrada. Queda pendiente de aprobaci\u00f3n por el club.",
+            PaymentId = payments[0].Id,
             NetAmount = netAmount,
             MarketplaceFee = marketplaceFee,
             TotalAmount = totalAmount
@@ -709,23 +744,26 @@ public class PaymentService : IPaymentService
         await _context.SaveChangesAsync();
     }
 
-    public async Task<string> CreateOrderAsync(int cuotaId)
+    public async Task<string> CreateOrderAsync(IEnumerable<int> cuotaIds)
     {
-        // NOTA: En este sistema actual, el "cuotaId" corresponde al Id de Payment.
-        var payment = await _context.Payments
+        var ids = (cuotaIds ?? Enumerable.Empty<int>())
+            .Where(id => id > 0)
+            .Distinct()
+            .ToList();
+
+        if (ids.Count == 0) return "NOT_FOUND";
+
+        var payments = await _context.Payments
             .Include(p => p.User)
-            .FirstOrDefaultAsync(p => p.Id == cuotaId);
+            .Where(p => ids.Contains(p.Id))
+            .ToListAsync();
 
-        if (payment == null) return "NOT_FOUND";
-        if (payment.Status == PaymentStatus.Paid) return "ALREADY_PAID";
+        if (payments.Count == 0) return "NOT_FOUND";
+        if (payments.Any(p => p.Status == PaymentStatus.Paid)) return "ALREADY_PAID";
 
-        // GetOrCreateClubConfigAsync garantiza un token no vacío (config → fallback sandbox).
         var clubConfig = await GetOrCreateClubConfigAsync();
 
-        // MercadoPago SDK (no usado en este paso; el proyecto ya tenía integración parcial)
-
-        // Monto principal (sin comisiones). En este proyecto, "Amount" ya representa lo adeudado.
-        var amount = payment.Amount + payment.LateFeeApplied;
+        var amount = payments.Sum(p => p.Amount + p.LateFeeApplied);
         if (amount <= 0) throw new InvalidOperationException("El monto de la cuota debe ser mayor a 0.");
 
         var rawFee = amount * (clubConfig.ApplicationFeePercentage / 100m);
@@ -733,13 +771,20 @@ public class PaymentService : IPaymentService
         applicationFee = Math.Round(applicationFee, 2, MidpointRounding.AwayFromZero);
         if (applicationFee < 0) applicationFee = 0;
 
-        // Resuelve el receptor final del cobro. Para cuotas de membresía es el Club;
-        // si en el futuro el concepto fuera una clase de un profesor habilitado, acá
-        // se pasaría su userId para rutear el pago a su cuenta de Mercado Pago.
         var collector = await ResolvePayoutCollectorAsync();
 
-        // Back URL / webhook
-        return await CreateMercadoPagoOrderAsync(cuotaId, amount, applicationFee, payment.User, collector.AccessToken);
+        var periodLabels = payments
+            .OrderBy(p => p.Id)
+            .Select(p => FormatPeriodo(p.Period, p.CreatedAt))
+            .ToList();
+
+        return await CreateMercadoPagoOrderAsync(
+            ids.OrderBy(id => id).ToList(),
+            periodLabels,
+            amount,
+            applicationFee,
+            payments[0].User,
+            collector.AccessToken);
     }
 
     /// <summary>
@@ -881,16 +926,13 @@ public class PaymentService : IPaymentService
     }
 
     private async Task<string> CreateMercadoPagoOrderAsync(
-        int cuotaId,
+        IReadOnlyList<int> cuotaIds,
+        IReadOnlyList<string> periodLabels,
         decimal amount,
         decimal applicationFee,
         User user,
         string accessToken)
     {
-        // 1) URL base del frontend a donde Mercado Pago redirige al finalizar el pago.
-        //    Se lee de la configuración; si no viene, es vacía o es una ruta relativa,
-        //    se fuerza el fallback local absoluto para evitar el error 400
-        //    "auto_return invalid. back_url.success must be defined".
         var configuredBaseUrl = _configuration["FrontendUrl"];
         var validBaseUrl = string.IsNullOrWhiteSpace(configuredBaseUrl)
             ? "http://localhost:5173"
@@ -902,30 +944,26 @@ public class PaymentService : IPaymentService
             validBaseUrl = "http://localhost:5173";
         }
 
-        // 2) Configura el Access Token (recibido desde la BD) y valida que no esté vacío antes de llamar a la API.
         accessToken = accessToken.Trim();
         if (string.IsNullOrWhiteSpace(accessToken))
         {
             throw new InvalidOperationException(
-                "El Access Token de Mercado Pago no está configurado en la base de datos (ClubConfigs.MercadoPagoAccessToken).");
+                "El Access Token de Mercado Pago no est\u00e1 configurado en la base de datos (ClubConfigs.MercadoPagoAccessToken).");
         }
 
         MercadoPagoConfig.AccessToken = accessToken;
 
-        // 3) Email del pagador con fallback seguro para Sandbox.
         var payerEmail = GetValidPayerEmail(user?.Email);
 
-        // 4) Construcción de la preferencia. UnitPrice redondeado a 2 decimales
-        //    (Mercado Pago rechaza importes con más de 2 cifras decimales) y
-        //    Quantity es un entero fijo >= 1.
-        //    El costo del servicio digital ATRIO se suma al total que abona el socio:
-        //    el comprador paga (amount + applicationFee) y el club recibe `amount`,
-        //    porque `MarketplaceFee` se descuenta de lo que cobra el vendedor.
+        var title = cuotaIds.Count == 1
+            ? $"Cuota Club - {periodLabels[0]}"
+            : $"Cuotas Club: {string.Join(", ", periodLabels)}";
+
         var items = new List<PreferenceItemRequest>
         {
             new PreferenceItemRequest
             {
-                Title = "Cuota Club",
+                Title = title,
                 Quantity = 1,
                 UnitPrice = Math.Round(amount, 2, MidpointRounding.AwayFromZero),
                 CurrencyId = "ARS"
@@ -943,10 +981,14 @@ public class PaymentService : IPaymentService
             });
         }
 
+        var externalReference = cuotaIds.Count == 1
+            ? $"cuota:{cuotaIds[0]}"
+            : $"cuotas:{string.Join(",", cuotaIds)}";
+
         var request = new PreferenceRequest
         {
             Items = items,
-            ExternalReference = $"cuota:{cuotaId}",
+            ExternalReference = externalReference,
             MarketplaceFee = applicationFee,
             Payer = new PreferencePayerRequest
             {
@@ -958,8 +1000,6 @@ public class PaymentService : IPaymentService
                 Failure = $"{validBaseUrl}/mis-cuotas?status=failure",
                 Pending = $"{validBaseUrl}/mis-cuotas?status=pending"
             }
-            // AutoReturn omitido intencionalmente: su serialización en el SDK de Mercado Pago
-            // provocaba el error 400 "auto_return invalid. back_url.success must be defined".
         };
 
         try
@@ -972,42 +1012,6 @@ public class PaymentService : IPaymentService
         {
             throw;
         }
-
-        /*var request = new OrderRequest
-        {
-            ExternalReference = $"cuota:{cuotaId}",
-            Checkout = new CheckoutRequest
-            {
-                Type = "redirect",
-                RedirectUrl = backUrl
-            }
-        };
-
-        // Taxes/fees: MercadoPago Orders usa itemization; application_fee se define en request.
-        // Si el SDK/versión no expone application_fee como propiedad, se envía vía AdditionalProperties.
-        request.AdditionalProperties = new Dictionary<string, object?>
-        {
-            { "application_fee", (double)applicationFee }
-        };
-
-        // Item
-        request.Items = new List<OrderItemRequest>
-        {
-            new OrderItemRequest
-            {
-                Id = $"cuota-{cuotaId}",
-                Title = "Cuota vencida",
-                Quantity = 1,
-                UnitPrice = (double)amount
-            }
-        };
-
-        var response = await new OrderClient().CreateAsync(request);
-        if (response == null) throw new InvalidOperationException("No se recibió respuesta de Mercado Pago.");
-
-        // Retornamos init_point
-        return response.InitPoint ?? response.Id ?? string.Empty;
-        */
     }
 
     /// <summary>
@@ -1033,7 +1037,7 @@ public class PaymentService : IPaymentService
         return isValid ? candidate : fallbackEmail;
     }
 
-    public async Task<CardPaymentResult> ProcessCardPaymentAsync(int cuotaId, string token)
+    public async Task<CardPaymentResult> ProcessCardPaymentAsync(IEnumerable<int> cuotaIds, string token)
     {
         if (string.IsNullOrWhiteSpace(token))
         {
@@ -1045,35 +1049,45 @@ public class PaymentService : IPaymentService
             };
         }
 
-        var payment = await _context.Payments
-            .Include(p => p.User)
-            .FirstOrDefaultAsync(p => p.Id == cuotaId);
+        var ids = (cuotaIds ?? Enumerable.Empty<int>()).Where(id => id > 0).Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            return new CardPaymentResult
+            {
+                Success = false,
+                Status = "BAD_REQUEST",
+                Message = "Se debe indicar al menos una cuota a abonar."
+            };
+        }
 
-        if (payment == null)
+        var payments = await _context.Payments
+            .Include(p => p.User)
+            .Where(p => ids.Contains(p.Id))
+            .ToListAsync();
+
+        if (payments.Count == 0)
         {
             return new CardPaymentResult
             {
                 Success = false,
                 Status = "NOT_FOUND",
-                Message = "No se encontró la cuota indicada."
+                Message = "No se encontraron las cuotas indicadas."
             };
         }
 
-        if (payment.Status == PaymentStatus.Paid)
+        if (payments.Any(p => p.Status == PaymentStatus.Paid))
         {
             return new CardPaymentResult
             {
                 Success = false,
                 Status = "ALREADY_PAID",
-                Message = "La cuota ya fue registrada como pagada."
+                Message = "Una de las cuotas ya fue registrada como pagada."
             };
         }
 
-        // Configuración global (token de MP + comisión ATRIO). Garantiza un token no vacío.
         var clubConfig = await GetOrCreateClubConfigAsync();
 
-        // Monto principal (sin comisión): lo adeudado por la cuota + recargo por mora.
-        var amount = payment.Amount + payment.LateFeeApplied;
+        var amount = payments.Sum(p => p.Amount + p.LateFeeApplied);
         if (amount <= 0)
         {
             return new CardPaymentResult
@@ -1084,14 +1098,11 @@ public class PaymentService : IPaymentService
             };
         }
 
-        // Costo del servicio digital ATRIO (comisión de ATRIO): min(3.5%, $1.500).
         var rawFee = amount * (clubConfig.ApplicationFeePercentage / 100m);
         var applicationFee = Math.Min(rawFee, clubConfig.MaxApplicationFeeAmount);
         applicationFee = Math.Round(applicationFee, 2, MidpointRounding.AwayFromZero);
         if (applicationFee < 0) applicationFee = 0;
 
-        // El comprador abona el total (base + comisión); `application_fee` se
-        // descuenta de lo que recibe el vendedor, por lo que el club netea `amount`.
         var transactionAmount = Math.Round(amount + applicationFee, 2, MidpointRounding.AwayFromZero);
 
         var accessToken = (clubConfig.MercadoPagoAccessToken ?? string.Empty).Trim();
@@ -1101,23 +1112,28 @@ public class PaymentService : IPaymentService
             {
                 Success = false,
                 Status = "NO_TOKEN",
-                Message = "El Access Token de Mercado Pago no está configurado."
+                Message = "El Access Token de Mercado Pago no est\u00e1 configurado."
             };
         }
 
         MercadoPagoConfig.AccessToken = accessToken;
 
+        var periods = payments.OrderBy(p => p.Id).Select(p => FormatPeriodo(p.Period, p.CreatedAt)).ToList();
+        var description = periods.Count == 1
+            ? $"Cuota Club - {periods[0]}"
+            : $"Cuotas Club: {string.Join(", ", periods)}";
+
         var request = new PaymentCreateRequest
         {
             TransactionAmount = transactionAmount,
             Token = token.Trim(),
-            Description = $"Cuota Club - {FormatPeriodo(payment.Period)}",
+            Description = description,
             Installments = 1,
             Payer = new PaymentPayerRequest
             {
-                Email = GetValidPayerEmail(payment.User?.Email)
+                Email = GetValidPayerEmail(payments[0].User?.Email)
             },
-            ExternalReference = $"cuota:{cuotaId}",
+            ExternalReference = ids.Count == 1 ? $"cuota:{ids[0]}" : $"cuotas:{string.Join(",", ids)}",
             ApplicationFee = applicationFee,
             BinaryMode = true
         };
@@ -1133,7 +1149,7 @@ public class PaymentService : IPaymentService
                 {
                     Success = false,
                     Status = "MP_ERROR",
-                    Message = "No se recibió respuesta de Mercado Pago."
+                    Message = "No se recibi\u00f3 respuesta de Mercado Pago."
                 };
             }
 
@@ -1141,36 +1157,26 @@ public class PaymentService : IPaymentService
 
             if (status == "approved")
             {
-                var registrarResult = await RegistrarPagoAsync(cuotaId, "MERCADOPAGO");
-                if (registrarResult == "OK")
+                foreach (var id in ids)
                 {
-                    return new CardPaymentResult
-                    {
-                        Success = true,
-                        Status = "approved",
-                        Message = "Pago aprobado y registrado correctamente.",
-                        MercadoPagoPaymentId = mpPayment.Id,
-                        PaymentId = cuotaId
-                    };
+                    await RegistrarPagoAsync(id, "MERCADOPAGO");
                 }
 
                 return new CardPaymentResult
                 {
-                    Success = false,
-                    Status = registrarResult,
-                    Message = "El pago fue aprobado pero no se pudo registrar internamente.",
+                    Success = true,
+                    Status = "approved",
+                    Message = "Pago aprobado y registrado correctamente.",
                     MercadoPagoPaymentId = mpPayment.Id,
-                    PaymentId = cuotaId
+                    PaymentId = ids[0]
                 };
             }
 
-            // pending / in_process / rejected: no se registra la cuota; si queda
-            // pendiente, el webhook (/api/payments/webhook) la confirmará.
             return new CardPaymentResult
             {
                 Success = false,
                 Status = status,
-                Message = $"El pago quedó en estado '{status}'.",
+                Message = $"El pago qued\u00f3 en estado '{status}'.",
                 MercadoPagoPaymentId = mpPayment.Id
             };
         }
@@ -1324,5 +1330,106 @@ public class PaymentService : IPaymentService
         }
 
         return "Adeuda cuota";
+    }
+
+    // ========== Mercado Pago - OAuth (vinculación de cuenta) ==========
+
+    private const string MercadoPagoAuthBaseUrl = "https://auth.mercadopago.com.ar/authorization";
+    private const string MercadoPagoOAuthTokenUrl = "https://api.mercadopago.com/oauth/token";
+
+    public Task<string?> BuildMercadoPagoConnectUrlAsync(int userId, string redirectUri)
+    {
+        var clientId = _configuration["MercadoPago:OAuth:ClientId"];
+        if (string.IsNullOrWhiteSpace(clientId))
+            return Task.FromResult<string?>(null);
+
+        var state = Convert.ToBase64String(Encoding.UTF8.GetBytes($"user:{userId}"));
+        var query = string.Join("&",
+            $"client_id={Uri.EscapeDataString(clientId)}",
+            "response_type=code",
+            "platform_id=mp",
+            $"state={Uri.EscapeDataString(state)}",
+            $"redirect_uri={Uri.EscapeDataString(redirectUri)}");
+
+        return Task.FromResult<string?>($"{MercadoPagoAuthBaseUrl}?{query}");
+    }
+
+    public async Task<MercadoPagoConnectResult> ConnectMercadoPagoAsync(string code, string state, string redirectUri)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+            return new MercadoPagoConnectResult { Success = false, Message = "Falta el código de autorización de Mercado Pago." };
+
+        if (!TryDecodeUserId(state, out var userId))
+            return new MercadoPagoConnectResult { Success = false, Message = "El estado de vinculación es inválido." };
+
+        var clientId = _configuration["MercadoPago:OAuth:ClientId"];
+        var clientSecret = _configuration["MercadoPago:OAuth:ClientSecret"];
+
+        if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))
+            return new MercadoPagoConnectResult { Success = false, Message = "La vinculación OAuth de Mercado Pago no está configurada." };
+
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (user == null)
+            return new MercadoPagoConnectResult { Success = false, Message = "Usuario no encontrado." };
+
+        try
+        {
+            using var http = new HttpClient();
+            using var content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["grant_type"] = "authorization_code",
+                ["client_id"] = clientId,
+                ["client_secret"] = clientSecret,
+                ["code"] = code,
+                ["redirect_uri"] = redirectUri
+            });
+
+            var response = await http.PostAsync(MercadoPagoOAuthTokenUrl, content);
+            var json = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+                return new MercadoPagoConnectResult { Success = false, Message = $"Mercado Pago rechazó la vinculación: {json}" };
+
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("access_token", out var accessToken) && accessToken.ValueKind == JsonValueKind.String)
+                user.MercadoPagoAccessToken = accessToken.GetString();
+
+            if (root.TryGetProperty("user_id", out var mpUserId))
+            {
+                user.MercadoPagoUserId = mpUserId.ValueKind switch
+                {
+                    JsonValueKind.Number => mpUserId.GetInt64().ToString(),
+                    JsonValueKind.String => mpUserId.GetString(),
+                    _ => user.MercadoPagoUserId
+                };
+            }
+
+            await _context.SaveChangesAsync();
+
+            return new MercadoPagoConnectResult { Success = true, Message = "Cuenta de Mercado Pago vinculada correctamente." };
+        }
+        catch (Exception ex)
+        {
+            return new MercadoPagoConnectResult { Success = false, Message = $"No se pudo vincular la cuenta: {ex.Message}" };
+        }
+    }
+
+    private static bool TryDecodeUserId(string? state, out int userId)
+    {
+        userId = 0;
+        if (string.IsNullOrWhiteSpace(state)) return false;
+
+        try
+        {
+            var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(state));
+            if (!decoded.StartsWith("user:", StringComparison.Ordinal)) return false;
+            return int.TryParse(decoded["user:".Length..], out userId);
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

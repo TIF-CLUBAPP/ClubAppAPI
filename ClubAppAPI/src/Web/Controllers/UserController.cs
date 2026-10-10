@@ -278,6 +278,36 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
+    /// Configuración de cobro directo del usuario autenticado (Alias/CBU + estado de Mercado Pago).
+    /// </summary>
+    [HttpGet("profile/payment-info")]
+    [Authorize]
+    public async Task<IActionResult> GetProfilePaymentInfo()
+    {
+        var (userId, _) = GetActorIdentity();
+        if (userId == null) return Unauthorized(new { message = "Token inválido." });
+
+        var result = await _userService.GetProfilePaymentInfoAsync(userId.Value);
+        return result == null ? NotFound(new { message = "Usuario no encontrado" }) : Ok(result);
+    }
+
+    /// <summary>
+    /// Guarda el Alias/CBU/CVU del usuario autenticado desde su propio perfil.
+    /// </summary>
+    [HttpPut("profile/payment-info")]
+    [Authorize]
+    public async Task<IActionResult> SaveProfilePaymentInfo([FromBody] SaveProfilePaymentInfoRequest request)
+    {
+        if (request == null) return BadRequest(new { message = "request inválido" });
+
+        var (userId, _) = GetActorIdentity();
+        if (userId == null) return Unauthorized(new { message = "Token inválido." });
+
+        var result = await _userService.SaveProfilePaymentInfoAsync(userId.Value, request);
+        return result == null ? NotFound(new { message = "Usuario no encontrado" }) : Ok(result);
+    }
+
+    /// <summary>
     /// Obtiene el Id y el Rol del usuario autenticado desde los claims del JWT.
     /// </summary>
     private (int? Id, UserRole? Role) GetActorIdentity()

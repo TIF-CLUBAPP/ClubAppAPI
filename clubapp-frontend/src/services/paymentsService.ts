@@ -45,15 +45,17 @@ export interface CardPaymentResult {
 export const paymentsService = {
   // ========== CreaciÃ³n de orden de pago (Mercado Pago) ==========
   /** Crea una orden de pago en Mercado Pago (POST /api/payments/create-order). */
-  createOrder: async (cuotaId: number): Promise<CreateOrderResponse> => {
-    const response = await api.post<CreateOrderResponse>('/payments/create-order', { cuotaId });
+  createOrder: async (cuotaId: number | number[]): Promise<CreateOrderResponse> => {
+    const cuotaIds = Array.isArray(cuotaId) ? cuotaId : [cuotaId];
+    const response = await api.post<CreateOrderResponse>('/payments/create-order', { cuotaIds });
     return response.data;
   },
 
   // ========== Pago con tarjeta tokenizada (Mercado Pago) ==========
   /** Procesa el pago con tarjeta usando el token de Mercado Pago (POST /api/payments/pay-with-card). */
-  payWithCard: async (cuotaId: number, token: string): Promise<CardPaymentResult> => {
-    const response = await api.post<CardPaymentResult>('/payments/pay-with-card', { cuotaId, token });
+  payWithCard: async (cuotaId: number | number[], token: string): Promise<CardPaymentResult> => {
+    const cuotaIds = Array.isArray(cuotaId) ? cuotaId : [cuotaId];
+    const response = await api.post<CardPaymentResult>('/payments/pay-with-card', { cuotaIds, token });
     return response.data;
   },
 
@@ -129,7 +131,12 @@ export const paymentsService = {
   /** Registrar una transferencia bancaria (POST /api/payments/register-transfer). */
   registerTransfer: async (data: RegisterTransferRequest, proofFile?: File | null): Promise<TransferPaymentResult> => {
     const formData = new FormData();
-    formData.append('cuotaId', data.cuotaId.toString());
+    const cuotaIds = data.cuotaIds?.length
+      ? data.cuotaIds
+      : data.cuotaId != null
+        ? [data.cuotaId]
+        : [];
+    formData.append('cuotaIds', JSON.stringify(cuotaIds));
     formData.append('totalAmount', data.totalAmount.toString());
     formData.append('netAmount', data.netAmount.toString());
     formData.append('marketplaceFee', data.marketplaceFee.toString());
@@ -163,6 +170,13 @@ export const paymentsService = {
   /** Guarda/víncula credenciales de Mercado Pago y alias del Club (POST /api/settings/payout-config). */
   savePayoutConfig: async (data: SavePayoutConfigRequest): Promise<PayoutConfig> => {
     const response = await api.post<PayoutConfig>('/settings/payout-config', data);
+    return response.data;
+  },
+
+  // ========== Mercado Pago - OAuth (vinculación de cuenta) ==========
+  /** Obtiene la URL de autorización OAuth para vincular la cuenta MP (POST /api/payments/mercadopago/connect). */
+  connectMercadoPago: async (): Promise<{ authorizationUrl: string }> => {
+    const response = await api.post<{ authorizationUrl: string }>('/payments/mercadopago/connect');
     return response.data;
   },
 };

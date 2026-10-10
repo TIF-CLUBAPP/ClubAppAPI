@@ -23,4 +23,10 @@ public interface IUserService
 
     /// <summary>Permite/deniega el cobro directo y guarda los datos de cobro del profesor.</summary>
     Task<TeacherPayoutSettingsDto?> UpdateTeacherPayoutSettingsAsync(int teacherId, TeacherPayoutSettingsRequest request);
+
+    /// <summary>Configuración de cobro del usuario autenticado (Alias/CBU + estado MP). Null si no existe.</summary>
+    Task<ProfilePaymentInfoDto?> GetProfilePaymentInfoAsync(int userId);
+
+    /// <summary>Guarda el Alias/CBU/CVU del usuario autenticado desde su perfil.</summary>
+    Task<ProfilePaymentInfoDto?> SaveProfilePaymentInfoAsync(int userId, SaveProfilePaymentInfoRequest request);
 }

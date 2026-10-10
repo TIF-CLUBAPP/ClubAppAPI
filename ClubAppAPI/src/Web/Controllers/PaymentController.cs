@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Dtos;
 using ClubApp.Domain.Entities;
@@ -21,9 +21,11 @@ public class PaymentsController : ControllerBase
 
     public class CreateMercadoPagoOrderRequest
     {
-        [System.ComponentModel.DataAnnotations.Required]
-        [System.ComponentModel.DataAnnotations.Range(1, int.MaxValue, ErrorMessage = "cuotaId inválido")]
-        public int CuotaId { get; set; }
+        /// <summary>ID de la cuota (pago individual).</summary>
+        public int? CuotaId { get; set; }
+
+        /// <summary>IDs de las cuotas a abonar en una misma operación (pago agrupado).</summary>
+        public List<int>? CuotaIds { get; set; }
     }
 
 
@@ -242,8 +244,9 @@ public class PaymentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RegisterTransfer([FromForm] RegisterTransferRequest request, IFormFile? proofFile)
     {
-        if (request == null || request.CuotaId <= 0)
-            return BadRequest(new { message = "request inválido: cuotaId es obligatorio." });
+        var ids = ResolveCuotaIds(request?.CuotaIds, request?.CuotaId);
+        if (request == null || ids.Count == 0)
+            return BadRequest(new { message = "request inv\u00e1lido: cuotaIds es obligatorio." });
 
         if (proofFile != null && proofFile.Length > 0)
         {
@@ -256,7 +259,7 @@ public class PaymentsController : ControllerBase
             if (!System.IO.Directory.Exists(uploadDir))
                 System.IO.Directory.CreateDirectory(uploadDir);
                 
-            var fileName = $"receipt_{request.CuotaId}_{Guid.NewGuid()}{ext}";
+            var fileName = $"receipt_{Guid.NewGuid()}{ext}";
             var filePath = System.IO.Path.Combine(uploadDir, fileName);
             
             using (var stream = new System.IO.FileStream(filePath, System.IO.FileMode.Create))
@@ -296,18 +299,18 @@ public class PaymentsController : ControllerBase
         if (request == null)
             return BadRequest(new { message = "request inválido" });
 
-        // Validación principal vía atributos en el DTO.
-        if (request.CuotaId <= 0)
-            return BadRequest(new { message = "cuotaId inválido" });
+        var ids = ResolveCuotaIds(request.CuotaIds, request.CuotaId);
+        if (ids.Count == 0)
+            return BadRequest(new { message = "cuotaIds inválido" });
 
-        var initPoint = await _paymentService.CreateOrderAsync(request.CuotaId);
+        var initPoint = await _paymentService.CreateOrderAsync(ids);
 
         switch (initPoint)
         {
             case "NOT_FOUND":
-                return NotFound(new { message = $"No se encontró la cuota {request.CuotaId} en la base de datos." });
+                return NotFound(new { message = "No se encontraron las cuotas indicadas en la base de datos." });
             case "ALREADY_PAID":
-                return BadRequest(new { message = "La cuota ya fue registrada como pagada." });
+                return BadRequest(new { message = "Una de las cuotas ya fue registrada como pagada." });
         }
 
         if (string.IsNullOrWhiteSpace(initPoint))
@@ -327,10 +330,11 @@ public class PaymentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> PayWithCard([FromBody] PayWithCardRequest request)
     {
-        if (request == null || request.CuotaId <= 0 || string.IsNullOrWhiteSpace(request.Token))
-            return BadRequest(new { message = "request inválido: cuotaId y token son obligatorios." });
+        var ids = ResolveCuotaIds(request?.CuotaIds, request?.CuotaId);
+        if (request == null || ids.Count == 0 || string.IsNullOrWhiteSpace(request.Token))
+            return BadRequest(new { message = "request inválido: cuotaIds y token son obligatorios." });
 
-        var result = await _paymentService.ProcessCardPaymentAsync(request.CuotaId, request.Token);
+        var result = await _paymentService.ProcessCardPaymentAsync(ids, request.Token);
 
         if (!result.Success && result.Status == "NOT_FOUND")
             return NotFound(new { message = result.Message });
@@ -339,6 +343,45 @@ public class PaymentsController : ControllerBase
             return BadRequest(new { message = result.Message });
 
         return Ok(result);
+    }
+
+    // ========== Mercado Pago - OAuth (vinculación de cuenta) ==========
+    /// <summary>
+    /// Devuelve la URL de autorización OAuth para que el usuario (profesor) vincule su
+    /// cuenta de Mercado Pago. El frontend redirige el navegador a esa URL.
+    /// </summary>
+    [HttpPost("mercadopago/connect")]
+    [Authorize]
+    public async Task<IActionResult> MercadoPagoConnect()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                          ?? User.FindFirst("sub")?.Value;
+        if (!int.TryParse(userIdClaim, out var userId))
+            return Unauthorized("Token inválido.");
+
+        var redirectUri = $"{Request.Scheme}://{Request.Host}/api/payments/mercadopago/callback";
+        var authorizationUrl = await _paymentService.BuildMercadoPagoConnectUrlAsync(userId, redirectUri);
+
+        if (string.IsNullOrWhiteSpace(authorizationUrl))
+            return BadRequest(new { message = "La vinculación OAuth de Mercado Pago no está configurada. Contactá al administrador." });
+
+        return Ok(new { authorizationUrl });
+    }
+
+    /// <summary>
+    /// Callback OAuth de Mercado Pago. Intercambia el código por credenciales y las guarda
+    /// en el usuario identificado por el parámetro `state`, luego redirige al frontend.
+    /// </summary>
+    [HttpGet("mercadopago/callback")]
+    [AllowAnonymous]
+    public async Task<IActionResult> MercadoPagoCallback([FromQuery] string? code, [FromQuery] string? state)
+    {
+        var redirectUri = $"{Request.Scheme}://{Request.Host}/api/payments/mercadopago/callback";
+        var result = await _paymentService.ConnectMercadoPagoAsync(code ?? string.Empty, state ?? string.Empty, redirectUri);
+
+        var frontendBase = Environment.GetEnvironmentVariable("FRONTEND_BASE_URL") ?? "http://localhost:5173";
+        var status = result.Success ? "connected" : "error";
+        return Redirect($"{frontendBase.TrimEnd('/')}/cuenta?mp={status}");
     }
 
     // ========== Mercado Pago - webhook ==========
@@ -373,5 +416,15 @@ public class PaymentsController : ControllerBase
         var url = $"{frontendBase}/cuotas?paid=1&cuotaId={cuotaId}";
         return Redirect(url);
     }
-}
 
+    private static List<int> ResolveCuotaIds(List<int>? cuotaIds, int? cuotaId)
+    {
+        if (cuotaIds != null && cuotaIds.Count > 0)
+            return cuotaIds.Where(id => id > 0).Distinct().ToList();
+
+        if (cuotaId.HasValue && cuotaId.Value > 0)
+            return new List<int> { cuotaId.Value };
+
+        return new List<int>();
+    }
+}

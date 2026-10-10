@@ -171,10 +171,19 @@ export function useMisCuotas() {
     setCuotas(prev => prev.map(c => c.id === updated.id ? updated : c));
   };
 
+  const updateCuotas = (updatedList: MemberCuota[]) => {
+    setCuotas(prev =>
+      prev.map(c => {
+        const match = updatedList.find(u => u.id === c.id);
+        return match ?? c;
+      }),
+    );
+  };
+
   const totalPending = cuotas.filter(c => c.status !== 'PAGADA').reduce((s, c) => s + c.totalAmount, 0);
   const hasOverdue = cuotas.some(c => c.status === 'EN_MORA');
   const hasPending = cuotas.some(c => c.status === 'PENDIENTE');
   const globalStatus: 'AL_DIA' | 'PENDIENTE' | 'EN_MORA' = hasOverdue ? 'EN_MORA' : hasPending ? 'PENDIENTE' : 'AL_DIA';
 
-  return { loading, settings, exemptionLabel, cuotas, totalPending, globalStatus, updateCuota };
+  return { loading, settings, exemptionLabel, cuotas, totalPending, globalStatus, updateCuota, updateCuotas };
 }

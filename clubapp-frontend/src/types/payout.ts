@@ -30,3 +30,11 @@ export interface TeacherPayoutSettingsRequest {
   mercadoPagoAccessToken?: string;
   mercadoPagoUserId?: string;
 }
+
+// Configuración de cobro directo del usuario autenticado (GET/PUT /api/users/profile/payment-info)
+export interface ProfilePaymentInfo {
+  allowsDirectPayment: boolean;
+  bankAlias?: string | null;
+  hasMercadoPagoAccessToken: boolean;
+  mercadoPagoUserId?: string | null;
+}

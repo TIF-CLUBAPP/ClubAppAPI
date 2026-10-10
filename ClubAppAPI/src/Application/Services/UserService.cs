@@ -230,4 +230,30 @@ public class UserService : IUserService
 
         return await GetTeacherPayoutSettingsAsync(teacherId);
     }
+
+    public async Task<ProfilePaymentInfoDto?> GetProfilePaymentInfoAsync(int userId)
+    {
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user == null) return null;
+
+        return new ProfilePaymentInfoDto
+        {
+            AllowsDirectPayment = user.AllowsDirectPayment,
+            BankAlias = user.BankAlias,
+            HasMercadoPagoAccessToken = !string.IsNullOrWhiteSpace(user.MercadoPagoAccessToken),
+            MercadoPagoUserId = user.MercadoPagoUserId
+        };
+    }
+
+    public async Task<ProfilePaymentInfoDto?> SaveProfilePaymentInfoAsync(int userId, SaveProfilePaymentInfoRequest request)
+    {
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user == null) return null;
+
+        user.BankAlias = string.IsNullOrWhiteSpace(request.BankAlias) ? null : request.BankAlias.Trim();
+
+        await _userRepository.UpdateAsync(user);
+
+        return await GetProfilePaymentInfoAsync(userId);
+    }
 }

@@ -1,6 +1,6 @@
 import { api } from './api';
 import type { UserListItem } from '../types/user';
-import type { TeacherPayoutSettings, TeacherPayoutSettingsRequest } from '../types/payout';
+import type { TeacherPayoutSettings, TeacherPayoutSettingsRequest, ProfilePaymentInfo } from '../types/payout';
 
 export interface GetUsersParams {
   searchQuery?: string;
@@ -60,6 +60,19 @@ export const userService = {
     data: TeacherPayoutSettingsRequest
   ): Promise<TeacherPayoutSettings> => {
     const response = await api.patch<TeacherPayoutSettings>(`/teachers/${id}/payout-settings`, data);
+    return response.data;
+  },
+
+  // ========== Configuración de cobro del usuario autenticado ==========
+  /** Configuración de cobro del usuario autenticado (GET /api/users/profile/payment-info). */
+  getProfilePaymentInfo: async (): Promise<ProfilePaymentInfo> => {
+    const response = await api.get<ProfilePaymentInfo>('/users/profile/payment-info');
+    return response.data;
+  },
+
+  /** Guarda el Alias/CBU/CVU del usuario autenticado (PUT /api/users/profile/payment-info). */
+  saveProfilePaymentInfo: async (bankAlias: string): Promise<ProfilePaymentInfo> => {
+    const response = await api.put<ProfilePaymentInfo>('/users/profile/payment-info', { bankAlias });
     return response.data;
   },
 };

@@ -18,8 +18,12 @@ import type {
 
 interface CheckoutModalProps {
   cuota: MemberCuota | null;
+  /** Varias cuotas a abonar en una misma operación (pago agrupado en "Mis Cuotas"). */
+  cuotas?: MemberCuota[];
   onClose: () => void;
   onPaymentSuccess: (paidCuota: MemberCuota) => void;
+  /** Se invoca al confirmar localmente un pago agrupado (tarjeta / confirmación final). */
+  onPaymentSuccessMany?: (paidCuotas: MemberCuota[]) => void;
   onViewReceipt: (cuota: MemberCuota) => void;
   formatCurrency: (val: number) => string;
   /** Habilita la opción "Dividir con Amigos" (pago grupal de reserva). */
@@ -71,13 +75,22 @@ const mapBookingToState = (b: GroupBookingDto): GroupPaymentState => ({
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   cuota,
+  cuotas,
   onClose,
   onPaymentSuccess,
+  onPaymentSuccessMany,
   onViewReceipt,
   formatCurrency,
   enableGroupPayment = false,
   prepareBookingForTotal,
 }) => {
+  // Normaliza la entrada a una lista de cuotas. El pago agrupado (varias cuotas)
+  // llega vía `cuotas`; los flujos de reserva/individual siguen usando `cuota`.
+  const cuotasList = cuotas && cuotas.length > 0 ? cuotas : cuota ? [cuota] : [];
+  const primary = cuotasList[0];
+  const isGrouped = cuotasList.length > 1;
+  const cuotaKey = cuotasList.map((c) => c.id).join('|');
+
   const [method, setMethod] = useState<'mercadopago' | 'card' | 'transfer'>('mercadopago');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -91,18 +104,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   // ========== Pago dividido / reserva grupal ==========
   const { user } = useAuth();
   const [payMode, setPayMode] = useState<'total' | 'split'>('total');
-  const [createdPaymentId, setCreatedPaymentId] = useState<number | null>(null);
   const [group, setGroup] = useState<GroupPaymentState>(() => createEmptyGroup());
   const [refreshingGroup, setRefreshingGroup] = useState(false);
   const [groupMessage, setGroupMessage] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
 
-  // Al cambiar de cuota (nueva reserva), se reinicia el modo y el estado grupal.
+  // Al cambiar de cuota (nueva reserva o nueva selección), se reinicia el modo y el estado grupal.
   useEffect(() => {
     setPayMode('total');
     setGroup(createEmptyGroup());
     setGroupMessage(null);
-    setCreatedPaymentId(null);
-  }, [cuota?.id]);
+  }, [cuotaKey]);
 
   // Polling del estado grupal: refleja los pagos de los amigos en tiempo real.
   const groupFullyPaid =
@@ -128,15 +139,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const cardExpiryRef = useRef<HTMLInputElement>(null);
   const cardCvcRef = useRef<HTMLInputElement>(null);
 
-  if (!cuota) return null;
+  if (cuotasList.length === 0) return null;
 
   // Todos los mÃ©todos (Mercado Pago, Tarjeta y Transferencia) suman el costo
   // del servicio digital ATRIO al total (3.5% - mÃ¡x $1.500).
   // En modo dividido, el organizador abona únicamente su cuota (total / participantes).
+  const totalBaseAmount = cuotasList.reduce((s, c) => s + (c.totalAmount || 0), 0);
+
   const perPersonAmount =
     payMode === 'split' && group.totalParticipants > 0
-      ? cuota.totalAmount / group.totalParticipants
-      : cuota.totalAmount;
+      ? totalBaseAmount / group.totalParticipants
+      : totalBaseAmount;
 
   const digitalServiceFee = computeDigitalServiceFee(perPersonAmount);
   const totalToPay = perPersonAmount + digitalServiceFee;
@@ -148,8 +161,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   // Alias del receptor final del cobro (Club o Profesor). Viene resuelto por el backend
   // desde GET /api/payments/mine; si no está disponible, se usa el alias por defecto.
-  const transferAlias = cuota.transferAlias || 'CLUB.ATLETICO.MP';
-  const payoutCollector = cuota.payoutCollector || 'Club';
+  const transferAlias = primary?.transferAlias || 'CLUB.ATLETICO.MP';
+  const payoutCollector = primary?.payoutCollector || 'Club';
+
+  // Los alquileres/reservas de cancha solo admiten pago automático (Mercado Pago
+  // o Tarjeta). La transferencia bancaria queda reservada para cuotas sociales.
+  const isCourtBooking = Boolean(primary?.reservation);
 
   const handleSetPayMode = (mode: 'total' | 'split') => {
     setPayMode(mode);
@@ -170,7 +187,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 email: user?.email,
                 username: user?.email?.split('@')[0],
                 isOrganizer: true,
-                shareAmount: cuota.totalAmount / Math.max(1, g.totalParticipants),
+                shareAmount: totalBaseAmount / Math.max(1, g.totalParticipants),
                 status: 'PENDING' as const,
                 invitedAt: new Date().toISOString(),
               },
@@ -194,7 +211,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           (p.email && x.email === p.email),
       );
       if (exists) return g;
-      const share = cuota.totalAmount / Math.max(1, g.totalParticipants);
+      const share = totalBaseAmount / Math.max(1, g.totalParticipants);
       return {
         ...g,
         participants: [...g.participants, { ...p, shareAmount: share, invitedAt: new Date().toISOString() }],
@@ -250,7 +267,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
 
     onPaymentSuccess({
-      ...cuota,
+      ...primary,
       status: 'PAGADA',
       paidAt: new Date().toLocaleString('es-AR', {
         day: '2-digit',
@@ -271,7 +288,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       setIsProcessing(true);
       setGroupMessage(null);
       try {
-        const reservation = cuota.reservation;
+        const reservation = primary?.reservation;
         if (!reservation?.resourceName) {
           throw new Error('No se pudo identificar el espacio a reservar.');
         }
@@ -281,7 +298,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           spaceId: reservation.spaceId ?? null,
           startTime: reservation.startTime,
           endTime: reservation.endTime,
-          amount: cuota.totalAmount,
+          amount: totalBaseAmount,
           totalParticipants: Math.max(2, group.totalParticipants),
           expiresInMinutes: 60,
           participants: group.participants
@@ -313,21 +330,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       return;
     }
 
-    console.log('--- INICIO HANDLE PAYMENT ---', cuota);
+    console.log('--- INICIO HANDLE PAYMENT ---', cuotasList);
 
     try {
+      // Resolver los IDs numéricos de todas las cuotas a abonar (una o varias).
+      let cuotaIds: number[] = cuotasList
+        .map((c) => resolveCuotaId(c))
+        .filter((id): id is number => id !== null);
+
       // Para reservas de cancha, la reserva (y su Payment) se crea recién al
       // confirmar el Pago Total. En ese caso no hay idReal y se usa
       // prepareBookingForTotal para evitar la doble reserva al abrir el checkout.
-      const hasRealCuotaId = (cuota as any)?.idReal != null || (cuota as any)?.cuotaId != null;
-      let cuotaId: number | null = createdPaymentId ?? (hasRealCuotaId ? resolveCuotaId(cuota) : null);
-
-      if (cuotaId === null && prepareBookingForTotal) {
+      if (cuotaIds.length === 0 && prepareBookingForTotal && cuotasList.length === 1) {
         setIsProcessing(true);
         try {
           const created = await prepareBookingForTotal();
-          cuotaId = created.paymentId;
-          setCreatedPaymentId(created.paymentId);
+          cuotaIds = [created.paymentId];
         } catch (err: any) {
           setIsProcessing(false);
           alert(
@@ -340,12 +358,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         }
         setIsProcessing(false);
       }
-      if (cuotaId === null) {
+      if (cuotaIds.length === 0) {
         console.error('[pago] cuotaId invÃ¡lido. No se enviarÃ¡ la peticiÃ³n.', {
-          cuota,
-          idReal: (cuota as any)?.idReal,
-          cuotaIdField: (cuota as any)?.cuotaId,
-          id: cuota?.id,
+          cuotasList,
         });
         alert('No se pudo iniciar el pago: no se pudo identificar la cuota.');
         return;
@@ -398,20 +413,25 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           throw new Error('No se pudo tokenizar la tarjeta con Mercado Pago.');
         }
 
-        const result = await paymentsService.payWithCard(cuotaId, cardToken.id);
+        const result = await paymentsService.payWithCard(cuotaIds, cardToken.id);
 
         if (result?.success && result.status === 'approved') {
           setIsProcessing(false);
           setIsSuccess(true);
           const now = new Date().toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-          onPaymentSuccess({
-            ...cuota,
-            status: 'PAGADA',
+          const paidCuotas = cuotasList.map((c) => ({
+            ...c,
+            status: 'PAGADA' as const,
             paidAt: now,
             paymentMethod: 'Tarjeta (Mercado Pago)',
             receiptNumber: `REC-2026-${Math.floor(10000 + Math.random() * 90000)}`,
             isOverdue: false,
-          });
+          }));
+          if (isGrouped) {
+            onPaymentSuccessMany?.(paidCuotas);
+          } else {
+            onPaymentSuccess(paidCuotas[0]);
+          }
           return;
         }
 
@@ -425,13 +445,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         setIsProcessing(true);
 
         console.info('[create-order] Iniciando pago digital.', {
-          cuotaId,
+          cuotaIds,
           method,
           digitalServiceFee,
           totalToPay,
         });
 
-        const order = await paymentsService.createOrder(cuotaId);
+        const order = await paymentsService.createOrder(cuotaIds);
 
         // El backend actual devuelve `init_point` (snake_case). Por robustez,
         // tambiÃ©n se aceptan las variantes camelCase / sandbox por si cambia la
@@ -466,9 +486,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
         const result = await paymentsService.registerTransfer(
           {
-            cuotaId,
+            cuotaIds,
             totalAmount: totalToPay,
-            netAmount: cuota.totalAmount,
+            netAmount: totalBaseAmount,
             marketplaceFee: digitalServiceFee,
             referenceNumber,
           },
@@ -500,7 +520,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         message: err?.message,
         status: err?.response?.status,
         responseData: err?.response?.data,
-        cuota,
+        cuotasList,
         method,
       });
       setIsProcessing(false);
@@ -526,7 +546,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           <div className="flex items-center justify-between pb-3 border-b border-slate-800">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400"><CreditCard className="w-5 h-5" /></div>
-              <div><h3 className="text-lg font-bold text-white">Pasarela de Pago</h3><p className="text-base text-slate-400">Cuota Social - {cuota.periodo}</p></div>
+              <div><h3 className="text-lg font-bold text-white">Pasarela de Pago</h3><p className="text-base text-slate-400">{isGrouped ? `Cuotas Sociales: ${cuotasList.map((c) => c.periodo).join(', ')}` : `Cuota Social - ${primary?.periodo}`}</p></div>
             </div>
             {!isProcessing && (<button onClick={onClose} className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800"><X className="w-5 h-5" /></button>)}
           </div>
@@ -547,7 +567,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </button>
               </div>
             ) : isSuccess ? (
-              <PaymentSuccessView cuota={cuota} onViewReceipt={onViewReceipt} />
+              <PaymentSuccessView cuotas={cuotasList} onViewReceipt={onViewReceipt} formatCurrency={formatCurrency} />
             ) : isProcessing ? (
               <div className="py-12 text-center space-y-3"><RefreshCw className="w-9 h-9 animate-spin text-emerald-400 mx-auto" /><p className="text-sm font-bold text-white">Procesando pago seguro...</p></div>
             ) : (
@@ -586,7 +606,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     )}
                     <GroupPaymentPanel
                       formatCurrency={formatCurrency}
-                      totalAmount={cuota.totalAmount}
+                      totalAmount={totalBaseAmount}
                       perPersonAmount={perPersonAmount}
                       group={group}
                       organizerHasPaid={organizerHasPaid}
@@ -599,17 +619,19 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   </>
                 ) : (
                   <PaymentSummaryBox
-                    cuota={cuota}
+                    cuotas={cuotasList}
                     formatCurrency={formatCurrency}
                     digitalServiceFee={digitalServiceFee}
                     totalToPay={totalToPay}
                   />
                 )}
 
-                <div className="grid grid-cols-3 gap-2">
+                <div className={`grid gap-2 ${isCourtBooking ? 'grid-cols-2' : 'grid-cols-3'}`}>
                   <button type="button" onClick={() => setMethod('mercadopago')} className={`p-2.5 rounded-xl border text-base font-medium flex flex-col items-center gap-1 ${method === 'mercadopago' ? 'bg-sky-500/10 border-sky-500 text-sky-400' : 'bg-slate-950 border-slate-800 text-slate-400'}`}><span className="font-extrabold text-sm">mp</span><span>Mercado Pago</span></button>
                   <button type="button" onClick={() => setMethod('card')} className={`p-2.5 rounded-xl border text-base font-medium flex flex-col items-center gap-1 ${method === 'card' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' : 'bg-slate-950 border-slate-800 text-slate-400'}`}><CreditCard className="w-4 h-4" /><span>Tarjeta</span></button>
-                  <button type="button" onClick={() => setMethod('transfer')} className={`p-2.5 rounded-xl border text-base font-medium flex flex-col items-center gap-1 ${method === 'transfer' ? 'bg-purple-500/10 border-purple-500 text-purple-400' : 'bg-slate-950 border-slate-800 text-slate-400'}`}><Building2 className="w-4 h-4" /><span>Transferencia</span></button>
+                  {!isCourtBooking && (
+                    <button type="button" onClick={() => setMethod('transfer')} className={`p-2.5 rounded-xl border text-base font-medium flex flex-col items-center gap-1 ${method === 'transfer' ? 'bg-purple-500/10 border-purple-500 text-purple-400' : 'bg-slate-950 border-slate-800 text-slate-400'}`}><Building2 className="w-4 h-4" /><span>Transferencia</span></button>
+                  )}
                 </div>
 
                 {method === 'transfer' && (

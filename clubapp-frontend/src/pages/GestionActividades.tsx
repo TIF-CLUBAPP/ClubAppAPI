@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Edit2, Trash2, X, Save, Clock, MapPin,
   CheckCircle2, AlertCircle, AlertTriangle, Dumbbell, RefreshCw, Users,
-  GraduationCap, UserPlus, ChevronDown,
+  GraduationCap, UserPlus, ChevronDown, Receipt, Banknote,
 } from 'lucide-react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
@@ -11,7 +11,7 @@ import { useAuth } from '../context/AuthContext';
 import { activityService } from '../services/activityService';
 import { spaceService } from '../services/spaceService';
 import { userService } from '../services/userService';
-import type { Activity, ActivityScheduleInput, SaveActivityRequest } from '../types/activity';
+import type { Activity, ActivityScheduleInput, SaveActivityRequest, ActivitySettlement } from '../types/activity';
 import type { Space } from '../types/space';
 import { SPORT_CATEGORIES } from '../types/space';
 import type { UserListItem } from '../types/user';
@@ -41,11 +41,19 @@ const timeToMin = (t: string): number => {
 const overlaps = (aStart: string, aEnd: string, bStart: string, bEnd: string): boolean =>
   timeToMin(aStart) < timeToMin(bEnd) && timeToMin(bStart) < timeToMin(aEnd);
 
+const fmtCurrency = (val: number) =>
+  new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(val);
+
 const emptyForm = (): SaveActivityRequest => ({
   name: '',
   description: '',
   category: SPORT_CATEGORIES[0],
   price: 0,
+  priceMember: 0,
+  priceNonMember: 0,
+  paymentCollector: 'CLUB',
+  professorFacilityFeeMember: 0,
+  professorFacilityFeeNonMember: 0,
   maxCapacity: 10,
   teacherId: null,
   instructorIds: [],
@@ -84,6 +92,10 @@ export default function GestionActividades() {
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Activity | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [settlementTarget, setSettlementTarget] = useState<Activity | null>(null);
+  const [settlement, setSettlement] = useState<ActivitySettlement | null>(null);
+  const [settlementLoading, setSettlementLoading] = useState(false);
+  const [settlementError, setSettlementError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [scheduleMode, setScheduleMode] = useState<'detailed' | 'massive'>('detailed');
   const [massiveBlocks, setMassiveBlocks] = useState<WeeklyScheduleBlock[]>([
@@ -204,6 +216,11 @@ export default function GestionActividades() {
       description: a.description,
       category: a.category,
       price: a.price,
+      priceMember: a.priceMember,
+      priceNonMember: a.priceNonMember,
+      paymentCollector: a.paymentCollector,
+      professorFacilityFeeMember: a.professorFacilityFeeMember,
+      professorFacilityFeeNonMember: a.professorFacilityFeeNonMember,
       maxCapacity: a.maxCapacity,
       teacherId: a.teacherId ?? null,
       instructorIds: (a.instructors ?? []).map((i) => i.id),
@@ -299,6 +316,21 @@ export default function GestionActividades() {
       setToast({ type: 'error', message: err?.response?.data?.message ?? 'No se pudo eliminar la actividad.' });
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const openSettlement = async (activity: Activity) => {
+    setSettlementTarget(activity);
+    setSettlement(null);
+    setSettlementError(null);
+    setSettlementLoading(true);
+    try {
+      const data = await activityService.getSettlement(activity.id);
+      setSettlement(data);
+    } catch (err: any) {
+      setSettlementError(err?.response?.data?.message ?? 'No se pudo cargar la liquidación.');
+    } finally {
+      setSettlementLoading(false);
     }
   };
 
@@ -453,6 +485,15 @@ export default function GestionActividades() {
                       </span>
                       <span>{Math.max(a.availableSpots, 0)} disponibles</span>
                     </div>
+
+                    {a.paymentCollector === 'PROFESSOR_DIRECT' && (
+                      <button
+                        onClick={() => openSettlement(a)}
+                        className="mt-2 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-300 text-xs font-bold hover:bg-violet-500/20 transition"
+                      >
+                        <Receipt size={14} /> Ver Liquidación
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -562,6 +603,76 @@ export default function GestionActividades() {
                     />
                   </div>
                 </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-1">Tipo de Cobro</label>
+                  <select
+                    value={form.paymentCollector}
+                    onChange={(e) =>
+                      setForm({ ...form, paymentCollector: e.target.value as SaveActivityRequest['paymentCollector'] })
+                    }
+                    className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                  >
+                    <option value="CLUB">Cobrado por el Club</option>
+                    <option value="PROFESSOR_DIRECT">Cobrado por el Profesor</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 mb-1">Precio Socio ($)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={form.priceMember === 0 ? '' : form.priceMember}
+                      onChange={(e) => setForm({ ...form, priceMember: parseNumericInput(e.target.value) })}
+                      className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 mb-1">Precio No Socio ($)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={form.priceNonMember === 0 ? '' : form.priceNonMember}
+                      onChange={(e) => setForm({ ...form, priceNonMember: parseNumericInput(e.target.value) })}
+                      className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                    />
+                  </div>
+                </div>
+
+                {form.paymentCollector === 'PROFESSOR_DIRECT' && (
+                  <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-4 space-y-3">
+                    <div>
+                      <h4 className="text-sm font-bold text-violet-300">Canon del Club</h4>
+                      <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                        Cuando el profesor cobra directamente a los alumnos, definí el canon que le corresponde al club por cada inscripción.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 mb-1">Canon Club por Socio ($)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={form.professorFacilityFeeMember === 0 ? '' : form.professorFacilityFeeMember}
+                          onChange={(e) => setForm({ ...form, professorFacilityFeeMember: parseNumericInput(e.target.value) })}
+                          className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 mb-1">Canon Club por No Socio ($)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={form.professorFacilityFeeNonMember === 0 ? '' : form.professorFacilityFeeNonMember}
+                          onChange={(e) => setForm({ ...form, professorFacilityFeeNonMember: parseNumericInput(e.target.value) })}
+                          className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="block text-xs font-bold text-slate-400">Profesores a cargo</label>
@@ -856,6 +967,103 @@ export default function GestionActividades() {
                 >
                   {deleting ? <RefreshCw size={15} className="animate-spin" /> : <Trash2 size={15} />}
                   {deleting ? 'Eliminando…' : 'Eliminar'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {settlementTarget && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60]"
+          >
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400 shrink-0">
+                    <Receipt size={22} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Liquidación de Canon</h3>
+                    <p className="text-sm text-slate-400">{settlementTarget.name}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSettlementTarget(null)}
+                  className="text-slate-400 hover:text-white p-1"
+                  title="Cerrar"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {settlementLoading ? (
+                <div className="flex items-center justify-center gap-2 py-10 text-slate-400 text-sm">
+                  <RefreshCw size={18} className="animate-spin text-violet-400" /> Cargando liquidación...
+                </div>
+              ) : settlementError ? (
+                <div className="mt-6 bg-red-500/10 border border-red-500/20 text-red-300 text-sm rounded-xl p-4">
+                  {settlementError}
+                </div>
+              ) : settlement ? (
+                <div className="mt-6 space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3 text-center">
+                      <p className="text-2xl font-black text-white">{settlement.memberEnrollments}</p>
+                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
+                        Alumnos Socios
+                      </p>
+                    </div>
+                    <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3 text-center">
+                      <p className="text-2xl font-black text-white">{settlement.nonMemberEnrollments}</p>
+                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
+                        Alumnos No Socios
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2 text-sm">
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span>Socios × Canon Socio</span>
+                      <span className="font-semibold text-white">
+                        {settlement.memberEnrollments} × {fmtCurrency(settlement.memberFee)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span>No Socios × Canon No Socio</span>
+                      <span className="font-semibold text-white">
+                        {settlement.nonMemberEnrollments} × {fmtCurrency(settlement.nonMemberFee)}
+                      </span>
+                    </div>
+                    <div className="border-t border-slate-800 pt-3 flex items-center justify-between gap-2">
+                      <span className="font-bold text-slate-200 flex items-center gap-1.5">
+                        <Banknote size={15} className="text-emerald-400" /> Total a Pagar al Club
+                      </span>
+                      <span className="text-xl font-black text-emerald-400">
+                        {fmtCurrency(settlement.totalSettlement)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setSettlementTarget(null)}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-300 border border-slate-700 hover:bg-slate-800"
+                >
+                  Cerrar
                 </button>
               </div>
             </motion.div>

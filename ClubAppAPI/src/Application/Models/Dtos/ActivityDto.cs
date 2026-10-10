@@ -13,6 +13,15 @@ public class ActivityDto
     public decimal ProfessorFacilityFeeMember { get; set; }
     public decimal ProfessorFacilityFeeNonMember { get; set; }
     public string? ProfessorMercadoPagoPublicKey { get; set; }
+
+    /// <summary>Alias/CBU/CVU del profesor que cobra directamente (solo PROFESSOR_DIRECT).</summary>
+    public string? ProfessorBankAlias { get; set; }
+
+    /// <summary>True si el profesor tiene una cuenta de Mercado Pago vinculada.</summary>
+    public bool ProfessorHasMercadoPago { get; set; }
+
+    /// <summary>Identificador de la cuenta de Mercado Pago del profesor (si está vinculada).</summary>
+    public string? ProfessorMercadoPagoUserId { get; set; }
     public int MaxCapacity { get; set; }
     public int? TeacherId { get; set; }
     public string? TeacherName { get; set; }

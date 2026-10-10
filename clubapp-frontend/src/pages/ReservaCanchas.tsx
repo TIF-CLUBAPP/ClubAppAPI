@@ -44,7 +44,7 @@ interface Slot {
   endMin: number;
 }
 
-type SlotStatus = 'available' | 'booked' | 'class';
+type SlotStatus = 'available' | 'booked' | 'class' | 'past';
 
 const WEEKDAYS_ES = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do'];
 const MONTHS_ES = [
@@ -351,14 +351,23 @@ export default function ReservaCanchas() {
     return classSchedules.some((s) => s.startMin < slot.endMin && slot.startMin < s.endMin);
   };
 
+  // Un turno es "pasado" únicamente si corresponde a hoy y su hora de inicio ya transcurrió.
+  const isPastSlot = (slot: Slot): boolean => {
+    if (selectedDate !== toDateInput(new Date())) return false;
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    return slot.startMin <= nowMin;
+  };
+
   const slotStatus = (slot: Slot): SlotStatus => {
+    if (isPastSlot(slot)) return 'past';
     if (classOccupied(slot)) return 'class';
     if (bookingOccupied(slot)) return 'booked';
     return 'available';
   };
 
   const handleToggleSlot = (slot: Slot) => {
-    if (!selectedSpace) return;
+    if (!selectedSpace || isPastSlot(slot)) return;
     setSelectedSlots((prev) =>
       prev.some((s) => s.key === slot.key)
         ? prev.filter((s) => s.key !== slot.key)
@@ -575,6 +584,7 @@ export default function ReservaCanchas() {
                       <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-400" /> Disponible</span>
                       <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-slate-500" /> Ocupado</span>
                       <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-sky-400" /> Clase</span>
+                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-slate-600" /> Pasado</span>
                     </div>
                   </div>
 
@@ -606,6 +616,20 @@ export default function ReservaCanchas() {
                             <span className="text-sm font-bold text-slate-400">{slot.start} – {slot.end}</span>
                             <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 bg-slate-800/60 rounded-full px-2 py-0.5">
                               <MapPin size={12} /> Ocupado
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      if (status === 'past') {
+                        return (
+                          <div
+                            key={slot.key}
+                            className="rounded-2xl border border-slate-800 bg-slate-900/40 p-3 flex flex-col items-center justify-center gap-1.5 text-center opacity-40 cursor-not-allowed"
+                          >
+                            <span className="text-sm font-bold text-slate-500 line-through">{slot.start} – {slot.end}</span>
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 bg-slate-800/40 rounded-full px-2 py-0.5">
+                              <X size={12} /> Pasado
                             </span>
                           </div>
                         );

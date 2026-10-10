@@ -58,6 +58,10 @@ public class BookingService : IBookingService
         if (dto.Amount < 0)
             throw new AppValidationException("El monto no puede ser negativo.");
 
+        // Rechaza reservas cuyo inicio ya quedó en el pasado (evita "colar" turnos vencidos).
+        if (dto.StartTime.ToUniversalTime() < DateTime.UtcNow)
+            throw new AppValidationException("No se pueden realizar reservas en horarios pasados.");
+
         var user = await _context.Users.FindAsync(userId);
         if (user == null) throw new NotFoundException("User", userId);
 

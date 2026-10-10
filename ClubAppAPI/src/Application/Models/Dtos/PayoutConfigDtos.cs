@@ -45,3 +45,32 @@ public class TeacherPayoutSettingsRequest
     public string? MercadoPagoAccessToken { get; set; }
     public string? MercadoPagoUserId { get; set; }
 }
+
+/// <summary>
+/// Configuración de cobro directo del usuario autenticado (GET/PUT /api/users/profile/payment-info).
+/// El AccessToken de Mercado Pago nunca se expone: solo se informa si ya está vinculado.
+/// </summary>
+public class ProfilePaymentInfoDto
+{
+    public bool AllowsDirectPayment { get; set; }
+    public string? BankAlias { get; set; }
+    public bool HasMercadoPagoAccessToken { get; set; }
+    public string? MercadoPagoUserId { get; set; }
+}
+
+/// <summary>
+/// Entrada para que el profesor guarde su Alias/CBU/CVU desde su propio perfil.
+/// </summary>
+public class SaveProfilePaymentInfoRequest
+{
+    public string? BankAlias { get; set; }
+}
+
+/// <summary>
+/// Resultado del callback de vinculación OAuth de Mercado Pago.
+/// </summary>
+public class MercadoPagoConnectResult
+{
+    public bool Success { get; set; }
+    public string? Message { get; set; }
+}

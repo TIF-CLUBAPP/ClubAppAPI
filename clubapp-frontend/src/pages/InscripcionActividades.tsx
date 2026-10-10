@@ -9,6 +9,10 @@ import {
   AlertCircle,
   Sparkles,
   UserCheck,
+  Wallet,
+  Copy,
+  X,
+  ExternalLink,
 } from 'lucide-react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
@@ -23,6 +27,8 @@ export default function InscripcionActividades() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [toast, setToast] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
+  const [pendingActivity, setPendingActivity] = useState<Activity | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const load = async () => {
     try {
@@ -51,15 +57,37 @@ export default function InscripcionActividades() {
       setToast({ type: 'error', text: 'No hay cupos disponibles para esta actividad.' });
       return;
     }
+
+    // Si la cobra directamente el profesor, mostramos sus datos de cobro antes de inscribir.
+    if (activity.paymentCollector === 'PROFESSOR_DIRECT') {
+      setPendingActivity(activity);
+      return;
+    }
+
+    await confirmEnroll(activity);
+  };
+
+  const confirmEnroll = async (activity: Activity) => {
     try {
       setBusyId(activity.id);
       await activityService.enroll(activity.id);
       setToast({ type: 'ok', text: `¡Inscripción exitosa en ${activity.name}!` });
+      setPendingActivity(null);
       await load();
     } catch (err: any) {
       setToast({ type: 'error', text: err?.response?.data?.message ?? 'No se pudo completar la inscripción.' });
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const copyAlias = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard no disponible; se ignora.
     }
   };
 
@@ -203,24 +231,37 @@ export default function InscripcionActividades() {
                               <UserCheck size={12} className="text-sky-400" /> {a.teacherName}
                             </span>
                           )}
-                          <span className="text-sm font-bold text-white">
-                            {a.price > 0 ? fmtCurrency(a.price) : 'Gratuita'}
-                          </span>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-xs text-slate-400">
+                              Socio:{' '}
+                              <span className="font-bold text-white">
+                                {a.priceMember > 0 ? fmtCurrency(a.priceMember) : 'Gratuita'}
+                              </span>
+                            </span>
+                            <span className="text-xs text-slate-400">
+                              No Socio:{' '}
+                              <span className="font-bold text-white">
+                                {a.priceNonMember > 0 ? fmtCurrency(a.priceNonMember) : 'Gratuita'}
+                              </span>
+                            </span>
+                          </div>
                         </div>
 
                         <button
                           onClick={() => handleEnroll(a)}
                           disabled={full || inactive || busyId === a.id}
                           className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                            full || inactive
-                              ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                              : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
-                          } disabled:opacity-60 disabled:cursor-not-allowed`}
+                            full
+                              ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30 cursor-not-allowed'
+                              : inactive
+                                ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                                : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
+                          } disabled:opacity-70 disabled:cursor-not-allowed`}
                         >
                           {busyId === a.id ? (
                             <RefreshCw size={14} className="animate-spin" />
                           ) : full ? (
-                            'Cupos llenos'
+                            'Sin Cupo'
                           ) : (
                             'Inscribirme'
                           )}
@@ -234,6 +275,114 @@ export default function InscripcionActividades() {
           </div>
         </main>
       </div>
+
+      {/* Modal de cobro directo del profesor (PROFESSOR_DIRECT) */}
+      {pendingActivity && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Wallet size={18} className="text-emerald-400" />
+                <h3 className="text-lg font-black text-white">Cobro directo del profesor</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPendingActivity(null)}
+                className="text-slate-400 hover:text-white transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className="mt-2 text-sm text-slate-300">
+              La actividad <span className="font-bold text-white">{pendingActivity.name}</span> se cobra
+              directamente al profesor. Coordiná el pago con:
+            </p>
+
+            <div className="mt-4 space-y-3">
+              {pendingActivity.teacherName && (
+                <div className="flex items-center gap-2 text-sm text-slate-200">
+                  <UserCheck size={16} className="text-sky-400" />
+                  <span className="font-semibold">{pendingActivity.teacherName}</span>
+                </div>
+              )}
+
+              {pendingActivity.professorBankAlias ? (
+                <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+                  <p className="text-[11px] uppercase tracking-wider text-emerald-300 font-semibold mb-1">
+                    Alias / CBU / CVU
+                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-bold text-white break-all">
+                      {pendingActivity.professorBankAlias}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => copyAlias(pendingActivity.professorBankAlias!)}
+                      className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 rounded-lg px-2.5 py-1.5 transition"
+                    >
+                      {copied ? <CheckCircle2 size={13} /> : <Copy size={13} />}
+                      {copied ? 'Copiado' : 'Copiar'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
+                  El profesor todavía no cargó su Alias/CBU. Contactalo para coordinar el pago.
+                </div>
+              )}
+
+              {pendingActivity.professorHasMercadoPago && (
+                <div className="rounded-2xl border border-sky-500/30 bg-sky-500/10 p-4">
+                  <p className="text-[11px] uppercase tracking-wider text-sky-300 font-semibold mb-1">
+                    Mercado Pago
+                  </p>
+                  <a
+                    href="https://www.mercadopago.com.ar/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-sm font-bold text-sky-300 hover:text-sky-200 transition"
+                  >
+                    Pagar por Mercado Pago <ExternalLink size={13} />
+                  </a>
+                </div>
+              )}
+            </div>
+
+            <p className="mt-4 text-[11px] text-slate-500">
+              La inscripción queda registrada, pero el pago se coordina directamente con el profesor.
+            </p>
+
+            <div className="mt-5 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPendingActivity(null)}
+                disabled={busyId === pendingActivity.id}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-bold text-slate-300 bg-slate-800 border border-slate-700 hover:bg-slate-700 rounded-xl px-4 py-2.5 transition disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => confirmEnroll(pendingActivity)}
+                disabled={busyId === pendingActivity.id}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-bold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded-xl px-4 py-2.5 transition disabled:opacity-50"
+              >
+                {busyId === pendingActivity.id ? (
+                  <RefreshCw size={14} className="animate-spin" />
+                ) : (
+                  <CheckCircle2 size={14} />
+                )}
+                Confirmar inscripción
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

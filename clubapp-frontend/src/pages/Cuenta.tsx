@@ -12,13 +12,17 @@ import {
   RefreshCw,
   Pencil,
   Save,
+  Wallet,
+  Link2,
 } from 'lucide-react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import { useAuth } from '../context/AuthContext';
 import { friendService } from '../services/friendService';
 import { userService, type UpdateProfilePayload } from '../services/userService';
+import { paymentsService } from '../services/paymentsService';
 import type { Friend, FriendRequestsState } from '../types/friend';
+import type { ProfilePaymentInfo } from '../types/payout';
 
 type Tab = 'perfil' | 'amigos' | 'solicitudes';
 
@@ -52,9 +56,10 @@ const formatDate = (iso?: string): string => {
 const nameOf = (u: { fullName?: string; firstName?: string; lastName?: string; email?: string }): string =>
   u.fullName || `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || u.email || '';
 
+// Personal autorizado para cobro directo. Los socios/alumnos (MEMBER) quedan excluidos.
 const isStaffRole = (role?: string): boolean => {
   const r = (role ?? '').trim().toUpperCase();
-  return r === 'SUPERADMIN' || r === 'ADMIN' || r === 'TEACHER' || r === 'STAFF' || r === 'PROFESOR';
+  return r === 'SUPERADMIN' || r === 'ADMIN' || r === 'TEACHER';
 };
 
 export default function Cuenta() {
@@ -75,6 +80,13 @@ export default function Cuenta() {
     phone: '',
     dni: '',
   });
+
+  // ========== Configuración de Cobros Directos (profesores / staff) ==========
+  const [paymentInfo, setPaymentInfo] = useState<ProfilePaymentInfo | null>(null);
+  const [aliasInput, setAliasInput] = useState('');
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentSaving, setPaymentSaving] = useState(false);
+  const [mpConnecting, setMpConnecting] = useState(false);
 
   const displayName = user
     ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email || 'Usuario'
@@ -205,6 +217,64 @@ export default function Cuenta() {
       showFeedback('error', 'No se pudo cancelar la solicitud.');
     } finally {
       setActingId(null);
+    }
+  };
+
+  const loadPaymentInfo = useCallback(async () => {
+    if (!isStaffRole(user?.role)) return;
+    setPaymentLoading(true);
+    try {
+      const info = await userService.getProfilePaymentInfo();
+      setPaymentInfo(info);
+      setAliasInput(info.bankAlias ?? '');
+    } catch {
+      // No interrumpe la pantalla de perfil si falla.
+    } finally {
+      setPaymentLoading(false);
+    }
+  }, [user?.role]);
+
+  useEffect(() => {
+    loadPaymentInfo();
+  }, [loadPaymentInfo]);
+
+  // Lee el resultado del flujo OAuth de Mercado Pago (redirect a /cuenta?mp=...).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const mp = params.get('mp');
+    if (mp === 'connected') {
+      showFeedback('ok', 'Cuenta de Mercado Pago vinculada correctamente.');
+      loadPaymentInfo();
+      window.history.replaceState({}, '', '/cuenta');
+    } else if (mp === 'error') {
+      showFeedback('error', 'No se pudo vincular la cuenta de Mercado Pago. Intentá de nuevo.');
+      window.history.replaceState({}, '', '/cuenta');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleSaveAlias = async () => {
+    setPaymentSaving(true);
+    try {
+      const info = await userService.saveProfilePaymentInfo(aliasInput.trim());
+      setPaymentInfo(info);
+      setAliasInput(info.bankAlias ?? '');
+      showFeedback('ok', 'Tu Alias/CBU/CVU fue guardado correctamente.');
+    } catch {
+      showFeedback('error', 'No se pudo guardar tu Alias/CBU/CVU.');
+    } finally {
+      setPaymentSaving(false);
+    }
+  };
+
+  const handleConnectMercadoPago = async () => {
+    setMpConnecting(true);
+    try {
+      const { authorizationUrl } = await paymentsService.connectMercadoPago();
+      window.location.href = authorizationUrl;
+    } catch {
+      showFeedback('error', 'No se pudo iniciar la vinculación con Mercado Pago.');
+      setMpConnecting(false);
     }
   };
 
@@ -434,6 +504,81 @@ export default function Cuenta() {
                   </form>
                 )}
               </div>
+            )}
+
+            {/* Configuración de Cobros Directos (profesores / staff) */}
+            {tab === 'perfil' && isStaffRole(user?.role) && (
+                <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Wallet size={18} className="text-emerald-400" />
+                    <h3 className="font-bold text-white">Configuración de Cobros Directos</h3>
+                  </div>
+                  <p className="text-xs text-slate-400 mb-5">
+                    Si dictás actividades con cobro directo, indicá tu Alias/CBU/CVU y vinculá tu
+                    cuenta de Mercado Pago para cobrar a los alumnos.
+                  </p>
+
+                  <label className="block text-xs text-slate-500 uppercase tracking-wider mb-1">
+                    Alias / CBU / CVU
+                  </label>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="text"
+                      value={aliasInput}
+                      onChange={(e) => setAliasInput(e.target.value)}
+                      placeholder="Ej: mi.alias.mp o CBU de 22 dígitos"
+                      disabled={paymentLoading}
+                      className="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white outline-none transition focus:border-emerald-400 disabled:opacity-50"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSaveAlias}
+                      disabled={paymentSaving || paymentLoading}
+                      className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg px-4 py-2 transition disabled:opacity-50"
+                    >
+                      {paymentSaving ? <RefreshCw size={13} className="animate-spin" /> : <Save size={13} />}
+                      Guardar
+                    </button>
+                  </div>
+
+                  <div className="mt-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full border ${
+                          paymentInfo?.hasMercadoPagoAccessToken
+                            ? 'bg-sky-500/10 text-sky-300 border-sky-500/30'
+                            : 'bg-slate-800 text-slate-400 border-slate-700'
+                        }`}
+                      >
+                        <Link2 size={12} />
+                        {paymentInfo?.hasMercadoPagoAccessToken
+                          ? 'Mercado Pago vinculado'
+                          : 'Mercado Pago no vinculado'}
+                      </span>
+                      {paymentInfo?.mercadoPagoUserId && (
+                        <span className="text-[11px] text-slate-500">ID: {paymentInfo.mercadoPagoUserId}</span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleConnectMercadoPago}
+                      disabled={mpConnecting}
+                      className="inline-flex items-center justify-center gap-2 text-sm font-bold text-white bg-[#009EE3] hover:bg-[#0086c2] rounded-lg px-4 py-2 transition disabled:opacity-60"
+                    >
+                      {mpConnecting ? <RefreshCw size={14} className="animate-spin" /> : <Link2 size={14} />}
+                      {paymentInfo?.hasMercadoPagoAccessToken
+                        ? 'Reconectar con Mercado Pago'
+                        : 'Conectar con Mercado Pago'}
+                    </button>
+                  </div>
+
+                  {paymentInfo && !paymentInfo.allowsDirectPayment && (
+                    <p className="mt-3 text-[11px] text-amber-300/80">
+                      Aviso: el cobro directo está deshabilitado por el Club. Un administrador debe habilitarlo
+                      para que puedas cobrar tus clases directamente.
+                    </p>
+                  )}
+                </div>
             )}
 
             {tab === 'amigos' && (
