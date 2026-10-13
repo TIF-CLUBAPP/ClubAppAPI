@@ -1,10 +1,14 @@
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar,
   Clock,
+  Dumbbell,
   MapPin,
   Trash2,
+  ChevronDown,
+  ChevronUp,
   CheckCircle2,
   AlertCircle,
   Sparkles,
@@ -65,6 +69,8 @@ const groupSchedules = (schedules: ActivitySchedule[]): { days: string; time: st
 };
 
 export default function Reservations() {
+  const navigate = useNavigate();
+
   const [enrollments, setEnrollments] = useState<MyEnrollment[]>([]);
   const [enrollmentsLoading, setEnrollmentsLoading] = useState(true);
   const [enrollmentsError, setEnrollmentsError] = useState<string | null>(null);
@@ -76,6 +82,7 @@ export default function Reservations() {
   const [filter, setFilter] = useState<'active' | 'all' | 'cancelled'>('active');
   const [cancellingId, setCancellingId] = useState<number | null>(null);
   const [bookingToCancel, setBookingToCancel] = useState<Booking | null>(null);
+  const [showAllCancelled, setShowAllCancelled] = useState(false);
 
   const loadEnrollments = useCallback(async () => {
     setEnrollmentsLoading(true);
@@ -134,6 +141,16 @@ export default function Reservations() {
     return true;
   });
 
+  const handleFilterChange = (next: 'active' | 'all' | 'cancelled') => {
+    setFilter(next);
+    setShowAllCancelled(false);
+  };
+
+  const isCancelledTab = filter === 'cancelled';
+  const hasMoreCancelled = isCancelledTab && !showAllCancelled && filteredBookings.length > 3;
+  const visibleBookings = isCancelledTab && !showAllCancelled ? filteredBookings.slice(0, 3) : filteredBookings;
+  const hiddenCancelledCount = hasMoreCancelled ? filteredBookings.length - 3 : 0;
+
   const activeEnrollments = enrollments.filter((e) => e.status !== 'CANCELED');
 
   return (
@@ -166,7 +183,20 @@ export default function Reservations() {
                 ) : enrollmentsError ? (
                   <EmptyState icon={<AlertCircle size={32} className="text-rose-500" />} title="No se pudieron cargar tus actividades" subtitle={enrollmentsError} onRetry={loadEnrollments} />
                 ) : activeEnrollments.length === 0 ? (
-                  <EmptyState icon={<Calendar size={32} />} title="Todavía no estás inscripto en ninguna actividad" subtitle="Podés inscribirte desde la sección Actividades." />
+                  <EmptyState
+                    icon={<Calendar size={32} />}
+                    title="Todavía no estás inscripto en ninguna actividad"
+                    subtitle="Descubrí todas las clases, deportes y disciplinas que el club tiene para ofrecerte."
+                    action={
+                      <button
+                        onClick={() => navigate('/actividades')}
+                        className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold px-5 py-2.5 rounded-xl shadow-lg shadow-emerald-500/20 transition-all inline-flex items-center gap-2 mt-4"
+                      >
+                        <Dumbbell size={18} />
+                        Explorar Actividades
+                      </button>
+                    }
+                  />
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <AnimatePresence>
@@ -227,9 +257,9 @@ export default function Reservations() {
                 </div>
 
                 <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-2xl border border-slate-800 self-start md:self-auto">
-                  <FilterButton active={filter === 'active'} onClick={() => setFilter('active')} activeClass="bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20">Activas</FilterButton>
-                  <FilterButton active={filter === 'all'} onClick={() => setFilter('all')} activeClass="bg-slate-800 text-white">Todas</FilterButton>
-                  <FilterButton active={filter === 'cancelled'} onClick={() => setFilter('cancelled')} activeClass="bg-rose-500 text-white shadow-md shadow-rose-500/20">Canceladas</FilterButton>
+                  <FilterButton active={filter === 'active'} onClick={() => handleFilterChange('active')} activeClass="bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20">Activas</FilterButton>
+                  <FilterButton active={filter === 'all'} onClick={() => handleFilterChange('all')} activeClass="bg-slate-800 text-white">Todas</FilterButton>
+                  <FilterButton active={filter === 'cancelled'} onClick={() => handleFilterChange('cancelled')} activeClass="bg-rose-500 text-white shadow-md shadow-rose-500/20">Canceladas</FilterButton>
                 </div>
               </div>
 
@@ -241,6 +271,7 @@ export default function Reservations() {
                 ) : filteredBookings.length === 0 ? (
                   <EmptyState icon={<Calendar size={32} />} title="No se encontraron reservas" subtitle={filter === 'active' ? 'No tenés ningún turno activo en este momento.' : 'No hay registros en esta categoría.'} />
                 ) : (
+                  <>
                   <motion.div
                     key={filter}
                     initial={{ opacity: 0, y: 10 }}
@@ -249,7 +280,7 @@ export default function Reservations() {
                     className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-h-[280px]"
                   >
                     <AnimatePresence>
-                      {filteredBookings.map((b) => {
+                      {visibleBookings.map((b) => {
                         const meta = BOOKING_STATUS_META[b.status] ?? { label: b.status, tone: 'warn' as StatusTone };
                         const isCancelled = b.status === 'Cancelled';
                         const spaceName = b.spaceName || b.resourceName || 'Espacio';
@@ -295,6 +326,31 @@ export default function Reservations() {
                       })}
                     </AnimatePresence>
                   </motion.div>
+
+                  {hasMoreCancelled && (
+                    <div className="flex justify-center mt-6">
+                      <button
+                        onClick={() => setShowAllCancelled(true)}
+                        className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold transition-all inline-flex items-center gap-2 border border-slate-700"
+                      >
+                        <ChevronDown size={16} />
+                        Mostrar más canceladas ({hiddenCancelledCount})
+                      </button>
+                    </div>
+                  )}
+
+                  {isCancelledTab && showAllCancelled && filteredBookings.length > 3 && (
+                    <div className="flex justify-center mt-6">
+                      <button
+                        onClick={() => setShowAllCancelled(false)}
+                        className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold transition-all inline-flex items-center gap-2 border border-slate-700"
+                      >
+                        <ChevronUp size={16} />
+                        Mostrar menos
+                      </button>
+                    </div>
+                  )}
+                  </>
                 )}
               </div>
             </section>
@@ -387,7 +443,7 @@ function FilterButton({ active, onClick, activeClass, children }: { active: bool
   );
 }
 
-function EmptyState({ icon, title, subtitle, onRetry }: { icon: ReactNode; title: string; subtitle?: string; onRetry?: () => void }) {
+function EmptyState({ icon, title, subtitle, onRetry, action }: { icon: ReactNode; title: string; subtitle?: string; onRetry?: () => void; action?: ReactNode }) {
   return (
     <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-12 text-center space-y-3">
       <div className="inline-flex p-4 rounded-full bg-slate-950 text-slate-500 border border-slate-800">{icon}</div>
@@ -398,6 +454,7 @@ function EmptyState({ icon, title, subtitle, onRetry }: { icon: ReactNode; title
           Reintentar
         </button>
       )}
+      {action}
     </div>
   );
 }
