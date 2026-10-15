@@ -1,5 +1,7 @@
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Services;
+using ClubApp.Infrastructure.Services;
+using ClubApp.Application.Models;
 using ClubApp.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using ClubApp.Domain.Interfaces;
@@ -7,13 +9,21 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.OpenApi;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using ClubApp.Infrastructure.Services;
 using Microsoft.Data.Sqlite;
 using ClubApp.Domain.Entities;
 using Microsoft.AspNetCore.Identity;
-using ClubApp.API.Middlewares; 
+using Microsoft.Extensions.Options;
+using ClubApp.API.Middlewares;
+using ClubApp.API.Hubs;
+using ClubApp.API.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ==========================================
+// 0. CONFIGURACIÓN FUERTEMENTE TIPADA (Options Pattern)
+// ==========================================
+builder.Services.Configure<MercadoPagoSettings>(
+    builder.Configuration.GetSection("MercadoPago"));
 
 // ==========================================
 // 1. REGISTRO DE REPOSITORIOS (Capa Datos)
@@ -24,6 +34,7 @@ builder.Services.AddScoped<IEnrollmentRepository, EnrollmentRepository>();
 builder.Services.AddScoped<IMembershipRepository, MembershipRepository>();
 builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
+builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
 
 // ==========================================
 // 2. SERVICIOS DEL SISTEMA Y AUTENTICACIÓN
@@ -31,6 +42,7 @@ builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 builder.Services.AddScoped<ICustomAuthenticationService, AutenticacionService>(); 
 
 builder.Services.AddControllers();
+builder.Services.AddSignalR();
 
 // ------------------------------------------
 // CONFIGURACION DE CORS
@@ -41,7 +53,8 @@ builder.Services.AddCors(options =>
     {
         policy.WithOrigins("http://localhost:5173") // URL de tu Frontend React
               .AllowAnyHeader()
-              .AllowAnyMethod();
+              .AllowAnyMethod()
+              .AllowCredentials();
     });
 });
 
@@ -62,6 +75,21 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidIssuer = issuer,
             ValidAudience = audience,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey))
+        };
+
+        // Permite la autenticación por query param para la conexión WebSocket de SignalR
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/notifications"))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            }
         };
     });
 
@@ -102,7 +130,7 @@ builder.Services.AddOpenApi(options =>
 // ==========================================
 // 4. CONFIGURACIÓN DE BASE DE DATOS (Fijada para Azure)
 // ==========================================
-string dbFileName = "clubapp_v2.db";
+string dbFileName = "clubapp_v3.db";
 string dbPath;
 
 if (Environment.GetEnvironmentVariable("HOME") != null)
@@ -122,11 +150,19 @@ builder.Services.AddDbContext<ApplicationContext>(options =>
 // 5. INYECCIÓN DE SERVICIOS DE APLICACIÓN
 // ==========================================
 builder.Services.AddScoped<IActivityService, ActivityService>();
+builder.Services.AddScoped<IBookingService, BookingService>();
+builder.Services.AddScoped<IGroupBookingService, GroupBookingService>();
+builder.Services.AddScoped<ISpaceService, SpaceService>();
+builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<INotificationDispatcher, SignalRNotificationDispatcher>();
 builder.Services.AddScoped<IMembershipService, MembershipService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IFriendService, FriendService>();
 
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 
@@ -144,7 +180,10 @@ using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationContext>();
     
-    ClubApp.Infrastructure.Data.DbInitializer.Seed(dbContext);
+    // Aplicar migraciones antes de inicializar la DB
+    dbContext.Database.Migrate();
+
+    ClubApp.Infrastructure.Data.DbInitializer.Seed(dbContext, app.Configuration);
 }
 #endregion
 
@@ -156,13 +195,20 @@ app.UseSwaggerUI(options =>
     options.RoutePrefix = string.Empty;
 });
 
-app.UseHttpsRedirection();
+// En desarrollo se usa HTTP (http://localhost:5236) para que el frontend
+// (http://localhost:5173) pueda conectarse sin redirecciones HTTPS.
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
+app.UseStaticFiles();
 app.UseCors("AllowReactApp");
 
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<NotificationHub>("/hubs/notifications");
 
 app.Run();

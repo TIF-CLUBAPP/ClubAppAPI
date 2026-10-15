@@ -25,6 +25,17 @@ public class EnrollmentsController : ControllerBase
         return Ok(await _enrollmentService.GetAllEnrollmentsAsync());
     }
 
+    /// <summary>Inscripciones del usuario autenticado (GET /api/enrollments/my).</summary>
+    [HttpGet("my")]
+    public async Task<IActionResult> GetMy()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
+            return Unauthorized("Token inválido.");
+
+        return Ok(await _enrollmentService.GetMyEnrollmentsAsync(userId));
+    }
+
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
     {

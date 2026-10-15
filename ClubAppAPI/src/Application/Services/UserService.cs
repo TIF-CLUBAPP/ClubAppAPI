@@ -18,17 +18,23 @@ public class UserService : IUserService
         _userRepository = userRepository;
     }
 
-    public async Task<IEnumerable<UserDto>> GetAllUsersAsync()
+    public async Task<IEnumerable<UserDto>> GetAllUsersAsync(string? searchQuery = null, UserRole? role = null, bool? isActive = null)
     {
-        var users = await _userRepository.GetAllAsync();
+        var users = await _userRepository.GetFilteredAsync(searchQuery, role, isActive);
 
         return users.Select(u => new UserDto
         {
             Id = u.Id,
             FirstName = u.FirstName,
             LastName = u.LastName,
+            FullName = u.FullName,
             Email = u.Email,
+            Dni = u.Dni,
+            Phone = u.Phone,
+            BirthDate = u.BirthDate,
             Role = u.Role,
+            IsActive = u.IsActive,
+            IsBlocked = !u.IsActive,
             BadgeNum = u.BadgeNum,
             CreatedAt = u.CreatedAt,
         }).ToList();
@@ -47,8 +53,14 @@ public class UserService : IUserService
             Id = user.Id,
             FirstName = user.FirstName,
             LastName = user.LastName,
+            FullName = user.FullName,
             Email = user.Email,
+            Dni = user.Dni,
+            Phone = user.Phone,
+            BirthDate = user.BirthDate,
             Role = user.Role,
+            IsActive = user.IsActive,
+            IsBlocked = !user.IsActive,
             BadgeNum = user.BadgeNum,
             CreatedAt = user.CreatedAt
         };
@@ -118,7 +130,23 @@ public class UserService : IUserService
             throw new NotFoundException("User", id);
         }
 
-        await _userRepository.DeleteAsync(id);
+        // Soft delete: conservamos el registro para no romper referencias (enrollments,
+        // memberships, pagos), pero el usuario deja de aparecer en la gestión.
+        user.IsDeleted = true;
+        user.IsActive = false;
+
+        await _userRepository.UpdateAsync(user);
+        return true;
+    }
+
+    public async Task<bool> SetUserStatusAsync(int id, bool isActive)
+    {
+        var user = await _userRepository.GetByIdAsync(id);
+        if (user == null) return false;
+
+        user.IsActive = isActive;
+
+        await _userRepository.UpdateAsync(user);
         return true;
     }
 
@@ -130,6 +158,15 @@ public class UserService : IUserService
 
         user.FirstName = request.FirstName ?? user.FirstName;
         user.LastName = request.LastName ?? user.LastName;
+
+        if (!string.IsNullOrWhiteSpace(request.Email))
+            user.Email = request.Email.Trim();
+
+        if (!string.IsNullOrWhiteSpace(request.Phone))
+            user.Phone = request.Phone.Trim();
+
+        if (!string.IsNullOrWhiteSpace(request.Dni))
+            user.Dni = request.Dni.Trim();
 
         await _userRepository.UpdateAsync(user);
         return true;
@@ -159,5 +196,64 @@ public class UserService : IUserService
 
         await _userRepository.UpdateAsync(user);
         return true;
+    }
+
+    public async Task<TeacherPayoutSettingsDto?> GetTeacherPayoutSettingsAsync(int teacherId)
+    {
+        var user = await _userRepository.GetByIdAsync(teacherId);
+        if (user == null || user.Role != UserRole.TEACHER) return null;
+
+        return new TeacherPayoutSettingsDto
+        {
+            TeacherId = user.Id,
+            AllowsDirectPayment = user.AllowsDirectPayment,
+            BankAlias = user.BankAlias,
+            HasMercadoPagoAccessToken = !string.IsNullOrWhiteSpace(user.MercadoPagoAccessToken),
+            MercadoPagoUserId = user.MercadoPagoUserId
+        };
+    }
+
+    public async Task<TeacherPayoutSettingsDto?> UpdateTeacherPayoutSettingsAsync(int teacherId, TeacherPayoutSettingsRequest request)
+    {
+        var user = await _userRepository.GetByIdAsync(teacherId);
+        if (user == null || user.Role != UserRole.TEACHER) return null;
+
+        user.AllowsDirectPayment = request.AllowsDirectPayment;
+        user.BankAlias = string.IsNullOrWhiteSpace(request.BankAlias) ? null : request.BankAlias.Trim();
+        user.MercadoPagoUserId = string.IsNullOrWhiteSpace(request.MercadoPagoUserId) ? null : request.MercadoPagoUserId.Trim();
+
+        // El token se actualiza solo si se envía uno nuevo; nunca se expone de vuelta.
+        if (!string.IsNullOrWhiteSpace(request.MercadoPagoAccessToken))
+            user.MercadoPagoAccessToken = request.MercadoPagoAccessToken.Trim();
+
+        await _userRepository.UpdateAsync(user);
+
+        return await GetTeacherPayoutSettingsAsync(teacherId);
+    }
+
+    public async Task<ProfilePaymentInfoDto?> GetProfilePaymentInfoAsync(int userId)
+    {
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user == null) return null;
+
+        return new ProfilePaymentInfoDto
+        {
+            AllowsDirectPayment = user.AllowsDirectPayment,
+            BankAlias = user.BankAlias,
+            HasMercadoPagoAccessToken = !string.IsNullOrWhiteSpace(user.MercadoPagoAccessToken),
+            MercadoPagoUserId = user.MercadoPagoUserId
+        };
+    }
+
+    public async Task<ProfilePaymentInfoDto?> SaveProfilePaymentInfoAsync(int userId, SaveProfilePaymentInfoRequest request)
+    {
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user == null) return null;
+
+        user.BankAlias = string.IsNullOrWhiteSpace(request.BankAlias) ? null : request.BankAlias.Trim();
+
+        await _userRepository.UpdateAsync(user);
+
+        return await GetProfilePaymentInfoAsync(userId);
     }
 }

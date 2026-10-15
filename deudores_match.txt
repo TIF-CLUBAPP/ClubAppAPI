@@ -1,0 +1,30 @@
+﻿29 : import type { CuotaVencida, CuotasVencidasStats } from '../types/deudores';
+177 : const formatCuotaDetalle = (periodo: string, monto: number): string => {
+185 :  * Determina si una cuota estÃ¡ vencida comparando su perÃ­odo con el mes actual.
+186 :  * Una cuota es vencida cuando su mes/aÃ±o es anterior al mes/aÃ±o de hoy.
+188 : const estaVencida = (periodo: string): boolean => {
+193 :   // Primer dÃ­a del mes actual: cualquier vencimiento anterior es una cuota vencida.
+202 : function getTextoPeriodos(deudor: CuotaVencida): string {
+248 :   debtor: CuotaVencida;
+249 :   onPay: (d: CuotaVencida) => void;
+250 :   onNotifyWhatsApp: (d: CuotaVencida) => void;
+251 :   onNotifyEmail: (d: CuotaVencida) => void;
+338 :   const [debtors, setDebtors] = useState<CuotaVencida[]>([]);
+339 :   const [stats, setStats] = useState<CuotasVencidasStats | null>(null);
+346 :   const [paymentTarget, setPaymentTarget] = useState<CuotaVencida | null>(null);
+347 :   const [blockTarget, setBlockTarget] = useState<{ debtor: CuotaVencida; status: boolean } | null>(null);
+429 :   const openPaymentModal = (debtor: CuotaVencida) => {
+493 :   const initiateToggleUserStatus = (debtor: CuotaVencida, currentStatus: boolean) => {
+528 :   const notifyByWhatsApp = (d: CuotaVencida) => {
+538 :   const notifyByEmail = (d: CuotaVencida) => {
+545 :         `mailto:${d.email}?subject=${encodeURIComponent('Recordatorio de cuota vencida')}&body=${encodeURIComponent(message)}`,
+607 :                   value={loading && !stats ? 'â€”' : formatNumber(stats?.totalCuotasVencidas ?? 0)}
+608 :                   sub="Cuotas vencidas sin cobrar"
+905 :                           // Una cuota estÃ¡ vencida si su perÃ­odo es anterior al mes actual.
+906 :                           const esVencida = estaVencida(periodo);
+908 :                           const esMasAntigua = idx === 0;
+909 :                           const montoCuota = Math.round(
+917 :                                 esVencida ? 'hover:bg-rose-500/5' : 'hover:bg-slate-800/40'
+928 :                                   esVencida ? 'text-rose-400' : 'text-white'
+931 :                                 {formatCuotaDetalle(periodo, montoCuota)}
+933 :                               {esMasAntigua && (

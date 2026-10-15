@@ -11,4 +11,5 @@ public interface IEnrollmentService
     Task<Enrollment?> GetEnrollmentByIdAsync(int id);
     Task<string> CreateEnrollmentAsync(int userId, CreateEnrollmentDto dto);
     Task<string> CancelEnrollmentAsync(int enrollmentId, int loggedInUserId, string loggedInUserRole); 
+    Task<IEnumerable<MyEnrollmentDto>> GetMyEnrollmentsAsync(int userId);
 }

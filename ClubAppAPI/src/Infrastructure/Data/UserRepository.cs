@@ -19,4 +19,41 @@ public class UserRepository : RepositoryBase<User>, IUserRepository
     {
         return await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
     }
+
+    /// <summary>
+    /// Consulta de usuarios con búsqueda por texto libre y filtros opcionales.
+    /// Siempre excluye a los usuarios eliminados (soft delete).
+    /// </summary>
+    public async Task<List<User>> GetFilteredAsync(string? searchQuery = null, UserRole? role = null, bool? isActive = null)
+    {
+        IQueryable<User> query = _context.Users
+            .Where(u => !u.IsDeleted);
+
+        if (!string.IsNullOrWhiteSpace(searchQuery))
+        {
+            string term = searchQuery.Trim().ToLower();
+            query = query.Where(u =>
+                (u.FirstName ?? string.Empty).ToLower().Contains(term) ||
+                (u.LastName ?? string.Empty).ToLower().Contains(term) ||
+                (u.FirstName + " " + u.LastName).ToLower().Contains(term) ||
+                (u.Dni ?? string.Empty).ToLower().Contains(term) ||
+                (u.Phone ?? string.Empty).ToLower().Contains(term) ||
+                (u.Email ?? string.Empty).ToLower().Contains(term));
+        }
+
+        if (role.HasValue)
+        {
+            query = query.Where(u => u.Role == role.Value);
+        }
+
+        if (isActive.HasValue)
+        {
+            query = query.Where(u => u.IsActive == isActive.Value);
+        }
+
+        return await query
+            .OrderBy(u => u.LastName)
+            .ThenBy(u => u.FirstName)
+            .ToListAsync();
+    }
 }

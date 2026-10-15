@@ -1,0 +1,3 @@
+﻿503 LINES
+13: // Use migrations to ensure schema is up-to-date (prevents divergence between EnsureCreated and migrations)
+14: context.Database.Migrate();

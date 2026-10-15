@@ -1,0 +1,8 @@
+﻿468|             var monthName = culture.DateTimeFormat.GetMonthName(fallbackDate.Value.Month);
+469|             var capitalized = char.ToUpperInvariant(monthName[0]) + monthName.Substring(1);
+470|             return $"{capitalized} {fallbackDate.Value.Year}";
+471|         }
+472| 
+473|         return "Adeuda cuota";
+474|     }
+475| }

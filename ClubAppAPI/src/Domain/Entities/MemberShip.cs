@@ -4,7 +4,7 @@ public enum MembershipStatus { ACTIVE, INACTIVE, SUSPENDED, EXPIRED, EXPIRING }
 
 public class Membership : BaseEntity
 {
-    public int User_id { get; set; }
+    public int UserId { get; set; }
     public decimal MonthlyPrice { get; set; }
     public MembershipStatus Status { get; set; } = MembershipStatus.INACTIVE;
     public DateTime StartDate { get; set; } = DateTime.UtcNow;

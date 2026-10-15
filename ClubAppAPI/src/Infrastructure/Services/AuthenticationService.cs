@@ -11,6 +11,9 @@ using ClubApp.Domain.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using BCrypt.Net;
+using Google.Apis.Auth;
+using ClubApp.Application.Dtos;
+using ClubApp.Domain.Entities;
 
 namespace ClubApp.Infrastructure.Services
 {
@@ -18,27 +21,158 @@ namespace ClubApp.Infrastructure.Services
     {
         private readonly IUserRepository _userRepository;
         private readonly IConfiguration _configuration;
+        private readonly IEmailService _emailService;
 
-        public AutenticacionService(IUserRepository userRepository, IConfiguration configuration)
+        public AutenticacionService(IUserRepository userRepository, IConfiguration configuration, IEmailService emailService)
         {
             _userRepository = userRepository;
             _configuration = configuration;
+            _emailService = emailService;
         }
 
-        public async Task<string?> AuthenticationAsync(AuthenticationRequest request)
+        public async Task<(string? Token, User? User)> AuthenticationAsync(AuthenticationRequest request)
         {
             var users = await _userRepository.GetAllAsync();
 
             var user = users.FirstOrDefault(u => u.FirstName == request.Email || u.Email == request.Email);
 
-            if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+            if (user == null || string.IsNullOrEmpty(user.PasswordHash) || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             {
                 System.Diagnostics.Debug.WriteLine("Intento de inicio de sesión fallido: Credenciales inválidas.");
-                return null;
+                return (null, null);
             }
 
-            System.Diagnostics.Debug.WriteLine($"Usuario autenticado correctamente: {user.Email}");
+            // Cuentas bloqueadas o eliminadas no pueden iniciar sesión
+            if (!user.IsActive || user.IsDeleted)
+            {
+                System.Diagnostics.Debug.WriteLine("Intento de inicio de sesión fallido: Cuenta bloqueada o eliminada.");
+                return (null, null);
+            }
 
+            return (GenerateToken(user), user);
+        }
+
+        public async Task<(bool Success, string? ErrorMessage)> RegisterAsync(UserRegisterDto dto)
+        {
+            // Política: permitir creación de cuenta aunque sea menor de edad.
+            // Los checks sobre suscripción/pagos se deben aplicar en las rutas de suscripción futuras.
+
+            var users = await _userRepository.GetAllAsync();
+            if (users.Any(u => u.Email.Equals(dto.Email, StringComparison.OrdinalIgnoreCase)))
+            {
+                return (false, "El correo electrónico ya está registrado.");
+            }
+
+            if (users.Any(u => u.Dni == dto.Dni))
+            {
+                return (false, "El DNI ya está registrado.");
+            }
+
+            var newUser = new User
+            {
+                FirstName = dto.FirstName,
+                LastName = dto.LastName,
+                Email = dto.Email,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
+                Dni = dto.Dni,
+                Phone = dto.Phone,
+                BirthDate = dto.BirthDate,
+                Role = UserRole.MEMBER
+            };
+
+            await _userRepository.AddAsync(newUser);
+            return (true, null);
+        }
+
+        public async Task<(bool Success, string? Token, bool RequiresProfileCompletion, int? UserId, User? User, string? ErrorMessage)> GoogleSignInAsync(GoogleAuthDto dto)
+        {
+            GoogleJsonWebSignature.Payload payload;
+            try
+            {
+                var googleClientId = _configuration["Authentication:Google:ClientId"];
+                var settings = new GoogleJsonWebSignature.ValidationSettings();
+                if (!string.IsNullOrWhiteSpace(googleClientId))
+                {
+                    settings.Audience = new[] { googleClientId };
+                }
+
+                payload = await GoogleJsonWebSignature.ValidateAsync(dto.IdToken, settings);
+            }
+            catch (Exception ex)
+            {
+                return (false, null, false, null, null, $"Token de Google inválido: {ex.Message}");
+            }
+
+            if (string.IsNullOrEmpty(payload?.Email))
+            {
+                return (false, null, false, null, null, "El token de Google no contiene correo electrónico.");
+            }
+
+            var existing = await _userRepository.GetUserByEmail(payload.Email);
+            if (existing != null)
+            {
+                // Asociar GoogleId si aún no está
+                if (string.IsNullOrEmpty(existing.GoogleId) && !string.IsNullOrEmpty(payload.Subject))
+                {
+                    existing.GoogleId = payload.Subject;
+                    await _userRepository.UpdateAsync(existing);
+                }
+
+                // Si faltan datos personales requeridos, indicar completion
+                if (string.IsNullOrEmpty(existing.Dni) || string.IsNullOrEmpty(existing.Phone) || !existing.BirthDate.HasValue)
+                {
+                    return (true, null, true, existing.Id, existing, null);
+                }
+
+                // Generar token
+                var token = GenerateToken(existing);
+                return (true, token, false, existing.Id, existing, null);
+            }
+
+            // Crear usuario base
+            var newUser = new User
+            {
+                Email = payload.Email,
+                FirstName = payload.GivenName ?? string.Empty,
+                LastName = payload.FamilyName ?? string.Empty,
+                GoogleId = payload.Subject,
+                PasswordHash = string.Empty, // No password for Google-only accounts
+                Role = UserRole.MEMBER
+            };
+
+            await _userRepository.AddAsync(newUser);
+
+            // Indicar que se requiere completar perfil y devolver Id
+            return (true, null, true, newUser.Id, newUser, null);
+        }
+
+        public async Task<(bool Success, string? Token, User? User, string? ErrorMessage)> CompleteGoogleProfileAsync(CompleteProfileDto dto)
+        {
+            // Política: permitir completar perfil aunque sea menor de edad. Restricción de suscripciones se manejará en endpoints de pago.
+
+            var user = await _userRepository.GetByIdAsync(dto.UserId);
+            if (user == null) return (false, null, null, "Usuario no encontrado.");
+
+            // Validar que el DNI no esté registrado por otro usuario
+            var users = await _userRepository.GetAllAsync();
+            if (users.Any(u => u.Dni == dto.Dni && u.Id != dto.UserId))
+            {
+                return (false, null, null, "El DNI ya está registrado por otro usuario.");
+            }
+
+            user.Dni = dto.Dni;
+            user.Phone = dto.Phone;
+            user.BirthDate = dto.BirthDate;
+
+            await _userRepository.UpdateAsync(user);
+
+            // Generar token para iniciar sesión automático tras completar perfil
+            var token = GenerateToken(user);
+            return (true, token, user, null);
+        }
+
+        private string? GenerateToken(User user)
+        {
             var secretKeyString = _configuration["Authentication:SecretForKey"];
             if (string.IsNullOrEmpty(secretKeyString))
             {
@@ -51,8 +185,8 @@ namespace ClubApp.Infrastructure.Services
             var claimsForToken = new List<Claim>
             {
                 new Claim("sub", user.Id.ToString()),
-                new Claim(ClaimTypes.Email, user.Email),
-                new Claim(ClaimTypes.Name, user.FirstName),
+                new Claim(ClaimTypes.Email, user.Email ?? string.Empty),
+                new Claim(ClaimTypes.Name, user.FirstName ?? string.Empty),
                 new Claim(ClaimTypes.Role, user.Role.ToString())
             };
 
@@ -68,6 +202,76 @@ namespace ClubApp.Infrastructure.Services
                 credentials);
 
             return new JwtSecurityTokenHandler().WriteToken(jwtSecurityToken);
+        }
+
+        private int CalculateAge(DateTime? birthDate)
+        {
+            if (!birthDate.HasValue) return 0;
+            var today = DateTime.UtcNow.Date;
+            var age = today.Year - birthDate.Value.Date.Year;
+            if (birthDate.Value.Date > today.AddYears(-age)) age--;
+            return age;
+        }
+
+        public async Task<(bool Success, string? ErrorMessage)> ForgotPasswordAsync(ForgotPasswordDto dto)
+        {
+            var users = await _userRepository.GetAllAsync();
+            var user = users.FirstOrDefault(u => u.Email.Equals(dto.Email, StringComparison.OrdinalIgnoreCase));
+
+            if (user == null)
+            {
+                // Devolver true para no revelar la existencia de emails por motivos de seguridad
+                return (true, null);
+            }
+
+            // Generar token seguro de recuperación
+            var tokenBytes = new byte[32];
+            using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create())
+            {
+                rng.GetBytes(tokenBytes);
+            }
+            string token = Convert.ToHexString(tokenBytes);
+
+            user.PasswordResetToken = token;
+            user.PasswordResetTokenExpiration = DateTime.UtcNow.AddHours(24);
+
+            await _userRepository.UpdateAsync(user);
+
+            string baseUrl = _configuration["FrontendUrl"] ?? "http://localhost:5173";
+            string resetLink = $"{baseUrl}/reset-password?token={Uri.EscapeDataString(token)}&email={Uri.EscapeDataString(user.Email)}";
+
+            await _emailService.SendPasswordResetEmailAsync(user.Email, resetLink);
+
+            return (true, null);
+        }
+
+        public async Task<(bool Success, string? ErrorMessage)> ResetPasswordAsync(ResetPasswordDto dto)
+        {
+            var users = await _userRepository.GetAllAsync();
+            var user = users.FirstOrDefault(u => u.Email.Equals(dto.Email, StringComparison.OrdinalIgnoreCase));
+
+            if (user == null || string.IsNullOrEmpty(user.PasswordResetToken))
+            {
+                return (false, "El token de recuperación es inválido o ha expirado.");
+            }
+
+            if (!string.Equals(user.PasswordResetToken, dto.Token, StringComparison.Ordinal))
+            {
+                return (false, "El token de recuperación es inválido.");
+            }
+
+            if (!user.PasswordResetTokenExpiration.HasValue || user.PasswordResetTokenExpiration.Value < DateTime.UtcNow)
+            {
+                return (false, "El token de recuperación ha expirado.");
+            }
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+            user.PasswordResetToken = null;
+            user.PasswordResetTokenExpiration = null;
+
+            await _userRepository.UpdateAsync(user);
+
+            return (true, null);
         }
     }
 }

@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import type { FormEvent } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, User as UserIcon, LogIn, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { Lock, User as UserIcon, LogIn, AlertCircle, CheckCircle2, Loader2, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
@@ -10,11 +11,12 @@ export default function Login() {
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
@@ -28,7 +30,7 @@ export default function Login() {
       }, 1000);
 
     } catch (err: any) {
-      const msg = err.response?.data?.message || err.response?.data?.title || 'No se pudo conectar con el servidor.';
+      const msg = err.response?.data?.message || err.response?.data?.title || err.message || 'No se pudo conectar con el servidor.';
       setError(msg);
     } finally {
       setLoading(false);
@@ -107,13 +109,22 @@ export default function Login() {
             <div className="relative flex items-center">
               <Lock className="absolute left-4 text-slate-500" size={18} />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-slate-950/60 border border-slate-800 rounded-xl py-3 pl-11 pr-4 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all text-sm"
+                className="w-full bg-slate-950/60 border border-slate-800 rounded-xl py-3 pl-11 pr-11 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all text-sm"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3.5 p-1 text-slate-400 hover:text-emerald-400 transition-colors focus:outline-none"
+                tabIndex={-1}
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
           </div>
 
@@ -123,7 +134,7 @@ export default function Login() {
             disabled={loading || success}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold rounded-xl shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+            className="w-full py-3.5 px-4 bg-linear-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold rounded-xl shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
           >
             {loading ? (
               <Loader2 className="animate-spin" size={20} />
@@ -134,6 +145,28 @@ export default function Login() {
               </>
             )}
           </motion.button>
+
+          {/* Enlaces de Recuperación y Registro */}
+          <div className="pt-2 flex flex-col items-center gap-3 text-sm">
+            <Link
+              to="/forgot-password"
+              className="text-slate-400 hover:text-emerald-400 transition-colors text-xs font-medium hover:underline"
+            >
+              ¿Olvidaste tu contraseña?
+            </Link>
+
+            <div className="w-full border-t border-slate-800/80 my-1" />
+
+            <p className="text-xs text-slate-400">
+              ¿No tenés cuenta?{' '}
+              <Link
+                to="/register"
+                className="text-emerald-400 hover:text-emerald-300 font-semibold transition-colors hover:underline"
+              >
+                Regístrate
+              </Link>
+            </p>
+          </div>
         </form>
       </motion.div>
     </div>

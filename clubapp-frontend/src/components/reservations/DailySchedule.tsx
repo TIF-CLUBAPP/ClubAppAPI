@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Calendar, Clock, Filter, Settings, Wrench, CheckCircle2, User } from 'lucide-react';
 import type { Court, ClubScheduleConfig, SportDiscipline, Reservation } from '../../types/reservation';
 import { useAuth } from '../../context/AuthContext';

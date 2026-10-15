@@ -1,24 +1,50 @@
-namespace ClubApp.Domain.Entities;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
-public enum PaymentMethod { MERCADOPAGO, CASH }
-public enum PaymentStatus { COMPLETED, PENDING, FAILED, OVERDUE }
-
-public class Payment : BaseEntity
+namespace ClubApp.Domain.Entities
 {
-    public int User_id { get; set; }
-    public int Member_id { get; set; }
-    
-    public decimal Amount { get; set; }               // Monto original
-    public decimal LateFee { get; set; } = 0m;        // Recargo por mora (10%)
-    public decimal TotalAmount => Amount + LateFee;    // Monto final calculado
+    public enum PaymentStatus 
+    { 
+        Pending, 
+        Paid, 
+        Overdue, 
+        Exempt 
+    }
 
-    public PaymentMethod Method { get; set; }
-    public PaymentStatus Status { get; set; } = PaymentStatus.PENDING;
-    public string ExternalTransactionId { get; set; } = string.Empty;
-    
-    public DateTime DueDate { get; set; } = DateTime.UtcNow.AddDays(30); // Fecha de vencimiento
-    public DateTime PaymentDate { get; set; } = DateTime.UtcNow;
+    public class Payment : BaseEntity
+    {
+        [Required]
+        public int UserId { get; set; }
 
-    public virtual User User { get; set; } = null!;
-    public virtual Membership Membership { get; set; } = null!;
+        [Required]
+        [MaxLength(20)] // Formato "MM/YYYY" o "Mes Año"
+        public string Period { get; set; } = string.Empty;
+
+        [Required]
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal Amount { get; set; }
+
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal LateFeeApplied { get; set; } = 0m;
+
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal MarketplaceFee { get; set; } = 0m;
+
+        public DateTime? PaymentDate { get; set; }
+
+        [Required]
+        public PaymentStatus Status { get; set; } = PaymentStatus.Pending;
+
+        [MaxLength(50)]
+        public string PaymentMethod { get; set; } = string.Empty; // Efectivo, Transferencia, MercadoPago, etc.
+
+        [MaxLength(100)]
+        public string? TransferReference { get; set; } // Nro. de operación / comprobante de transferencia
+
+        [MaxLength(255)]
+        public string? ReceiptUrl { get; set; } // URL/ruta del archivo de comprobante adjunto
+
+        // Navegaci�n
+        public virtual User User { get; set; } = null!;
+    }
 }

@@ -1,0 +1,81 @@
+﻿391|                     PaymentIds = g.Select(p => p.Id).OrderBy(id => id).ToList()
+392|                 };
+393|             })
+394|             .OrderByDescending(d => d.MontoTotalAdeudado)
+395|             .ToList();
+396|     }
+397| 
+398|     public async Task<string> RegistrarPagoAsync(int cuotaId)
+399|     {
+400|         var payment = await _context.Payments
+401|             .Include(p => p.User)
+402|             .FirstOrDefaultAsync(p => p.Id == cuotaId);
+403| 
+404|         if (payment == null) return "NOT_FOUND";
+405|         if (payment.Status == PaymentStatus.Paid) return "ALREADY_PAID";
+406| 
+407|         var now = DateTime.UtcNow;
+408| 
+409|         payment.Status = PaymentStatus.Paid;
+410|         payment.PaymentDate = now;
+411| 
+412|         var membership = await _context.Memberships
+413|             .FirstOrDefaultAsync(m => m.UserId == payment.UserId);
+414|         if (membership != null)
+415|         {
+416|             membership.Status = MembershipStatus.ACTIVE;
+417|         }
+418| 
+419|         var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == payment.UserId);
+420|         if (user != null)
+421|         {
+422|             user.LastPaymentDate = now;
+423|         }
+424| 
+425|         await _context.SaveChangesAsync();
+426|         return "OK";
+427|     }
+428| 
+429|     // Ej: "Julio 2026"
+430|     private static string FormatPeriodo(string period, DateTime? fallbackDate = null)
+431|     {
+432|         // period = "yyyy-MM" (formato estándar ISO) o "MM/yyyy" (legacy) o "Mes Año" (legacy)
+433|         bool hasValidPeriod = !string.IsNullOrWhiteSpace(period) && period.Length >= 7;
+434| 
+435|         if (hasValidPeriod)
+436|         {
+437|             int month = 0, year = 0;
+438|             
+439|             // Intentar parsear como "yyyy-MM" (nuevo formato estándar)
+440|             if (period.Contains("-") && int.TryParse(period.AsSpan(0, 4), out year) && int.TryParse(period.AsSpan(5, 2), out month))
+441|             {
+442|                 var culture = CultureInfo.GetCultureInfo("es-AR");
+443|                 var monthName = culture.DateTimeFormat.GetMonthName(month);
+444|                 var capitalized = char.ToUpperInvariant(monthName[0]) + monthName.Substring(1);
+445|                 return $"{capitalized} {year}";
+446|             }
+447|             
+448|             // Intentar parsear como "MM/yyyy" (legacy)
+449|             if (period.Contains("/") && int.TryParse(period.AsSpan(0, 2), out month) && int.TryParse(period.AsSpan(3, 4), out year))
+450|             {
+451|                 var culture = CultureInfo.GetCultureInfo("es-AR");
+452|                 var monthName = culture.DateTimeFormat.GetMonthName(month);
+453|                 var capitalized = char.ToUpperInvariant(monthName[0]) + monthName.Substring(1);
+454|                 return $"{capitalized} {year}";
+455|             }
+456|             
+457|             // Si ya está en formato "Mes Año" (longitud > 7), devolver tal cual
+458|             if (period.Length > 7)
+459|             {
+460|                 return period;
+461|             }
+462|         }
+463| 
+464|         // Si no hay período válido, generar desde fallbackDate (CreatedAt o DueDate)
+465|         if (fallbackDate.HasValue)
+466|         {
+467|             var culture = CultureInfo.GetCultureInfo("es-AR");
+468|             var monthName = culture.DateTimeFormat.GetMonthName(fallbackDate.Value.Month);
+469|             var capitalized = char.ToUpperInvariant(monthName[0]) + monthName.Substring(1);
+470|             return $"{capitalized} {fallbackDate.Value.Year}";
+471|         }

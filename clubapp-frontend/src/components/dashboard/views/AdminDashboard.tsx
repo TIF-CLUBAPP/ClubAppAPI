@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import WeatherWidget from '../WeatherWidget';
 import { Users, CheckSquare, Clock, MapPin, CheckCircle2 } from 'lucide-react';
 

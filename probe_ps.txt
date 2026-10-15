@@ -1,0 +1,3 @@
+﻿119: // ========== Configuración de cuotas (FeeSettings) ==========
+121: public async Task<FeeSettingsDto> GetFeeSettingsAsync()
+137: public async Task<FeeSettingsDto> UpdateFeeSettingsAsync(UpdateFeeSettingsDto dto)
