@@ -1,0 +1,2 @@
+ClubAppAPI\src\Web\Controllers\CuotasController.cs:74:    public async Task<IActionResult> RegistrarPagoParcial([FromBody] RegistrarPagoParcialDto dto)
+ClubAppAPI\src\Web\Controllers\CuotasController.cs:96:public class RegistrarPagoParcialDto

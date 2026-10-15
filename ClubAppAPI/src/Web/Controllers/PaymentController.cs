@@ -1,0 +1,430 @@
+using Microsoft.AspNetCore.Mvc;
+using ClubApp.Application.Interfaces;
+using ClubApp.Application.Dtos;
+using ClubApp.Domain.Entities;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
+
+namespace ClubApp.API.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+[Authorize]
+public class PaymentsController : ControllerBase
+{
+    private readonly IPaymentService _paymentService;
+
+    public PaymentsController(IPaymentService paymentService)
+    {
+        _paymentService = paymentService;
+    }
+
+    public class CreateMercadoPagoOrderRequest
+    {
+        /// <summary>ID de la cuota (pago individual).</summary>
+        public int? CuotaId { get; set; }
+
+        /// <summary>IDs de las cuotas a abonar en una misma operación (pago agrupado).</summary>
+        public List<int>? CuotaIds { get; set; }
+    }
+
+
+    [HttpGet]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    public async Task<IActionResult> GetAll()
+    {
+        return Ok(await _paymentService.GetAllPaymentsAsync());
+    }
+
+    [HttpGet("{id:int}")]
+    public async Task<IActionResult> GetById(int id)
+    {
+        var payment = await _paymentService.GetByIdAsync(id);
+        if (payment == null)
+            return NotFound(new { message = $"No se encontró el registro de pago {id}." });
+
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var userRoleClaim = User.FindFirst(ClaimTypes.Role)?.Value;
+
+        if (userRoleClaim != "ADMIN" && userRoleClaim != "SUPERADMIN" && payment.UserId.ToString() != userIdClaim)
+        {
+            return StatusCode(403, new { message = "No tienes permiso para ver este registro de pago." });
+        }
+
+        return Ok(payment);
+    }
+    [HttpGet("user/{userId:int}")]
+    public async Task<IActionResult> GetByUserId(int userId)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var userRoleClaim = User.FindFirst(ClaimTypes.Role)?.Value;
+
+        if (userRoleClaim != "ADMIN" && userRoleClaim != "SUPERADMIN" && userId.ToString() != userIdClaim)
+        {
+            return StatusCode(403, new { message = "No tienes permiso para ver el historial contable de otro usuario." });
+        }
+
+        return Ok(await _paymentService.GetPaymentsByUserIdAsync(userId));
+    }
+
+    // ========== Mis cuotas (usuario autenticado) ==========
+    /// <summary>
+    /// Devuelve las cuotas del usuario autenticado con su ID numérico primario real.
+    /// El frontend las usa para pagar vía /api/payments/create-order con el ID de la BD.
+    /// </summary>
+    [HttpGet("mine")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetMine()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
+            return Unauthorized("Token inválido.");
+
+        return Ok(await _paymentService.GetUserCuotasAsync(userId));
+    }
+
+    [HttpPost]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Post([FromBody] CreatePaymentDto dto)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var userRoleClaim = User.FindFirst(ClaimTypes.Role)?.Value;
+
+        if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int loggedInUserId))
+            return Unauthorized("Token inválido.");
+
+        var createdPayment = await _paymentService.CreatePaymentAsync(loggedInUserId, userRoleClaim ?? "", dto);
+
+        return CreatedAtAction(
+            nameof(GetById),
+            new { id = createdPayment.Id },
+            createdPayment
+        );
+    }
+
+    [HttpPatch("{paymentId:int}/status")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    public async Task<IActionResult> UpdateStatus(int paymentId, [FromBody] UpdatePaymentStatusDto dto)
+    {
+        if (!Enum.IsDefined(typeof(PaymentStatus), dto.Status))
+            return BadRequest(new { message = "Estado de pago inválido." });
+
+        var result = await _paymentService.UpdateStatusAsync(paymentId, (PaymentStatus)dto.Status);
+
+        if (result == "NOT_FOUND")
+            return NotFound(new { message = "El registro de pago no existe." });
+
+        return Ok(new { message = "Estado de pago actualizado en caja." });
+    }
+
+    // ========== Configuración de cuotas (FeeSettings) ==========
+    /// <summary>
+    /// Obtener configuración actual de cuotas.
+    /// </summary>
+    [HttpGet("settings")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetFeeSettings()
+    {
+        return Ok(await _paymentService.GetFeeSettingsAsync());
+    }
+
+    /// <summary>
+    /// Actualizar configuración de cuotas.
+    /// </summary>
+    [HttpPut("settings")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> UpdateFeeSettings([FromBody] UpdateFeeSettingsDto dto)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        int? changedByUserId = int.TryParse(userIdClaim, out var uid) ? uid : null;
+
+        var updated = await _paymentService.UpdateFeeSettingsAsync(dto, changedByUserId);
+        return Ok(updated);
+    }
+
+    /// <summary>
+    /// Obtener el historial de cambios de precios de cuotas.
+    /// </summary>
+    [HttpGet("settings/history")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetFeeSettingsHistory()
+    {
+        return Ok(await _paymentService.GetFeeSettingsHistoryAsync());
+    }
+
+    // ========== Exenciones ==========
+    /// <summary>
+    /// Obtener todas las exenciones (usuarios y roles).
+    /// </summary>
+    [HttpGet("exemptions")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetExemptions()
+    {
+        return Ok(await _paymentService.GetExemptionsAsync());
+    }
+
+    /// <summary>
+    /// Alternar exención de cuotas para un usuario específico.
+    /// </summary>
+    [HttpPut("exemptions/user/{userId:int}")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ToggleUserExemption(int userId, [FromBody] ToggleUserExemptionDto dto)
+    {
+        var result = await _paymentService.ToggleUserExemptionAsync(userId, dto.IsExemptFromFees);
+        if (result == null)
+            return NotFound(new { message = $"Usuario {userId} no encontrado." });
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Alternar exención de cuotas para un rol específico.
+    /// </summary>
+    [HttpPut("exemptions/role/{roleName}")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ToggleRoleExemption(string roleName, [FromBody] ToggleRoleExemptionDto dto)
+    {
+        var result = await _paymentService.ToggleRoleExemptionAsync(roleName, dto.AreFeesExempt);
+        if (result == null)
+            return NotFound(new { message = $"Rol {roleName} no encontrado." });
+        return Ok(result);
+    }
+
+    // ========== Listado de pagos con filtros ==========
+    /// <summary>
+    /// Obtener lista paginada de pagos con filtros.
+    /// </summary>
+    [HttpGet("paged")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPaymentsPaged([FromQuery] PaymentFilterDto filter)
+    {
+        return Ok(await _paymentService.GetPaymentsAsync(filter));
+    }
+
+    // ========== Registro manual de pago ==========
+    /// <summary>
+    /// Registrar un pago manualmente.
+    /// </summary>
+    [HttpPost("register")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RegisterPayment([FromBody] RegisterPaymentDto dto)
+    {
+        var result = await _paymentService.RegisterPaymentAsync(dto);
+        if (result == null)
+            return NotFound(new { message = "No se pudo registrar el pago." });
+        return Ok(result);
+    }
+
+    // ========== Transferencia bancaria ==========
+    /// <summary>
+    /// Registra una transferencia bancaria (pendiente de aprobación del club).
+    /// El frontend envía cuotaId, montos y referencia; el backend recalcula la
+    /// comisión ATRIO y persiste el registro para auditoría/facturación.
+    /// </summary>
+    [HttpPost("register-transfer")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RegisterTransfer([FromForm] RegisterTransferRequest request, IFormFile? proofFile)
+    {
+        var ids = ResolveCuotaIds(request?.CuotaIds, request?.CuotaId);
+        if (request == null || ids.Count == 0)
+            return BadRequest(new { message = "request inv\u00e1lido: cuotaIds es obligatorio." });
+
+        if (proofFile != null && proofFile.Length > 0)
+        {
+            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".pdf" };
+            var ext = System.IO.Path.GetExtension(proofFile.FileName).ToLowerInvariant();
+            if (!allowedExtensions.Contains(ext))
+                return BadRequest(new { message = "El archivo adjunto debe ser JPG, PNG o PDF." });
+                
+            var uploadDir = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "wwwroot", "uploads", "receipts");
+            if (!System.IO.Directory.Exists(uploadDir))
+                System.IO.Directory.CreateDirectory(uploadDir);
+                
+            var fileName = $"receipt_{Guid.NewGuid()}{ext}";
+            var filePath = System.IO.Path.Combine(uploadDir, fileName);
+            
+            using (var stream = new System.IO.FileStream(filePath, System.IO.FileMode.Create))
+            {
+                await proofFile.CopyToAsync(stream);
+            }
+            
+            request.ReceiptUrl = $"/uploads/receipts/{fileName}";
+        }
+
+        var result = await _paymentService.RegisterTransferAsync(request);
+
+        if (!result.Success && result.Status == "NOT_FOUND")
+            return NotFound(new { message = result.Message });
+
+        if (!result.Success && result.Status == "ALREADY_PAID")
+            return BadRequest(new { message = result.Message });
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Transferencias pendientes de aprobación (con desglose de comisión ATRIO).
+    /// </summary>
+    [HttpGet("transfers/pending")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPendingTransfers()
+    {
+        return Ok(await _paymentService.GetPendingTransfersAsync());
+    }
+
+    // ========== Mercado Pago - create order ==========
+    [HttpPost("create-order")]
+    public async Task<IActionResult> CreateOrder([FromBody] CreateMercadoPagoOrderRequest request)
+    {
+        if (request == null)
+            return BadRequest(new { message = "request inválido" });
+
+        var ids = ResolveCuotaIds(request.CuotaIds, request.CuotaId);
+        if (ids.Count == 0)
+            return BadRequest(new { message = "cuotaIds inválido" });
+
+        var initPoint = await _paymentService.CreateOrderAsync(ids);
+
+        switch (initPoint)
+        {
+            case "NOT_FOUND":
+                return NotFound(new { message = "No se encontraron las cuotas indicadas en la base de datos." });
+            case "ALREADY_PAID":
+                return BadRequest(new { message = "Una de las cuotas ya fue registrada como pagada." });
+        }
+
+        if (string.IsNullOrWhiteSpace(initPoint))
+            return BadRequest(new { message = "No se pudo crear la orden de pago en Mercado Pago." });
+
+        return Ok(new { init_point = initPoint, message = "Orden creada en Mercado Pago." });
+    }
+
+    // ========== Mercado Pago - pago con tarjeta (token) ==========
+    /// <summary>
+    /// Procesa el pago con tarjeta tokenizada (Branded). El frontend tokeniza los
+    /// datos en el navegador con el SDK de Mercado Pago y envía solo el token.
+    /// </summary>
+    [HttpPost("pay-with-card")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> PayWithCard([FromBody] PayWithCardRequest request)
+    {
+        var ids = ResolveCuotaIds(request?.CuotaIds, request?.CuotaId);
+        if (request == null || ids.Count == 0 || string.IsNullOrWhiteSpace(request.Token))
+            return BadRequest(new { message = "request inválido: cuotaIds y token son obligatorios." });
+
+        var result = await _paymentService.ProcessCardPaymentAsync(ids, request.Token);
+
+        if (!result.Success && result.Status == "NOT_FOUND")
+            return NotFound(new { message = result.Message });
+
+        if (!result.Success && result.Status == "ALREADY_PAID")
+            return BadRequest(new { message = result.Message });
+
+        return Ok(result);
+    }
+
+    // ========== Mercado Pago - OAuth (vinculación de cuenta) ==========
+    /// <summary>
+    /// Devuelve la URL de autorización OAuth para que el usuario (profesor) vincule su
+    /// cuenta de Mercado Pago. El frontend redirige el navegador a esa URL.
+    /// </summary>
+    [HttpPost("mercadopago/connect")]
+    [Authorize]
+    public async Task<IActionResult> MercadoPagoConnect()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                          ?? User.FindFirst("sub")?.Value;
+        if (!int.TryParse(userIdClaim, out var userId))
+            return Unauthorized("Token inválido.");
+
+        var redirectUri = $"{Request.Scheme}://{Request.Host}/api/payments/mercadopago/callback";
+        var authorizationUrl = await _paymentService.BuildMercadoPagoConnectUrlAsync(userId, redirectUri);
+
+        if (string.IsNullOrWhiteSpace(authorizationUrl))
+            return BadRequest(new { message = "La vinculación OAuth de Mercado Pago no está configurada. Contactá al administrador." });
+
+        return Ok(new { authorizationUrl });
+    }
+
+    /// <summary>
+    /// Callback OAuth de Mercado Pago. Intercambia el código por credenciales y las guarda
+    /// en el usuario identificado por el parámetro `state`, luego redirige al frontend.
+    /// </summary>
+    [HttpGet("mercadopago/callback")]
+    [AllowAnonymous]
+    public async Task<IActionResult> MercadoPagoCallback([FromQuery] string? code, [FromQuery] string? state)
+    {
+        var redirectUri = $"{Request.Scheme}://{Request.Host}/api/payments/mercadopago/callback";
+        var result = await _paymentService.ConnectMercadoPagoAsync(code ?? string.Empty, state ?? string.Empty, redirectUri);
+
+        var frontendBase = Environment.GetEnvironmentVariable("FRONTEND_BASE_URL") ?? "http://localhost:5173";
+        var status = result.Success ? "connected" : "error";
+        return Redirect($"{frontendBase.TrimEnd('/')}/cuenta?mp={status}");
+    }
+
+    // ========== Mercado Pago - webhook ==========
+    // POST /api/payments/webhook
+    [HttpPost("webhook")]
+    [AllowAnonymous]
+    public async Task<IActionResult> MercadoPagoWebhook()
+    {
+        using var reader = new StreamReader(Request.Body);
+        var payloadJson = await reader.ReadToEndAsync();
+
+        var result = await _paymentService.ProcessMercadoPagoWebhookAsync(payloadJson);
+
+        // Si el pago fue aprobado y ya se registró, devolvemos 200.
+        return result switch
+        {
+            "OK" => Ok(new { message = "Pago registrado." }),
+            "ALREADY_PAID" => Ok(new { message = "Pago ya estaba registrado." }),
+            "IGNORED" => Ok(new { message = "Evento ignorado." }),
+            _ => BadRequest(new { message = result })
+        };
+    }
+
+    // GET /api/payments/mercadopago/success?cuotaId=...
+    [HttpGet("mercadopago/success")]
+    [AllowAnonymous]
+    public IActionResult MercadoPagoSuccess([FromQuery] int cuotaId)
+    {
+        // El frontend está escuchando su propia ruta. Redirigimos con querystring.
+        // Si no existe una ruta exacta en el frontend, ajustá el destino.
+        var frontendBase = Environment.GetEnvironmentVariable("FRONTEND_BASE_URL") ?? "http://localhost:5173";
+        var url = $"{frontendBase}/cuotas?paid=1&cuotaId={cuotaId}";
+        return Redirect(url);
+    }
+
+    private static List<int> ResolveCuotaIds(List<int>? cuotaIds, int? cuotaId)
+    {
+        if (cuotaIds != null && cuotaIds.Count > 0)
+            return cuotaIds.Where(id => id > 0).Distinct().ToList();
+
+        if (cuotaId.HasValue && cuotaId.Value > 0)
+            return new List<int> { cuotaId.Value };
+
+        return new List<int>();
+    }
+}

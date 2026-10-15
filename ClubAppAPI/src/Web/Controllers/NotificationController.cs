@@ -1,0 +1,129 @@
+using Microsoft.AspNetCore.Mvc;
+using ClubApp.Application.Interfaces;
+using ClubApp.Application.Dtos;
+using ClubApp.Domain.Entities;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
+
+namespace ClubApp.API.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+[Authorize]
+public class NotificationsController : ControllerBase
+{
+    private readonly INotificationService _notificationService;
+
+    public NotificationsController(INotificationService notificationService)
+    {
+        _notificationService = notificationService;
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetAll()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdClaim, out int loggedInUserId)) return Unauthorized();
+
+        return Ok(await _notificationService.GetMyNotificationsAsync(loggedInUserId));
+    }
+
+    [HttpGet("{id:int}")]
+    public async Task<IActionResult> GetById(int id)
+    {
+        var notification = await _notificationService.GetByIdAsync(id);
+        if (notification == null) return NotFound();
+
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
+
+        if (userRole != "ADMIN" && userRole != "SUPERADMIN" && notification.UserId.ToString() != userIdClaim)
+        {
+            return StatusCode(403, "Acceso denegado.");
+        }
+
+        return Ok(notification);
+    }
+
+    [HttpPost]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Post([FromBody] CreateNotificationDto dto)
+    {
+        // 1. El servicio crea la notificación y devuelve el objeto con su ID asignado
+        var createdNotification = await _notificationService.CreateNotificationAsync(dto);
+
+        // 2. Devolvemos 201 Created apuntando a GetById
+        return CreatedAtAction(
+            nameof(GetById), 
+            new { id = createdNotification.Id }, 
+            createdNotification
+        );
+    }
+
+    [HttpPut("{id:int}")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    public async Task<IActionResult> Put(int id, [FromBody] UpdateNotificationDto dto)
+    {
+        var result = await _notificationService.UpdateNotificationAsync(id, dto);
+        if (result == "NOT_FOUND") return NotFound("La notificación no existe.");
+        return Ok(new { message = "Notificación corregida." });
+    }
+
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> Delete(int id)
+    {
+        var notification = await _notificationService.GetByIdAsync(id);
+        if (notification == null) return NotFound("No se encontró el registro para eliminar.");
+
+        if (!IsAdmin() && notification.UserId != GetUserId())
+            return StatusCode(403, "No te pertenece esta notificación.");
+
+        await _notificationService.DeleteNotificationAsync(id);
+        return Ok(new { message = "Notificación eliminada." });
+    }
+
+    [HttpGet("user/{userId:int}")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    public async Task<IActionResult> GetByUserId(int userId)
+    {
+        return Ok(await _notificationService.GetNotificationsByUserIdAsync(userId));
+    }
+
+    [HttpPatch("{id:int}/read")]
+    public async Task<IActionResult> MarkAsRead(int id) => await MarkAsReadInternalAsync(id);
+
+    [HttpPost("{id:int}/read")]
+    public async Task<IActionResult> MarkAsReadPost(int id) => await MarkAsReadInternalAsync(id);
+
+    [HttpPost("read-all")]
+    public async Task<IActionResult> MarkAllAsRead()
+    {
+        await _notificationService.MarkAllAsReadAsync(GetUserId());
+        return Ok(new { message = "Todas las notificaciones fueron marcadas como leídas." });
+    }
+
+    private async Task<IActionResult> MarkAsReadInternalAsync(int id)
+    {
+        var result = await _notificationService.MarkAsReadAsync(id, GetUserId());
+        if (result == "NOT_FOUND") return NotFound();
+        if (result == "NOT_AUTHORIZED") return StatusCode(403, "No te pertenece esta alerta.");
+
+        return Ok(new { message = "Marcada como leída." });
+    }
+
+    private int GetUserId()
+    {
+        var raw = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                  ?? User.FindFirst("sub")?.Value;
+        if (int.TryParse(raw, out var id)) return id;
+        throw new UnauthorizedAccessException("Token inválido.");
+    }
+
+    private bool IsAdmin()
+    {
+        var role = User.FindFirst(ClaimTypes.Role)?.Value;
+        return role == "ADMIN" || role == "SUPERADMIN";
+    }
+}

@@ -1,0 +1,14 @@
+﻿22: [HttpGet]
+29: [HttpGet("{id:int}")]
+46: [HttpGet("user/{userId:int}")]
+98: // ========== Configuración de cuotas (FeeSettings) ==========
+102: [HttpGet("settings")]
+105: public async Task<IActionResult> GetFeeSettings()
+107: return Ok(await _paymentService.GetFeeSettingsAsync());
+113: [HttpPut("settings")]
+117: public async Task<IActionResult> UpdateFeeSettings([FromBody] UpdateFeeSettingsDto dto)
+119: var updated = await _paymentService.UpdateFeeSettingsAsync(dto);
+127: [HttpGet("exemptions")]
+138: [HttpPut("exemptions/user/{userId:int}")]
+153: [HttpPut("exemptions/role/{roleName}")]
+169: [HttpGet("paged")]

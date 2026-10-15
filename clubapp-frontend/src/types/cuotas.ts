@@ -1,0 +1,259 @@
+// Configuración de cuotas (GET/PUT /api/payments/settings)
+export interface FeeSettings {
+  baseFeeAmount: number;
+  lateFeePercentage: number;
+  lateFeeType: 'percentage' | 'fixed';
+  dueDayOfMonth: number;
+  /** Fecha ISO desde la que rige la tarifa actual. null = vigente desde siempre. */
+  effectiveFromDate?: string | null;
+  /** Fecha ISO (1° del mes siguiente) en la que entrará en vigencia el último cambio guardado. */
+  pendingEffectiveFromDate?: string | null;
+  /** Precio base de la tarifa pendiente (aplicará desde pendingEffectiveFromDate). null = sin cambio pendiente. */
+  pendingBaseFeeAmount?: number | null;
+  /** Porcentaje de recargo por mora pendiente. null = sin cambio pendiente. */
+  pendingLateFeePercentage?: number | null;
+  /** Día de vencimiento pendiente. null = sin cambio pendiente. */
+  pendingDueDayOfMonth?: number | null;
+}
+
+// Entrada del historial de precios (GET /api/payments/settings/history)
+export interface FeeSettingsHistoryEntry {
+  id: number;
+  previousBaseFeeAmount: number;
+  previousLateFeePercentage: number;
+  previousDueDayOfMonth: number;
+  newBaseFeeAmount: number;
+  newLateFeePercentage: number;
+  newDueDayOfMonth: number;
+  effectiveFromDate: string;
+  changedAt: string;
+  changedByUserId?: number | null;
+  notes?: string | null;
+}
+
+// Exención de usuario (GET /api/payments/exemptions)
+export interface UserExemption {
+  UserId: number;
+  FullName: string;
+  Email: string;
+  Role: string;
+  IsExemptFromFees: boolean;
+  dni?: string;
+  category?: 'Discapacidad' | 'Jubilado' | 'Beca Social/Deportiva' | 'Socio Vitalicio' | 'Otro' | string;
+  discountPercentage?: number; // 1 - 100%
+  reason?: string; // Observaciones / Motivo
+}
+
+// Exención de rol (GET /api/payments/exemptions)
+export interface RoleExemption {
+  Role: string;
+  AreFeesExempt: boolean;
+  discountPercentage?: number; // 0 - 100%
+  Description?: string;
+  userCount?: number;
+}
+
+// Respuesta completa de exenciones
+export interface ExemptionsResponse {
+  Roles: RoleExemption[];
+  Users: UserExemption[];
+}
+
+// Exención de cuota por rol (GET/PUT /api/fee-settings/role-exemptions)
+export interface RoleFeeExemption {
+  roleName: string;
+  /** Porcentaje de exención VIGENTE hoy (0-100). 100 = exento total. */
+  discountPercentage: number;
+  /** Porcentaje pendiente que aplicará desde effectiveFromDate (1° del mes siguiente). */
+  pendingDiscountPercentage?: number | null;
+  /** Fecha ISO desde la que regirá el porcentaje pendiente. */
+  effectiveFromDate?: string | null;
+  updatedAt: string;
+  description?: string | null;
+}
+
+// Condición de suspensión por mora.
+export type SuspensionCondition = 'OR' | 'AND';
+
+// Regla de corte de servicio / suspensión de socio por mora (GET/PUT /api/fee-settings/suspension-rules)
+export interface SuspensionSettings {
+  maxOverdueMonths: number;
+  maxOverdueAmount: number;
+  suspensionCondition: SuspensionCondition;
+  pendingMaxOverdueMonths?: number | null;
+  pendingMaxOverdueAmount?: number | null;
+  pendingSuspensionCondition?: SuspensionCondition | null;
+  effectiveFromDate?: string | null;
+  updatedAt: string;
+}
+
+// DTO para guardar reglas de suspensión (PUT /api/fee-settings/suspension-rules)
+export interface UpdateSuspensionRulesRequest {
+  maxOverdueMonths: number;
+  maxOverdueAmount: number;
+  suspensionCondition: SuspensionCondition;
+}
+
+// Pago para listado (GET /api/payments)
+export interface Payment {
+  id: number;
+  userId: string;
+  userName: string;
+  period: string;
+  amount: number;
+  lateFeeApplied: number;
+  totalAmount: number;
+  paymentDate?: string;
+  status: string;
+  paymentMethod?: string;
+}
+
+// Respuesta paginada de pagos
+export interface PagedPaymentsResponse {
+  items: Payment[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+}
+
+// DTO para registrar pago manual (POST /api/payments/register)
+export interface RegisterPaymentRequest {
+  userId: string;
+  period: string;
+  paymentMethod: string;
+  amount: number;
+}
+
+export interface PaymentFilter {
+  status?: string;
+  search?: string;
+  period?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+
+// Estadísticas de deuda
+export interface CuotasVencidasStats {
+  totalCuotasVencidas: number;
+  montoTotalDeuda: number;
+}
+
+// Estado de la cuota / situación del socio en el padrón de deudores
+export type EstadoCuota = 'EN_MORA' | 'PENDIENTE' | 'AL_DIA' | 'EXENTO';
+
+export interface CuotaVencida {
+  socioId: number;
+  nombre: string;
+  apellido: string;
+  email: string;
+  telefono: string;
+  dni: string;
+  cantidadCuotasImpagas: number;
+  periodosVencidos: string[];
+  montoTotalAdeudado: number;
+  diasDeAtraso: number;
+  paymentIds: number[];
+  esAutoBloqueado: boolean;
+  esBloqueadoManual: boolean;
+  estaBloqueado: boolean;
+  /** Porcentaje de exención aplicado al socio (0-100). 100 = no genera deuda. */
+  exencionPorcentaje?: number;
+  /** Porcentaje de mora aplicado sobre el subtotal bonificado (0-100). */
+  moraPorcentaje?: number;
+  /** Situación consolidada del socio para filtros y badges. */
+  estadoCuota?: EstadoCuota;
+  /** Motivo de la exención (ej. "Jubilado", "Staff"). */
+  motivoExencion?: string;
+}
+
+
+export interface MemberCuota {
+  id: string;
+  /** ID numérico primario de la cuota (Payment.Id) en la base de datos. */
+  idReal?: number;
+  periodo: string; // ej. "Septiembre 2026"
+  mesAno: string; // ej. "2026-09"
+  fechaVencimiento: string; // ej. "15/09/2026"
+  baseAmount: number;
+  discountPercentage: number;
+  discountReason?: string;
+  isOverdue: boolean;
+  lateFeeAmount: number;
+  lateFeeLabel?: string;
+  totalAmount: number;
+  status: 'PAGADA' | 'PENDIENTE' | 'EN_MORA';
+  paidAt?: string;
+  paymentMethod?: string;
+  receiptNumber?: string;
+  /** Alias / CBU / CVU que recibe la transferencia (Club o Profesor). */
+  transferAlias?: string;
+  /** Receptor final del cobro (para mostrar en el checkout). */
+  payoutCollector?: string;
+  /** Metadata de la reserva asociada (para el pago dividido / reserva grupal). */
+  reservation?: {
+    resourceName: string;
+    spaceId?: number;
+    startTime: string;
+    endTime: string;
+  };
+}
+
+// Cuota del usuario devuelta por el backend (GET /api/payments/mine)
+export interface UserCuota {
+  id: number;             // ID numérico primario (Payment.Id)
+  period: string;         // "yyyy-MM"
+  amount: number;         // monto base
+  lateFeeApplied: number; // recargo por mora
+  status: string;         // "PENDING" | "PAID" | "OVERDUE" | "EXEMPT"
+  paymentDate?: string | null;
+  paymentMethod?: string;
+  createdAt: string;
+  /** Alias / CBU / CVU a mostrar en el checkout de transferencia. */
+  transferAlias?: string;
+  /** Receptor final del cobro ("Club" o el nombre del profesor). */
+  payoutCollector?: string;
+}
+
+// DTO para registrar transferencia bancaria (POST /api/payments/register-transfer)
+export interface RegisterTransferRequest {
+  /** ID de la cuota a abonar (pago individual). */
+  cuotaId?: number;
+  /** IDs de las cuotas a abonar en una misma operación (pago agrupado). */
+  cuotaIds?: number[];
+  totalAmount: number;   // base + comisión
+  netAmount: number;     // base + mora
+  marketplaceFee: number; // comisión ATRIO
+  referenceNumber?: string;
+}
+
+// Resultado del registro de una transferencia (POST /api/payments/register-transfer)
+export interface TransferPaymentResult {
+  success: boolean;
+  status: string; // PENDING | NOT_FOUND | ALREADY_PAID
+  message: string;
+  paymentId?: number | null;
+  netAmount: number;
+  marketplaceFee: number;
+  totalAmount: number;
+}
+
+// Transferencia pendiente de aprobación (GET /api/payments/transfers/pending)
+export interface PendingTransfer {
+  id: number;
+  userId: number;
+  membershipId: number;
+  userName: string;
+  period: string;
+  amount: number;
+  lateFeeApplied: number;
+  marketplaceFee: number;
+  totalAmount: number;
+  method: string;
+  paymentMethod: string;
+  status: string;
+  paymentDate: string;
+  externalTransactionId?: string | null;
+  transferReference?: string | null;
+}
+

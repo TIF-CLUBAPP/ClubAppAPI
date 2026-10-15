@@ -1,0 +1,14 @@
+﻿dotnet : 
+C:\Users\berto\AppData\Local\GitHubDesktop\ClubApp\ClubAppAPI\src\Web\Web.csproj : 
+warning NU1903: El paquete "Microsoft.OpenApi" 2.4.1 tiene una vulnerabilidad de 
+gravedad alta conocida, https://github.com/advisories/GHSA-v5pm-xwqc-g5wc
+En línea: 1 Carácter: 58
++ ... p\ClubApp'; dotnet ef migrations add AddFeeSettingsHistory --project  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (C:\Users\berto\...-v5pm-xwqc-g5wc:String)  
+   [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Build started...
+Build failed. Use dotnet build to see the errors.
+EXIT=1
