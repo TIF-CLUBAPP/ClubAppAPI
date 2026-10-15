@@ -24,8 +24,8 @@ jobs:
       - name: Build with dotnet
         run: dotnet build --configuration Release --no-restore
 
-      - name: dotnet publish
-        run: dotnet publish ClubAppAPI/src/Web/Web.csproj -c Release -o ./publish
+      - name: Build with dotnet
+        run: dotnet build ClubAppAPI/ClubApp.slnx --configuration Release --no-restore
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
