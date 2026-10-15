@@ -1,28 +1,26 @@
 import React from 'react';
-import { CheckCircle2, Clock, AlertTriangle, CreditCard, ChevronRight, ListChecks, Eraser } from 'lucide-react';
+import { CheckCircle2, Clock, AlertTriangle, CreditCard, ChevronRight } from 'lucide-react';
 
 interface AccountStatusCardProps {
   globalStatus: 'AL_DIA' | 'PENDIENTE' | 'EN_MORA';
   totalPendingAmount: number;
-  /** Cantidad de cuotas seleccionadas para abonar. */
-  selectedCount: number;
-  /** Monto total de las cuotas seleccionadas. */
+  /** 'current' => paga la cuota del mes vigente; 'selected' => paga las cuotas tildadas. */
+  mode: 'current' | 'selected';
+  /** Monto total de las cuotas tildadas (solo se muestra en modo 'selected'). */
   selectedTotal: number;
-  /** true si todas las cuotas abonables están seleccionadas. */
-  allSelected: boolean;
-  onPaySelected: () => void;
-  onToggleSelectAll: () => void;
+  /** Habilita el botón principal de pago. */
+  canPay: boolean;
+  onPay: () => void;
   formatCurrency: (val: number) => string;
 }
 
 export const AccountStatusCard: React.FC<AccountStatusCardProps> = ({
   globalStatus,
   totalPendingAmount,
-  selectedCount,
+  mode,
   selectedTotal,
-  allSelected,
-  onPaySelected,
-  onToggleSelectAll,
+  canPay,
+  onPay,
   formatCurrency,
 }) => {
   return (
@@ -39,7 +37,7 @@ export const AccountStatusCard: React.FC<AccountStatusCardProps> = ({
       />
 
       <div className="relative z-10 space-y-6">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
           <div className="space-y-3 max-w-xl">
             <div className="flex items-center gap-3">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
@@ -83,44 +81,32 @@ export const AccountStatusCard: React.FC<AccountStatusCardProps> = ({
             <p className="text-xs text-slate-400 leading-relaxed">
               {globalStatus === 'AL_DIA'
                 ? '¡Excelente! No tenés cuotas impagas en este momento. Mantenés tu carnet habilitado para reservas e instalaciones.'
-                : 'Seleccioná las cuotas que querés abonar y pagalas todas juntas en una sola operación, con acreditación inmediata.'}
+                : 'Aboná tu cuota actual o tildá varias cuotas para pagarlas juntas en una sola operación, con acreditación inmediata.'}
             </p>
           </div>
+
+          {/* Botón destacado: esquina superior derecha de la tarjeta. */}
+          {canPay && (
+            <div className="lg:self-center shrink-0">
+              <button
+                onClick={onPay}
+                className="inline-flex items-center justify-center gap-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-6 py-4 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all transform hover:-translate-y-0.5 active:translate-y-0 whitespace-nowrap"
+              >
+                <CreditCard className="w-5 h-5" />
+                <span className="text-sm">
+                  {mode === 'selected' ? (
+                    <>
+                      Pagar Seleccionadas <span className="font-extrabold">{formatCurrency(selectedTotal)}</span>
+                    </>
+                  ) : (
+                    'Pagar Cuota Actual'
+                  )}
+                </span>
+                <ChevronRight className="w-4 h-4 opacity-75" />
+              </button>
+            </div>
+          )}
         </div>
-
-        {totalPendingAmount > 0 && (
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 border-t border-slate-800 pt-5">
-            <button
-              onClick={onPaySelected}
-              disabled={selectedCount === 0}
-              className="flex-1 flex items-center justify-center gap-3 bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-bold px-6 py-4 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all transform hover:-translate-y-0.5 active:translate-y-0 disabled:transform-none disabled:shadow-none disabled:cursor-not-allowed"
-            >
-              <CreditCard className="w-5 h-5" />
-              <span>
-                Pagar Cuotas Seleccionadas ({selectedCount}){' '}
-                <span className="font-extrabold">{formatCurrency(selectedTotal)}</span>
-              </span>
-              <ChevronRight className="w-4 h-4 opacity-75" />
-            </button>
-
-            <button
-              onClick={onToggleSelectAll}
-              className="flex items-center justify-center gap-2 px-5 py-4 rounded-2xl border border-slate-700 bg-slate-950 hover:bg-slate-800 text-slate-300 text-sm font-semibold transition"
-            >
-              {allSelected ? (
-                <>
-                  <Eraser className="w-4 h-4" />
-                  <span>Desmarcar Todas</span>
-                </>
-              ) : (
-                <>
-                  <ListChecks className="w-4 h-4" />
-                  <span>Seleccionar Todas</span>
-                </>
-              )}
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );

@@ -71,6 +71,37 @@ public interface IPaymentService
     Task<UserExemptionDto?> ToggleUserExemptionAsync(int userId, bool isExempt);
     Task<RoleExemptionDto?> ToggleRoleExemptionAsync(string roleName, bool areFeesExempt);
 
+    // ========== Exención de cuota por rol (porcentaje) ==========
+    /// <summary>
+    /// Devuelve la política de exención por rol (porcentaje vigente y pendiente).
+    /// </summary>
+    Task<List<RoleFeeExemptionDto>> GetRoleFeeExemptionsAsync();
+
+    /// <summary>
+    /// Actualiza los porcentajes de exención por rol. NO es retroactivo: el cambio
+    /// queda pendiente y comienza a regir el 1° del mes siguiente.
+    /// </summary>
+    Task<List<RoleFeeExemptionDto>> UpdateRoleFeeExemptionsAsync(List<RoleFeeExemptionDto> exemptions);
+
+    // ========== Corte de servicio / suspensión por deuda ==========
+
+    /// <summary>
+    /// Devuelve la regla de suspensión por mora (vigente + pendiente).
+    /// </summary>
+    Task<SuspensionSettingsDto> GetSuspensionSettingsAsync();
+
+    /// <summary>
+    /// Guarda la nueva regla de suspensión por mora. NO es retroactivo: queda pendiente
+    /// y comienza a regir el 1° del mes siguiente.
+    /// </summary>
+    Task<SuspensionSettingsDto> UpdateSuspensionSettingsAsync(UpdateSuspensionSettingsRequest dto);
+
+    /// <summary>
+    /// Evalúa si el socio excede los límites de mora configurados (meses y/o monto según
+    /// la condición OR/AND). Devuelve el motivo de la suspensión o null si no corresponde.
+    /// </summary>
+    Task<string?> GetSuspensionReasonAsync(int userId);
+
     // ========== Listado de pagos con filtros ==========
     Task<PagedPaymentsResponseDto> GetPaymentsAsync(PaymentFilterDto filter);
 

@@ -218,6 +218,12 @@ public class UsersController : ControllerBase
             return Forbid();
         }
 
+        // Un ADMIN de club no puede asignar el rol SUPERADMIN (reservado a la cuenta raíz de plataforma)
+        if (dto.NewRole == (int)UserRole.SUPERADMIN && actorRole != UserRole.SUPERADMIN)
+        {
+            return Forbid();
+        }
+
         // Evita que un SUPERADMIN le quite el rol a otro SUPERADMIN y deje la app sin dueño
         if (actorRole == UserRole.SUPERADMIN && target.Role == UserRole.SUPERADMIN && dto.NewRole != (int)UserRole.SUPERADMIN)
         {

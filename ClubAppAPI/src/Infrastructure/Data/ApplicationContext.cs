@@ -19,6 +19,8 @@ namespace ClubApp.Infrastructure.Data
         public DbSet<FeeSettings> FeeSettings { get; set; }
         public DbSet<FeeSettingsHistory> FeeSettingsHistory { get; set; }
         public DbSet<RoleConfiguration> RoleConfigurations { get; set; }
+        public DbSet<RoleFeeExemption> RoleFeeExemptions { get; set; }
+        public DbSet<SuspensionSettings> SuspensionSettings { get; set; }
         public DbSet<ClubConfig> ClubConfigs { get; set; }
         public DbSet<ActivitySchedule> ActivitySchedules { get; set; }
         public DbSet<ResourceBooking> ResourceBookings { get; set; }
@@ -55,6 +57,11 @@ namespace ClubApp.Infrastructure.Data
             // Configuración de RoleConfiguration - único por Role
             modelBuilder.Entity<RoleConfiguration>()
                 .HasIndex(r => r.Role)
+                .IsUnique();
+
+            // Política de exención de cuota por rol (%): único por RoleName.
+            modelBuilder.Entity<RoleFeeExemption>()
+                .HasIndex(r => r.RoleName)
                 .IsUnique();
 
             // Configuración de Payment

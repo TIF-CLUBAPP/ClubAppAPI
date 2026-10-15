@@ -59,6 +59,41 @@ export interface ExemptionsResponse {
   Users: UserExemption[];
 }
 
+// Exención de cuota por rol (GET/PUT /api/fee-settings/role-exemptions)
+export interface RoleFeeExemption {
+  roleName: string;
+  /** Porcentaje de exención VIGENTE hoy (0-100). 100 = exento total. */
+  discountPercentage: number;
+  /** Porcentaje pendiente que aplicará desde effectiveFromDate (1° del mes siguiente). */
+  pendingDiscountPercentage?: number | null;
+  /** Fecha ISO desde la que regirá el porcentaje pendiente. */
+  effectiveFromDate?: string | null;
+  updatedAt: string;
+  description?: string | null;
+}
+
+// Condición de suspensión por mora.
+export type SuspensionCondition = 'OR' | 'AND';
+
+// Regla de corte de servicio / suspensión de socio por mora (GET/PUT /api/fee-settings/suspension-rules)
+export interface SuspensionSettings {
+  maxOverdueMonths: number;
+  maxOverdueAmount: number;
+  suspensionCondition: SuspensionCondition;
+  pendingMaxOverdueMonths?: number | null;
+  pendingMaxOverdueAmount?: number | null;
+  pendingSuspensionCondition?: SuspensionCondition | null;
+  effectiveFromDate?: string | null;
+  updatedAt: string;
+}
+
+// DTO para guardar reglas de suspensión (PUT /api/fee-settings/suspension-rules)
+export interface UpdateSuspensionRulesRequest {
+  maxOverdueMonths: number;
+  maxOverdueAmount: number;
+  suspensionCondition: SuspensionCondition;
+}
+
 // Pago para listado (GET /api/payments)
 export interface Payment {
   id: number;

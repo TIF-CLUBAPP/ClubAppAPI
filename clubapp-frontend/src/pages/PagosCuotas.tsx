@@ -33,16 +33,10 @@ import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import { paymentsService } from '../services/paymentsService';
 import { userService } from '../services/userService';
-import type { FeeSettings, RoleExemption, UserExemption } from '../types/cuotas';
+import type { FeeSettings, RoleFeeExemption, UserExemption, SuspensionSettings, SuspensionCondition } from '../types/cuotas';
 import type { UserListItem } from '../types/user';
 import type { PayoutConfig } from '../types/payout';
-
-const DEFAULT_ROLES: RoleExemption[] = [
-  { Role: 'STAFF', AreFeesExempt: true, discountPercentage: 100, Description: 'Personal administrativo y de campo', userCount: 8 },
-  { Role: 'TEACHER', AreFeesExempt: true, discountPercentage: 100, Description: 'Entrenadores y profesores del club', userCount: 15 },
-  { Role: 'ADMIN', AreFeesExempt: true, discountPercentage: 100, Description: 'Comisión directiva y administradores', userCount: 5 },
-  { Role: 'MEMBER', AreFeesExempt: false, discountPercentage: 0, Description: 'Socios generales del club', userCount: 142 },
-];
+import { computeDigitalServiceFee } from '../config/fees';
 
 const INITIAL_USER_EXEMPTIONS: UserExemption[] = [
   {
@@ -91,6 +85,13 @@ const INITIAL_USER_EXEMPTIONS: UserExemption[] = [
   }
 ];
 
+// Roles técnicos de plataforma/testing que NO representan una categoría de
+// membresía del club; se excluyen del panel de exención de cuota por rol.
+const EXCLUDED_ROLE_EXEMPTIONS = new Set(['SUPERADMIN']);
+
+const filterClubRoleExemptions = (exemptions: RoleFeeExemption[]): RoleFeeExemption[] =>
+  exemptions.filter(r => !EXCLUDED_ROLE_EXEMPTIONS.has(r.roleName.toUpperCase()));
+
 export const PagosCuotas: React.FC = () => {
   // Estados de Configuración
   const [settings, setSettings] = useState<FeeSettings>({
@@ -104,6 +105,13 @@ export const PagosCuotas: React.FC = () => {
   const [lateFeeInput, setLateFeeInput] = useState<string>('0');
   const [dueDayInput, setDueDayInput] = useState<string>('10');
 
+  // Estados de Corte de Servicio / Suspensión por Deuda
+  const [suspensionRules, setSuspensionRules] = useState<SuspensionSettings | null>(null);
+  const [maxOverdueMonthsInput, setMaxOverdueMonthsInput] = useState<string>('2');
+  const [maxOverdueAmountInput, setMaxOverdueAmountInput] = useState<string>('10000');
+  const [suspensionConditionInput, setSuspensionConditionInput] = useState<SuspensionCondition>('OR');
+  const [savingSuspensionRules, setSavingSuspensionRules] = useState(false);
+
   // Estados de Cuentas de Cobro (payout)
   const [payoutConfig, setPayoutConfig] = useState<PayoutConfig | null>(null);
   const [bankAliasInput, setBankAliasInput] = useState('');
@@ -113,7 +121,8 @@ export const PagosCuotas: React.FC = () => {
   const [savingPayout, setSavingPayout] = useState(false);
 
   // Estados de Exenciones
-  const [roleExemptions, setRoleExemptions] = useState<RoleExemption[]>(DEFAULT_ROLES);
+  const [roleExemptions, setRoleExemptions] = useState<RoleFeeExemption[]>([]);
+  const [savingRoleExemptions, setSavingRoleExemptions] = useState(false);
   const [userExemptions, setUserExemptions] = useState<UserExemption[]>(INITIAL_USER_EXEMPTIONS);
   const [searchUser, setSearchUser] = useState('');
 
@@ -208,10 +217,12 @@ export const PagosCuotas: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [settingsData, exemptionsData, payoutData] = await Promise.all([
+      const [settingsData, exemptionsData, roleExemptionsData, payoutData, suspensionData] = await Promise.all([
         paymentsService.getSettings(),
         paymentsService.getExemptions(),
+        paymentsService.getRoleExemptions(),
         paymentsService.getPayoutConfig().catch(() => null),
+        paymentsService.getSuspensionRules().catch(() => null),
       ]);
       // Tarifa vigente (en curso hoy): queda fija y no cambia al editar.
       const vigenteBase = settingsData.baseFeeAmount ?? 0;
@@ -237,19 +248,12 @@ export const PagosCuotas: React.FC = () => {
       setLateFeeInput(String(draftLate));
       setDueDayInput(String(draftDue));
       
-      if (exemptionsData.Roles && exemptionsData.Roles.length > 0) {
-        const mergedRoles = DEFAULT_ROLES.map(def => {
-          const found = exemptionsData.Roles.find(r => r.Role.toUpperCase() === def.Role.toUpperCase());
-          if (!found) return def;
-          const isExempt = found.AreFeesExempt;
-          const pct = found.discountPercentage !== undefined ? found.discountPercentage : (isExempt ? 100 : 0);
-          return {
-            ...def,
-            AreFeesExempt: isExempt && pct > 0,
-            discountPercentage: pct
-          };
-        });
-        setRoleExemptions(mergedRoles);
+      if (roleExemptionsData && roleExemptionsData.length > 0) {
+        // El valor editable es el cambio pendiente (si existe) o el vigente; así el
+        // porcentaje guardado se mantiene visible tras recargar.
+        setRoleExemptions(
+          filterClubRoleExemptions(roleExemptionsData).map(r => ({ ...r, discountPercentage: r.pendingDiscountPercentage ?? r.discountPercentage }))
+        );
       }
 
       if (exemptionsData.Users && exemptionsData.Users.length > 0) {
@@ -266,6 +270,13 @@ export const PagosCuotas: React.FC = () => {
         setPayoutConfig(payoutData);
         setBankAliasInput(payoutData.bankAlias || '');
         setMpUserIdInput(payoutData.mercadoPagoUserId || '');
+      }
+
+      if (suspensionData) {
+        setSuspensionRules(suspensionData);
+        setMaxOverdueMonthsInput(String(suspensionData.pendingMaxOverdueMonths ?? suspensionData.maxOverdueMonths));
+        setMaxOverdueAmountInput(String(suspensionData.pendingMaxOverdueAmount ?? suspensionData.maxOverdueAmount));
+        setSuspensionConditionInput((suspensionData.pendingSuspensionCondition ?? suspensionData.suspensionCondition) as SuspensionCondition);
       }
     } catch (err) {
       setMessage({ text: 'Error al cargar los datos del módulo de cuotas.', type: 'error' });
@@ -385,21 +396,54 @@ export const PagosCuotas: React.FC = () => {
     setPendingSettings(null);
   };
 
-  const handleRolePercentageChange = async (roleName: string, newPercentage: number) => {
+  const handleRolePercentageChange = (roleName: string, newPercentage: number) => {
     const clampedPct = Math.min(100, Math.max(0, newPercentage));
-    const isExempt = clampedPct > 0;
-
     setRoleExemptions(prev =>
-      prev.map(r => r.Role === roleName ? { ...r, discountPercentage: clampedPct, AreFeesExempt: isExempt } : r)
+      prev.map(r => r.roleName === roleName ? { ...r, discountPercentage: clampedPct } : r)
     );
+  };
 
+  const handleSaveRoleExemptions = async () => {
     try {
-      await paymentsService.toggleRoleExemption(roleName, isExempt);
+      setSavingRoleExemptions(true);
+      const updated = await paymentsService.updateRoleExemptions(roleExemptions);
+      setRoleExemptions(
+        filterClubRoleExemptions(updated).map(r => ({ ...r, discountPercentage: r.pendingDiscountPercentage ?? r.discountPercentage }))
+      );
+      setMessage({
+        text: 'Política de exención por rol guardada. Se aplicará a partir de la emisión del mes siguiente.',
+        type: 'success'
+      });
     } catch (err) {
-      console.warn(`[paymentsService] toggleRoleExemption percentage fallback for ${roleName}: backend endpoint not active yet. Local state updated successfully.`);
+      setMessage({ text: 'No se pudo guardar la política de exención por rol.', type: 'error' });
+    } finally {
+      setSavingRoleExemptions(false);
     }
+  };
 
-    setMessage({ text: `Porcentaje de exención (${clampedPct}%) guardado para el rol ${getRoleLabel(roleName)}.`, type: 'success' });
+  const handleSaveSuspensionRules = async () => {
+    const months = Math.max(0, parseInt(maxOverdueMonthsInput, 10) || 0);
+    const amount = Math.max(0, parseFloat(maxOverdueAmountInput) || 0);
+    try {
+      setSavingSuspensionRules(true);
+      const updated = await paymentsService.updateSuspensionRules({
+        maxOverdueMonths: months,
+        maxOverdueAmount: amount,
+        suspensionCondition: suspensionConditionInput,
+      });
+      setSuspensionRules(updated);
+      setMaxOverdueMonthsInput(String(updated.pendingMaxOverdueMonths ?? updated.maxOverdueMonths));
+      setMaxOverdueAmountInput(String(updated.pendingMaxOverdueAmount ?? updated.maxOverdueAmount));
+      setSuspensionConditionInput((updated.pendingSuspensionCondition ?? updated.suspensionCondition) as SuspensionCondition);
+      setMessage({
+        text: 'Reglas de suspensión guardadas. Regirán a partir del próximo mes.',
+        type: 'success',
+      });
+    } catch (err) {
+      setMessage({ text: 'No se pudo guardar las reglas de suspensión.', type: 'error' });
+    } finally {
+      setSavingSuspensionRules(false);
+    }
   };
 
   // Modal & User Exemption Handlers
@@ -527,7 +571,6 @@ export const PagosCuotas: React.FC = () => {
   const getRoleLabel = (role: string) => {
     switch (role.toUpperCase()) {
       case 'ADMIN': return 'Directivos y Admins';
-      case 'SUPERADMIN': return 'Super Administradores';
       case 'TEACHER':
       case 'COACH': return 'Entrenadores y Profesores';
       case 'STAFF': return 'Personal de Staff';
@@ -896,6 +939,133 @@ export const PagosCuotas: React.FC = () => {
                 </form>
               </div>
 
+              {/* 1.2 CORTE DE SERVICIO / SUSPENSIÓN DE SOCIO POR DEUDA */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
+                <div>
+                  <h2 className="text-lg font-semibold flex items-center gap-2">
+                    <PauseCircle className="w-5 h-5 text-rose-400" />
+                    ⛔ Configuración de Corte de Servicio / Suspensión de Socio
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Definí los límites de mora a partir de los cuales un socio queda suspendido y no puede inscribirse a actividades ni reservar espacios.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+                  {/* MESES DE MORA PERMITIDOS */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-2">
+                      Meses de mora permitidos
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      onKeyDown={(e) => ["-", "e", "E"].includes(e.key) && e.preventDefault()}
+                      value={maxOverdueMonthsInput}
+                      onChange={e => setMaxOverdueMonthsInput(e.target.value)}
+                      className="w-full h-10.5 bg-slate-950 border border-slate-800 rounded-xl px-4 text-white focus:outline-none focus:border-rose-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none font-medium"
+                    />
+                  </div>
+
+                  {/* MONTO MÁXIMO DE DEUDA */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-2">
+                      Monto máximo de deuda ($)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        onKeyDown={(e) => ["-", "e", "E"].includes(e.key) && e.preventDefault()}
+                        value={maxOverdueAmountInput}
+                        onChange={e => setMaxOverdueAmountInput(e.target.value)}
+                        className="w-full h-10.5 bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-4 text-white focus:outline-none focus:border-rose-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none font-medium"
+                      />
+                    </div>
+                  </div>
+
+                  {/* CONDICIÓN DE SUSPENSIÓN */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-2">
+                      Condición de suspensión
+                    </label>
+                    <div className="bg-slate-900 border border-slate-800 p-1 rounded-xl flex gap-1 h-10.5 items-center">
+                      <button
+                        type="button"
+                        onClick={() => setSuspensionConditionInput('OR')}
+                        className={`flex-1 h-full rounded-lg px-3 text-sm border transition-colors ${suspensionConditionInput === 'OR' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 font-medium' : 'border-transparent hover:bg-slate-800/60 text-slate-200'}`}
+                      >
+                        Meses o Monto
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSuspensionConditionInput('AND')}
+                        className={`flex-1 h-full rounded-lg px-3 text-sm border transition-colors ${suspensionConditionInput === 'AND' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 font-medium' : 'border-transparent hover:bg-slate-800/60 text-slate-200'}`}
+                      >
+                        Meses y Monto
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                {/* VISUALIZACIÓN DE VIGENCIA */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="bg-slate-950 border border-slate-800 rounded-xl p-4">
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                      Regla vigente este mes
+                    </p>
+                    {(() => {
+                      const m = suspensionRules?.maxOverdueMonths ?? (parseInt(maxOverdueMonthsInput, 10) || 0);
+                      const a = suspensionRules?.maxOverdueAmount ?? (parseFloat(maxOverdueAmountInput) || 0);
+                      const c = suspensionRules?.suspensionCondition ?? suspensionConditionInput;
+                      return (
+                        <div className="space-y-1 text-sm text-slate-200">
+                          <p>Hasta <span className="font-bold text-white">{m}</span> meses de mora</p>
+                          <p>Hasta <span className="font-bold text-white">{new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(a)}</span> de deuda</p>
+                          <p>Criterio: <span className="font-bold text-white">{c === 'AND' ? 'Únicamente al superar ambos límites a la vez.' : 'Al superar cualquiera de los límites (meses o monto).'}</span></p>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                  <div className="bg-slate-950 border border-amber-500/30 rounded-xl p-4">
+                    <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-2">
+                      Regla programada (próximo mes)
+                    </p>
+                    {(() => {
+                      const m = suspensionRules?.pendingMaxOverdueMonths ?? (parseInt(maxOverdueMonthsInput, 10) || 0);
+                      const a = suspensionRules?.pendingMaxOverdueAmount ?? (parseFloat(maxOverdueAmountInput) || 0);
+                      const c = suspensionRules?.pendingSuspensionCondition ?? suspensionConditionInput;
+                      return (
+                        <div className="space-y-1 text-sm text-amber-200">
+                          <p>Hasta <span className="font-bold text-amber-300">{m}</span> meses de mora</p>
+                          <p>Hasta <span className="font-bold text-amber-300">{new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(a)}</span> de deuda</p>
+                          <p>Criterio: <span className="font-bold text-amber-300">{c === 'AND' ? 'Únicamente al superar ambos límites a la vez.' : 'Al superar cualquiera de los límites (meses o monto).'}</span></p>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
+                  <Info className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                  <p className="text-sm text-amber-200 leading-relaxed">
+                    Las reglas de suspensión se guardan como pendientes y regirán a partir del próximo mes.
+                  </p>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleSaveSuspensionRules}
+                    disabled={savingSuspensionRules}
+                    className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold px-5 py-2.5 rounded-xl shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <Save className="w-4 h-4" />
+                    {savingSuspensionRules ? 'Guardando...' : 'Guardar Reglas de Suspensión'}
+                  </button>
+                </div>
+              </div>
+
               {/* 1.5 CUENTAS DE COBRO (SPLIT PAYMENTS) */}
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
                 <div>
@@ -994,6 +1164,10 @@ export const PagosCuotas: React.FC = () => {
                   <p className="text-xs text-slate-400 mt-1">
                     Definí el porcentaje de exención aplicable a todos los socios registrados bajo cada rol.
                   </p>
+                  <p className="text-xs text-amber-300/90 mt-2 flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+                    <Info className="w-3.5 h-3.5 shrink-0" />
+                    Las modificaciones de exención por rol se aplicarán automáticamente a partir de la emisión del mes siguiente.
+                  </p>
                 </div>
 
                 {/* NOTIFICACIÓN CONTEXTUAL CON ANIMACIÓN SUAVE */}
@@ -1030,14 +1204,30 @@ export const PagosCuotas: React.FC = () => {
                   )}
                 </AnimatePresence>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {roleExemptions.map(role => {
-                    const pct = role.discountPercentage ?? (role.AreFeesExempt ? 100 : 0);
-                    const isExempt = role.AreFeesExempt && pct > 0;
+                    const pct = role.discountPercentage;
+                    const isExempt = pct > 0;
+                    const isFullExemption = pct === 100;
+
+                    // Simulación de precio en tiempo real: misma base que "Tarifa Digital ATRIO"
+                    // (cuota programada del próximo mes, o cuota vigente base si no hay cambio).
+                    const baseFee = parseFloat(baseFeeInput) || 0;
+                    const descuento = (baseFee * pct) / 100;
+                    const subtotal = Math.max(0, baseFee - descuento);
+                    const costoPlataforma = computeDigitalServiceFee(subtotal);
+                    const totalFinal = subtotal + costoPlataforma;
+                    const fmtARS = (value: number, decimals: number) =>
+                      new Intl.NumberFormat('es-AR', {
+                        style: 'currency',
+                        currency: 'ARS',
+                        minimumFractionDigits: decimals,
+                        maximumFractionDigits: decimals,
+                      }).format(value);
 
                     return (
                       <div
-                        key={role.Role}
+                        key={role.roleName}
                         className="bg-slate-950 border border-slate-800/80 rounded-2xl p-5 flex flex-col justify-between hover:border-slate-700/80 transition space-y-4 shadow-lg"
                       >
                         {/* CABECERA DE LA TARJETA CON BADGE */}
@@ -1047,10 +1237,10 @@ export const PagosCuotas: React.FC = () => {
                               <ShieldCheck className="w-5 h-5" />
                             </div>
                             <div>
-                              <h3 className="font-semibold text-sm text-white">{getRoleLabel(role.Role)}</h3>
+                              <h3 className="font-semibold text-sm text-white">{getRoleLabel(role.roleName)}</h3>
                               <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
                                 <Users className="w-3.5 h-3.5 text-slate-500" />
-                                {role.userCount !== undefined ? `${role.userCount} socios` : 'Integrantes del rol'}
+                                {role.description || 'Integrantes del rol'}
                               </p>
                             </div>
                           </div>
@@ -1077,7 +1267,7 @@ export const PagosCuotas: React.FC = () => {
                                 max="100"
                                 onKeyDown={(e) => ["-", "e", "E"].includes(e.key) && e.preventDefault()}
                                 value={pct}
-                                onChange={e => handleRolePercentageChange(role.Role, Number(e.target.value))}
+                                onChange={e => handleRolePercentageChange(role.roleName, Number(e.target.value))}
                                 className="w-10 bg-transparent text-right text-xs text-white focus:outline-none font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               />
                               <span className="text-xs text-slate-400 font-bold ml-0.5">%</span>
@@ -1090,7 +1280,7 @@ export const PagosCuotas: React.FC = () => {
                               <button
                                 key={preset}
                                 type="button"
-                                onClick={() => handleRolePercentageChange(role.Role, preset)}
+                                onClick={() => handleRolePercentageChange(role.roleName, preset)}
                                 className={`py-1.5 px-2 text-xs font-semibold rounded-xl border transition-all text-center ${
                                   pct === preset
                                     ? 'bg-emerald-600 text-white border-emerald-500 shadow-md font-bold'
@@ -1101,10 +1291,60 @@ export const PagosCuotas: React.FC = () => {
                               </button>
                             ))}
                           </div>
+
+                          {/* SIMULACIÓN DE PRECIO EN TIEMPO REAL */}
+                          <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/80 mt-3 text-xs space-y-2">
+                            {isFullExemption && (
+                              <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-2.5 py-2 text-emerald-300 font-semibold">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                                Total a cobrar: {fmtARS(totalFinal, 2)} (Exención Completa)
+                              </div>
+                            )}
+
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-400">Cuota Base</span>
+                              <span className="text-slate-200 font-semibold">{fmtARS(baseFee, 0)}</span>
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-400">Descuento Exención ({pct}%)</span>
+                              <span className="text-rose-400 font-semibold">-{fmtARS(descuento, 2)}</span>
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-400">Subtotal Socio</span>
+                              <span className="text-slate-200 font-semibold">{fmtARS(subtotal, 2)}</span>
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-400">Costo Servicio Digital (3.5%)</span>
+                              <span className="text-emerald-400 font-semibold">+{fmtARS(costoPlataforma, 2)}</span>
+                            </div>
+
+                            <div className="flex items-center justify-between border-t border-slate-800/80 pt-2">
+                              <span className="text-slate-300 font-semibold">Monto Final Cobrado en App</span>
+                              <span className="text-emerald-300 font-bold text-sm">{fmtARS(totalFinal, 2)}</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     );
                   })}
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-slate-800/80">
+                  <p className="text-xs text-slate-500">
+                    Los cambios se guardan como pendientes y regirán desde el próximo ciclo de facturación.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleSaveRoleExemptions}
+                    disabled={savingRoleExemptions}
+                    className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition shadow-lg shadow-emerald-950/40 whitespace-nowrap"
+                  >
+                    {savingRoleExemptions ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    {savingRoleExemptions ? 'Guardando...' : 'Guardar Política de Exención'}
+                  </button>
                 </div>
               </div>
 

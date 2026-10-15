@@ -5,6 +5,9 @@ import type {
   ExemptionsResponse, 
   UserExemption, 
   RoleExemption, 
+  RoleFeeExemption, 
+  SuspensionSettings,
+  UpdateSuspensionRulesRequest,
   PagedPaymentsResponse,
   PaymentFilter,
   RegisterPaymentRequest,
@@ -96,6 +99,35 @@ export const paymentsService = {
   toggleRoleExemption: async (roleName: string, isExempt: boolean): Promise<RoleExemption> => {
     // Backend expects: { AreFeesExempt: boolean }
     const response = await api.put<RoleExemption>(`/payments/exemptions/role/${roleName}`, { AreFeesExempt: isExempt });
+    return response.data;
+  },
+
+  // ========== Exención de cuota por rol (porcentaje) ==========
+  /** Obtener la política de exención de cuota por rol (GET /api/fee-settings/role-exemptions). */
+  getRoleExemptions: async (): Promise<RoleFeeExemption[]> => {
+    const response = await api.get<RoleFeeExemption[]>('/fee-settings/role-exemptions');
+    return response.data;
+  },
+
+  /**
+   * Guardar la nueva política de exención por rol (PUT /api/fee-settings/role-exemptions).
+   * No es retroactivo: se aplica a partir del 1° del mes siguiente.
+   */
+  updateRoleExemptions: async (exemptions: RoleFeeExemption[]): Promise<RoleFeeExemption[]> => {
+    const response = await api.put<RoleFeeExemption[]>('/fee-settings/role-exemptions', { exemptions });
+    return response.data;
+  },
+
+  // ========== Corte de servicio / suspensión por deuda ==========
+  /** Obtener la regla de suspensión por mora (GET /api/fee-settings/suspension-rules). */
+  getSuspensionRules: async (): Promise<SuspensionSettings> => {
+    const response = await api.get<SuspensionSettings>('/fee-settings/suspension-rules');
+    return response.data;
+  },
+
+  /** Guardar la nueva regla de suspensión por mora (PUT /api/fee-settings/suspension-rules). */
+  updateSuspensionRules: async (data: UpdateSuspensionRulesRequest): Promise<SuspensionSettings> => {
+    const response = await api.put<SuspensionSettings>('/fee-settings/suspension-rules', data);
     return response.data;
   },
 

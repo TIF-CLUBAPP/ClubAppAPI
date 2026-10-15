@@ -127,7 +127,18 @@ export default function Sidebar() {
             </Link>
           )}
 
-
+          {isAuthenticated && (role === 'TEACHER' || role === 'ADMIN' || role === 'SUPERADMIN') && (
+            <Link 
+              to="/asistencia" 
+              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
+                location.pathname === '/asistencia'
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+              }`}
+            >
+              <ClipboardCheck size={18} /> Asistencia
+            </Link>
+          )}
 
           {isAuthenticated && (role === 'ADMIN' || role === 'SUPERADMIN') && (
             <Link 
@@ -192,19 +203,6 @@ export default function Sidebar() {
               }`}
             >
               <Users size={18} /> Socios
-            </Link>
-          )}
-
-          {isAuthenticated && (role === 'TEACHER' || role === 'ADMIN' || role === 'SUPERADMIN') && (
-            <Link 
-              to="/asistencia" 
-              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
-                location.pathname === '/asistencia'
-                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-              }`}
-            >
-              <ClipboardCheck size={18} /> Asistencia
             </Link>
           )}
         </nav>

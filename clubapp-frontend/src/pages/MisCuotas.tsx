@@ -52,6 +52,22 @@ export const MisCuotas: React.FC = () => {
   const selectedTotal = selectedCuotas.reduce((s, c) => s + c.totalAmount, 0);
   const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedCuotaIds.includes(id));
 
+  // Cuota del mes vigente (abonable) para el botón "Pagar Cuota Actual".
+  const currentMonthCuota = useMemo(() => {
+    const now = new Date();
+    const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    return cuotas.find((c) => c.mesAno === period && c.status !== 'PAGADA' && c.totalAmount > 0);
+  }, [cuotas]);
+
+  // Si el usuario tildó cuotas, el botón paga la selección; si no (o solo tildó la vigente),
+  // paga la cuota del mes actual.
+  const onlyCurrentSelected =
+    selectedCuotas.length === 1 && currentMonthCuota != null && selectedCuotas[0].id === currentMonthCuota.id;
+  const payMode: 'current' | 'selected' =
+    selectedCuotas.length === 0 || onlyCurrentSelected ? 'current' : 'selected';
+  const cuotasToPay = payMode === 'current' ? (currentMonthCuota ? [currentMonthCuota] : []) : selectedCuotas;
+  const canPay = payMode === 'current' ? currentMonthCuota != null : selectedCuotas.length > 0;
+
   const toggleCuota = (id: number) => {
     setSelectedCuotaIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
@@ -61,12 +77,13 @@ export const MisCuotas: React.FC = () => {
   };
 
   const openCheckout = () => {
-    if (selectedCuotas.length === 0) return;
-    setCheckoutCuotas(selectedCuotas);
+    if (cuotasToPay.length === 0) return;
+    setCheckoutCuotas(cuotasToPay);
   };
 
   const handlePaymentSuccessMany = (paidCuotas: MemberCuota[]) => {
     updateCuotas(paidCuotas);
+    setSelectedCuotaIds([]);
   };
 
   return (
@@ -113,17 +130,18 @@ export const MisCuotas: React.FC = () => {
                 <AccountStatusCard
                   globalStatus={globalStatus}
                   totalPendingAmount={totalPending}
-                  selectedCount={selectedCuotas.length}
+                  mode={payMode}
                   selectedTotal={selectedTotal}
-                  allSelected={allSelected}
-                  onPaySelected={openCheckout}
-                  onToggleSelectAll={toggleSelectAll}
+                  canPay={canPay}
+                  onPay={openCheckout}
                   formatCurrency={fmt}
                 />
                 <CuotasList
                   cuotas={cuotas}
                   settings={settings}
                   selectedCuotaIds={selectedCuotaIds}
+                  allSelected={allSelected}
+                  onToggleSelectAll={toggleSelectAll}
                   onToggleCuota={toggleCuota}
                   onViewReceipt={setSelectedReceipt}
                   formatCurrency={fmt}
@@ -138,7 +156,7 @@ export const MisCuotas: React.FC = () => {
         cuota={null}
         cuotas={checkoutCuotas ?? undefined}
         onClose={() => setCheckoutCuotas(null)}
-        onPaymentSuccess={(updated) => { updateCuota(updated); }}
+        onPaymentSuccess={(updated) => { updateCuota(updated); setSelectedCuotaIds([]); }}
         onPaymentSuccessMany={handlePaymentSuccessMany}
         onViewReceipt={(c) => { setCheckoutCuotas(null); const u = cuotas.find(q => q.id === c.id) || c; setSelectedReceipt(u); }}
         formatCurrency={fmt}

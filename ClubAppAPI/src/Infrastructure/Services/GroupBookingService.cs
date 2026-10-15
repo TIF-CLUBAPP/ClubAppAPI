@@ -36,6 +36,11 @@ public class GroupBookingService : IGroupBookingService
         var organizer = await _context.Users.FindAsync(organizerUserId);
         if (organizer == null) throw new NotFoundException("User", organizerUserId);
 
+        // Regla de corte de servicio: deniega la reserva grupal si el organizador excede los límites de mora.
+        var suspensionReason = await _paymentService.GetSuspensionReasonAsync(organizerUserId);
+        if (suspensionReason != null)
+            throw new AppValidationException(suspensionReason);
+
         // Resolver el espacio (si viene del catálogo) y validar conflicto con clases.
         Space? space = null;
         if (dto.SpaceId.HasValue)

@@ -10,10 +10,12 @@ namespace ClubApp.Infrastructure.Services;
 public class EnrollmentService : IEnrollmentService
 {
     private readonly ApplicationContext _context;
+    private readonly IPaymentService _paymentService;
 
-    public EnrollmentService(ApplicationContext context)
+    public EnrollmentService(ApplicationContext context, IPaymentService paymentService)
     {
         _context = context;
+        _paymentService = paymentService;
     }
 
     public async Task<IEnumerable<Enrollment>> GetAllEnrollmentsAsync()
@@ -34,14 +36,12 @@ public class EnrollmentService : IEnrollmentService
 
     public async Task<string> CreateEnrollmentAsync(int userId, CreateEnrollmentDto dto)
     {
-        // REGLA DE NEGOCIO (M�dulo 3): Verificar si el usuario registra deudas o pagos vencidos
-        bool hasOverdueDebt = await _context.Payments
-            .AnyAsync(p => p.UserId == userId &&
-                          (p.Status == PaymentStatus.Overdue || p.Status == PaymentStatus.Pending));
-
-        if (hasOverdueDebt)
+        // Se evalúa la regla configurada de corte de servicio / suspensión por mora
+        // (meses y/o monto según condición OR/AND).
+        var suspensionReason = await _paymentService.GetSuspensionReasonAsync(userId);
+        if (suspensionReason != null)
         {
-            return "No puedes inscribirte a actividades porque registras deudas o cuotas vencidas pendientes.";
+            return suspensionReason;
         }
 
         var activity = await _context.Activities.FindAsync(dto.ActivityId);

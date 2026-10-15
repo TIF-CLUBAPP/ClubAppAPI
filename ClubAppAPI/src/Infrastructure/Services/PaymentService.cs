@@ -435,6 +435,307 @@ public class PaymentService : IPaymentService
         };
     }
 
+    // ========== Exención de cuota por rol (porcentaje) ==========
+
+    private static readonly string[] RoleFeeExemptionDefaults = { "MEMBER", "TEACHER", "ADMIN", "SUPERADMIN" };
+
+    public async Task<List<RoleFeeExemptionDto>> GetRoleFeeExemptionsAsync()
+    {
+        await PromoteExpiredRoleFeeExemptionsAsync(DateTime.UtcNow);
+        await EnsureRoleFeeExemptionsSeededAsync();
+
+        var exemptions = await _context.RoleFeeExemptions.ToListAsync();
+
+        // Orden estable y legible para la UI (socios primero, luego staff/directivos).
+        return exemptions
+            .OrderBy(e => RoleFeeExemptionOrder(e.RoleName))
+            .Select(MapToRoleFeeExemptionDto)
+            .ToList();
+    }
+
+    public async Task<List<RoleFeeExemptionDto>> UpdateRoleFeeExemptionsAsync(List<RoleFeeExemptionDto> exemptions)
+    {
+        await PromoteExpiredRoleFeeExemptionsAsync(DateTime.UtcNow);
+        await EnsureRoleFeeExemptionsSeededAsync();
+
+        var now = DateTime.UtcNow;
+        var effectiveFrom = CalcularVigenciaProximoMes(now);
+
+        if (exemptions != null)
+        {
+            foreach (var dto in exemptions)
+            {
+                if (string.IsNullOrWhiteSpace(dto.RoleName)) continue;
+
+                var roleName = dto.RoleName.Trim().ToUpperInvariant();
+                var newPct = Math.Clamp(dto.DiscountPercentage, 0m, 100m);
+
+                var existing = await _context.RoleFeeExemptions
+                    .FirstOrDefaultAsync(e => e.RoleName == roleName);
+
+                if (existing == null)
+                {
+                    _context.RoleFeeExemptions.Add(new RoleFeeExemption
+                    {
+                        RoleName = roleName,
+                        DiscountPercentage = 0m,
+                        PendingDiscountPercentage = newPct,
+                        EffectiveFromDate = effectiveFrom,
+                        UpdatedAt = now
+                    });
+                }
+                else
+                {
+                    if (existing.DiscountPercentage == newPct)
+                    {
+                        // Sin cambio efectivo: se cancela cualquier cambio pendiente previo.
+                        existing.PendingDiscountPercentage = null;
+                        existing.EffectiveFromDate = null;
+                        existing.UpdatedAt = now;
+                    }
+                    else
+                    {
+                        existing.PendingDiscountPercentage = newPct;
+                        existing.EffectiveFromDate = effectiveFrom;
+                        existing.UpdatedAt = now;
+                    }
+                }
+            }
+        }
+
+        await _context.SaveChangesAsync();
+
+        return await GetRoleFeeExemptionsAsync();
+    }
+
+    /// <summary>
+    /// Promueve los cambios de exención pendientes cuando ya venció su fecha de vigencia
+    /// (1° del mes). Así el porcentaje "pendiente" pasa a ser el "vigente" sin intervención manual.
+    /// </summary>
+    private async Task PromoteExpiredRoleFeeExemptionsAsync(DateTime now)
+    {
+        var expired = await _context.RoleFeeExemptions
+            .Where(e => e.PendingDiscountPercentage != null
+                        && e.EffectiveFromDate != null
+                        && e.EffectiveFromDate <= now)
+            .ToListAsync();
+
+        if (expired.Count == 0) return;
+
+        foreach (var item in expired)
+        {
+            item.DiscountPercentage = item.PendingDiscountPercentage!.Value;
+            item.PendingDiscountPercentage = null;
+            item.EffectiveFromDate = null;
+            item.UpdatedAt = now;
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
+    /// <summary>Garantiza que exista una fila base para cada rol de la app.</summary>
+    private async Task EnsureRoleFeeExemptionsSeededAsync()
+    {
+        var existing = await _context.RoleFeeExemptions
+            .Where(e => RoleFeeExemptionDefaults.Contains(e.RoleName))
+            .Select(e => e.RoleName)
+            .ToListAsync();
+
+        var missing = RoleFeeExemptionDefaults.Where(r => !existing.Contains(r)).ToList();
+        foreach (var role in missing)
+        {
+            _context.RoleFeeExemptions.Add(new RoleFeeExemption
+            {
+                RoleName = role,
+                // Los roles de gestión (TEACHER/ADMIN/SUPERADMIN) arrancan 100% exentos.
+                DiscountPercentage = role == "MEMBER" ? 0m : 100m,
+                UpdatedAt = DateTime.UtcNow
+            });
+        }
+
+        if (missing.Count > 0)
+            await _context.SaveChangesAsync();
+    }
+
+    /// <summary>Devuelve el porcentaje de exención VIGENTE para un rol (0-100).</summary>
+    private async Task<decimal> GetEffectiveDiscountForRoleAsync(string roleName)
+    {
+        await PromoteExpiredRoleFeeExemptionsAsync(DateTime.UtcNow);
+
+        var exemption = await _context.RoleFeeExemptions
+            .FirstOrDefaultAsync(e => e.RoleName == roleName);
+
+        return exemption?.DiscountPercentage ?? 0m;
+    }
+
+    private static RoleFeeExemptionDto MapToRoleFeeExemptionDto(RoleFeeExemption e) => new()
+    {
+        RoleName = e.RoleName,
+        DiscountPercentage = e.DiscountPercentage,
+        PendingDiscountPercentage = e.PendingDiscountPercentage,
+        EffectiveFromDate = e.EffectiveFromDate,
+        UpdatedAt = e.UpdatedAt,
+        Description = GetRoleDescription(e.RoleName)
+    };
+
+    private static string? GetRoleDescription(string roleName) => roleName switch
+    {
+        "MEMBER" => "Socios generales del club",
+        "TEACHER" => "Entrenadores y profesores del club",
+        "ADMIN" => "Comisión directiva y administradores",
+        "SUPERADMIN" => "Super administradores del club",
+        _ => null
+    };
+
+    private static int RoleFeeExemptionOrder(string roleName)
+    {
+        var index = Array.IndexOf(RoleFeeExemptionDefaults, roleName);
+        return index < 0 ? int.MaxValue : index;
+    }
+
+    // ========== Corte de servicio / suspensión por deuda ==========
+
+    /// <summary>Normaliza la condición de suspensión a "OR" o "AND" (default OR).</summary>
+    private static string NormalizeSuspensionCondition(string? condition) =>
+        string.Equals(condition, "AND", StringComparison.OrdinalIgnoreCase) ? "AND" : "OR";
+
+    public async Task<SuspensionSettingsDto> GetSuspensionSettingsAsync()
+    {
+        await PromoteExpiredSuspensionSettingsAsync(DateTime.UtcNow);
+
+        var settings = await _context.SuspensionSettings.FirstOrDefaultAsync();
+        if (settings == null)
+        {
+            settings = new SuspensionSettings
+            {
+                MaxOverdueMonths = 2,
+                MaxOverdueAmount = 10000m,
+                SuspensionCondition = "OR",
+                UpdatedAt = DateTime.UtcNow
+            };
+            _context.SuspensionSettings.Add(settings);
+            await _context.SaveChangesAsync();
+        }
+
+        return new SuspensionSettingsDto
+        {
+            MaxOverdueMonths = settings.MaxOverdueMonths,
+            MaxOverdueAmount = settings.MaxOverdueAmount,
+            SuspensionCondition = settings.SuspensionCondition,
+            PendingMaxOverdueMonths = settings.PendingMaxOverdueMonths,
+            PendingMaxOverdueAmount = settings.PendingMaxOverdueAmount,
+            PendingSuspensionCondition = settings.PendingSuspensionCondition,
+            EffectiveFromDate = settings.EffectiveFromDate,
+            UpdatedAt = settings.UpdatedAt
+        };
+    }
+
+    public async Task<SuspensionSettingsDto> UpdateSuspensionSettingsAsync(UpdateSuspensionSettingsRequest dto)
+    {
+        await PromoteExpiredSuspensionSettingsAsync(DateTime.UtcNow);
+
+        var now = DateTime.UtcNow;
+        var effectiveFrom = CalcularVigenciaProximoMes(now);
+
+        var months = Math.Max(0, dto.MaxOverdueMonths);
+        var amount = Math.Max(0m, dto.MaxOverdueAmount);
+        var condition = NormalizeSuspensionCondition(dto.SuspensionCondition);
+
+        var settings = await _context.SuspensionSettings.FirstOrDefaultAsync();
+        if (settings == null)
+        {
+            settings = new SuspensionSettings();
+            _context.SuspensionSettings.Add(settings);
+        }
+
+        // Si la regla ingresada coincide con la vigente, se cancela cualquier cambio pendiente previo.
+        if (settings.MaxOverdueMonths == months &&
+            settings.MaxOverdueAmount == amount &&
+            string.Equals(settings.SuspensionCondition, condition, StringComparison.OrdinalIgnoreCase))
+        {
+            settings.PendingMaxOverdueMonths = null;
+            settings.PendingMaxOverdueAmount = null;
+            settings.PendingSuspensionCondition = null;
+            settings.EffectiveFromDate = null;
+            settings.UpdatedAt = now;
+        }
+        else
+        {
+            settings.PendingMaxOverdueMonths = months;
+            settings.PendingMaxOverdueAmount = amount;
+            settings.PendingSuspensionCondition = condition;
+            settings.EffectiveFromDate = effectiveFrom;
+            settings.UpdatedAt = now;
+        }
+
+        await _context.SaveChangesAsync();
+        return await GetSuspensionSettingsAsync();
+    }
+
+    /// <summary>
+    /// Promueve el cambio pendiente de regla de suspensión cuando ya venció su fecha de vigencia
+    /// (1° del mes). Así la regla "pendiente" pasa a ser la "vigente" sin intervención manual.
+    /// </summary>
+    private async Task PromoteExpiredSuspensionSettingsAsync(DateTime now)
+    {
+        var settings = await _context.SuspensionSettings.FirstOrDefaultAsync();
+        if (settings == null || settings.PendingMaxOverdueMonths == null)
+            return;
+
+        if (settings.EffectiveFromDate == null || settings.EffectiveFromDate > now)
+            return;
+
+        settings.MaxOverdueMonths = settings.PendingMaxOverdueMonths!.Value;
+        settings.MaxOverdueAmount = settings.PendingMaxOverdueAmount ?? settings.MaxOverdueAmount;
+        settings.SuspensionCondition = settings.PendingSuspensionCondition ?? settings.SuspensionCondition;
+        settings.PendingMaxOverdueMonths = null;
+        settings.PendingMaxOverdueAmount = null;
+        settings.PendingSuspensionCondition = null;
+        settings.EffectiveFromDate = null;
+        settings.UpdatedAt = now;
+
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<string?> GetSuspensionReasonAsync(int userId)
+    {
+        var settings = await GetSuspensionSettingsAsync();
+
+        // Sin regla configurada (o límites en 0) no hay suspensión automática por mora.
+        if (settings.MaxOverdueMonths <= 0 && settings.MaxOverdueAmount <= 0)
+            return null;
+
+        var unpaid = await _context.Payments
+            .Where(p => p.UserId == userId &&
+                        (p.Status == PaymentStatus.Overdue || p.Status == PaymentStatus.Pending))
+            .ToListAsync();
+
+        if (unpaid.Count == 0)
+            return null;
+
+        // "Meses de mora" = cantidad de períodos impagos (una cuota por mes).
+        var overdueMonths = unpaid.Select(p => p.Period).Distinct().Count();
+        var overdueAmount = unpaid.Sum(p => p.Amount + p.LateFeeApplied);
+
+        var exceedsMonths = overdueMonths > settings.MaxOverdueMonths;
+        var exceedsAmount = overdueAmount > settings.MaxOverdueAmount;
+
+        var suspended = string.Equals(settings.SuspensionCondition, "AND", StringComparison.OrdinalIgnoreCase)
+            ? (exceedsMonths && exceedsAmount)
+            : (exceedsMonths || exceedsAmount);
+
+        if (!suspended)
+            return null;
+
+        var conditionLabel = string.Equals(settings.SuspensionCondition, "AND", StringComparison.OrdinalIgnoreCase)
+            ? "supera ambos límites (meses y monto)"
+            : "supera el límite de meses o de monto";
+
+        return $"El socio está suspendido por mora: registra {overdueMonths} cuota(s) impaga(s) por " +
+               $"${overdueAmount:N0} y {conditionLabel} permitidos " +
+               $"({settings.MaxOverdueMonths} meses y ${settings.MaxOverdueAmount:N0}).";
+    }
+
     // ========== Listado de pagos con filtros ==========
 
     public async Task<PagedPaymentsResponseDto> GetPaymentsAsync(PaymentFilterDto filter)
@@ -729,14 +1030,23 @@ public class PaymentService : IPaymentService
         var settings = await GetFeeSettingsAsync();
         var baseFee = settings.BaseFeeAmount > 0 ? settings.BaseFeeAmount : 15000m;
 
+        // Exención de cuota por rol: consulta el porcentaje VIGENTE para el rol del socio.
+        // Los cambios guardados no son retroactivos (se promueven recién el 1° del mes siguiente),
+        // por lo que esta cuota del período actual se emite con el porcentaje ya vigente.
+        var discountPct = await GetEffectiveDiscountForRoleAsync(user.Role.ToString());
+        var isFullyExempt = discountPct >= 100m;
+        var amount = isFullyExempt
+            ? 0m
+            : Math.Round(baseFee * (1m - discountPct / 100m), 2, MidpointRounding.AwayFromZero);
+
         _context.Payments.Add(new Payment
         {
             UserId = userId,
             Period = period,
-            Amount = baseFee,
+            Amount = amount,
             LateFeeApplied = 0m,
             PaymentMethod = string.Empty,
-            Status = PaymentStatus.Pending,
+            Status = isFullyExempt ? PaymentStatus.Exempt : PaymentStatus.Pending,
             PaymentDate = null,
             CreatedAt = now
         });

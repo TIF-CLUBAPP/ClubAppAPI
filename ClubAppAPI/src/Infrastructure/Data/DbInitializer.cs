@@ -84,6 +84,43 @@ namespace ClubApp.Infrastructure.Data
             }
 
             // ==========================================
+            // 0.15 SEEDING DE REGLAS DE SUSPENSIÓN POR MORA (SuspensionSettings)
+            // ==========================================
+            // Garantiza que exista una fila base con límites por defecto para el
+            // corte de servicio / suspensión de socios morosos.
+            if (!context.SuspensionSettings.Any())
+            {
+                context.SuspensionSettings.Add(new SuspensionSettings
+                {
+                    MaxOverdueMonths = 2,
+                    MaxOverdueAmount = 10000m,
+                    SuspensionCondition = "OR",
+                    UpdatedAt = DateTime.UtcNow
+                });
+                context.SaveChanges();
+            }
+
+            // ==========================================
+            // 0.2 SEEDING DE EXENCIÓN DE CUOTA POR ROL (RoleFeeExemption)
+            // ==========================================
+            // Garantiza una fila base por rol (MEMBER 0%, gestión 100%). La política
+            // editable por el admin vive en esta tabla y NO es retroactiva.
+            var roleExemptionNames = new[] { "MEMBER", "TEACHER", "ADMIN", "SUPERADMIN" };
+            foreach (var roleName in roleExemptionNames)
+            {
+                if (!context.RoleFeeExemptions.Any(e => e.RoleName == roleName))
+                {
+                    context.RoleFeeExemptions.Add(new RoleFeeExemption
+                    {
+                        RoleName = roleName,
+                        DiscountPercentage = roleName == "MEMBER" ? 0m : 100m,
+                        UpdatedAt = DateTime.UtcNow
+                    });
+                }
+            }
+            context.SaveChanges();
+
+            // ==========================================
             // 1. SEEDING DE USUARIOS (Sin forzar IDs)
             // ==========================================
             if (!context.Users.Any())
@@ -109,7 +146,22 @@ namespace ClubApp.Infrastructure.Data
                     });
                 }
 
-                // Cuatro Profesores
+                // Un Administrador de Club (ADMIN) para pruebas de gestión
+                users.Add(new User
+                {
+                    BadgeNum = "000",
+                    FirstName = "Administrador",
+                    LastName = "Club",
+                    Email = "admin@clubapp.com",
+                    PasswordHash = hashedPassword,
+                    Role = UserRole.ADMIN,
+                    Dni = "21000001",
+                    Phone = "+54944400001",
+                    BirthDate = new DateTime(1988, 3, 10),
+                    CreatedAt = new DateTime(2026, 6, 26, 0, 0, 0, DateTimeKind.Utc)
+                });
+
+                // Cuatro Profesores (TEACHER)
                 for (int i = 1; i <= 4; i++)
                 {
                     users.Add(new User
@@ -119,7 +171,7 @@ namespace ClubApp.Infrastructure.Data
                         LastName = "Profe",
                         Email = $"profesor{i}@clubapp.com",
                         PasswordHash = hashedPassword,
-                        Role = UserRole.ADMIN,
+                        Role = UserRole.TEACHER,
                         Dni = $"2000000{i}",
                         Phone = $"+549111000{i:000}",
                         BirthDate = new DateTime(1990, 1, 1).AddYears(i),

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, Clock, Receipt } from 'lucide-react';
+import { Calendar, Clock, Receipt, ListChecks, Eraser } from 'lucide-react';
 import type { MemberCuota, FeeSettings } from '../../types/cuotas';
 import { cuotaNumericId } from '../../utils/cuotaIds';
 
@@ -8,6 +8,9 @@ interface CuotasListProps {
   settings: FeeSettings;
   /** IDs numéricos de las cuotas seleccionadas para abonar (pago agrupado). */
   selectedCuotaIds: number[];
+  /** true si todas las cuotas abonables están seleccionadas. */
+  allSelected: boolean;
+  onToggleSelectAll: () => void;
   onToggleCuota: (cuotaId: number) => void;
   onViewReceipt: (cuota: MemberCuota) => void;
   formatCurrency: (val: number) => string;
@@ -17,20 +20,41 @@ export const CuotasList: React.FC<CuotasListProps> = ({
   cuotas,
   settings,
   selectedCuotaIds,
+  allSelected,
+  onToggleSelectAll,
   onToggleCuota,
   onViewReceipt,
   formatCurrency,
 }) => {
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-xl space-y-6">
-      <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
         <h2 className="text-lg font-bold text-white flex items-center gap-2">
           <Calendar className="w-5 h-5 text-emerald-400" />
           Historial y Próximos Vencimientos
         </h2>
-        <span className="text-xs text-slate-400">
-          Vencimiento: día <span className="text-emerald-400 font-bold">{settings.dueDayOfMonth}</span>
-        </span>
+        <div className="flex items-center justify-between sm:justify-end gap-3">
+          <span className="text-xs text-slate-400">
+            Vencimiento: día <span className="text-emerald-400 font-bold">{settings.dueDayOfMonth}</span>
+          </span>
+          <button
+            type="button"
+            onClick={onToggleSelectAll}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-950 hover:bg-slate-800 text-slate-300 text-xs font-semibold transition"
+          >
+            {allSelected ? (
+              <>
+                <Eraser className="w-4 h-4" />
+                <span>Desmarcar Todas</span>
+              </>
+            ) : (
+              <>
+                <ListChecks className="w-4 h-4" />
+                <span>Seleccionar Todas</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       <div className="space-y-4">

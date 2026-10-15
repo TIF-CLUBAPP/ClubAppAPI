@@ -654,6 +654,40 @@ namespace Infrastructure.Migrations
                     b.ToTable("RoleConfigurations");
                 });
 
+            modelBuilder.Entity("ClubApp.Domain.Entities.RoleFeeExemption", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("DiscountPercentage")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<DateTime?>("EffectiveFromDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("PendingDiscountPercentage")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<string>("RoleName")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RoleName")
+                        .IsUnique();
+
+                    b.ToTable("RoleFeeExemptions");
+                });
+
             modelBuilder.Entity("ClubApp.Domain.Entities.Space", b =>
                 {
                     b.Property<int>("Id")
@@ -705,6 +739,47 @@ namespace Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Spaces");
+                });
+
+            modelBuilder.Entity("ClubApp.Domain.Entities.SuspensionSettings", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("EffectiveFromDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("MaxOverdueAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("MaxOverdueMonths")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal?>("PendingMaxOverdueAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int?>("PendingMaxOverdueMonths")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("PendingSuspensionCondition")
+                        .HasMaxLength(10)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SuspensionCondition")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SuspensionSettings");
                 });
 
             modelBuilder.Entity("ClubApp.Domain.Entities.User", b =>

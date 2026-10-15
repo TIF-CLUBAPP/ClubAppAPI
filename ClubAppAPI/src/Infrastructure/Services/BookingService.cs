@@ -65,6 +65,11 @@ public class BookingService : IBookingService
         var user = await _context.Users.FindAsync(userId);
         if (user == null) throw new NotFoundException("User", userId);
 
+        // Regla de corte de servicio: deniega la reserva si el socio excede los límites de mora.
+        var suspensionReason = await _paymentService.GetSuspensionReasonAsync(userId);
+        if (suspensionReason != null)
+            throw new AppValidationException(suspensionReason);
+
         // Resolver el espacio (si viene del catálogo) y validar conflicto con clases.
         Space? space = null;
         if (dto.SpaceId.HasValue)

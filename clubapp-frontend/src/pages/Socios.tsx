@@ -25,7 +25,7 @@ import Header from '../components/layout/Header';
 import Sidebar from '../components/layout/Sidebar';
 import { useAuth } from '../context/AuthContext';
 import { userService } from '../services/userService';
-import { ROLE_OPTIONS, getRoleConfig, type UserListItem } from '../types/user';
+import { ROLE_OPTIONS, getRoleConfig, type RoleOption, type UserListItem } from '../types/user';
 import type { UserRole } from '../types/auth';
 
 const getInitials = (fullName: string) => {
@@ -245,6 +245,7 @@ function ModalShell({ onClose, children }: { onClose: () => void; children: Reac
 function RoleModal({
   user,
   value,
+  roles,
   onChange,
   processing,
   error,
@@ -253,6 +254,7 @@ function RoleModal({
 }: {
   user: UserListItem;
   value: UserRole;
+  roles: RoleOption[];
   onChange: (role: UserRole) => void;
   processing: boolean;
   error: string | null;
@@ -288,7 +290,7 @@ function RoleModal({
         onChange={(e) => onChange(e.target.value as UserRole)}
         className="mt-1.5 w-full px-3.5 py-3 rounded-2xl bg-slate-950 border border-slate-700 text-white text-sm font-semibold focus:border-sky-500 focus:outline-none transition-all"
       >
-        {ROLE_OPTIONS.map((r) => (
+        {roles.map((r) => (
           <option key={r.value} value={r.value} className="bg-slate-900">
             {r.label}
           </option>
@@ -551,6 +553,13 @@ export default function Socios() {
   const [searchParams] = useSearchParams();
   const isStaff = currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPERADMIN';
   const isSuperAdmin = currentUser?.role === 'SUPERADMIN';
+
+  // Roles que el actor actual puede asignar. El SUPERADMIN queda reservado a la
+  // cuenta raíz de plataforma, por lo que un ADMIN de club no lo ve en el modal.
+  const assignableRoles = useMemo(
+    () => (isSuperAdmin ? ROLE_OPTIONS : ROLE_OPTIONS.filter((r) => r.value !== 'SUPERADMIN')),
+    [isSuperAdmin]
+  );
 
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1087,6 +1096,7 @@ export default function Socios() {
               <RoleModal
                 user={roleTarget}
                 value={selectedRole}
+                roles={assignableRoles}
                 onChange={setSelectedRole}
                 processing={roleProcessing}
                 error={roleError}
