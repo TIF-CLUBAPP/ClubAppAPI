@@ -1,4 +1,5 @@
 import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
+import { API_BASE_URL } from './api';
 
 let connection: HubConnection | null = null;
 let currentToken: string | null = null;
@@ -20,7 +21,7 @@ export const startSignalRNotificationConnection = (
 
   currentToken = token;
 
-  const hubUrl = 'http://localhost:5236/hubs/notifications';
+  const hubUrl = `${API_BASE_URL}/hubs/notifications`;
 
   connection = new HubConnectionBuilder()
     .withUrl(hubUrl, {
