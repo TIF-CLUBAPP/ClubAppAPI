@@ -1,0 +1,3 @@
+# Logs and temporary diagnostic/dump files (repository root)
+/*.log
+/*.txt
