@@ -49,12 +49,11 @@ builder.Services.AddSignalR();
 // ------------------------------------------
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowReactApp", policy =>
+    options.AddPolicy("AllowAll", policy =>
     {
-        policy.WithOrigins("http://localhost:5173") // URL de tu Frontend React
+        policy.AllowAnyOrigin()
               .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials();
+              .AllowAnyMethod();
     });
 });
 
@@ -203,7 +202,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseStaticFiles();
-app.UseCors("AllowReactApp");
+app.UseCors("AllowAll");
 
 app.UseAuthentication();
 app.UseAuthorization();
