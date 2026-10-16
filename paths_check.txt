@@ -1,4 +1,0 @@
-Application
-Domain
-Infrastructure
-Web
