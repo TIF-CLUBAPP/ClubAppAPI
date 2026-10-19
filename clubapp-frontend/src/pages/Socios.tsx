@@ -1022,14 +1022,14 @@ export default function Socios() {
                   {/* Tabla de usuarios — pantallas md en adelante */}
                   <div className="hidden md:block rounded-3xl border border-slate-800 bg-slate-900/80 overflow-hidden">
                     <div className="overflow-x-auto scrollbar-thin">
-                      <table className="w-full text-left text-sm min-w-245">
+                      <table className="w-full table-fixed text-left text-sm">
                         <thead>
                           <tr className="border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-500">
-                            <th className="px-4 py-3 sm:px-5 sm:py-3.5 font-bold whitespace-nowrap min-w-55">Usuario</th>
-                            <th className="px-4 py-3 sm:px-5 sm:py-3.5 font-bold whitespace-nowrap min-w-37.5">DNI / Teléfono</th>
-                            <th className="px-4 py-3 sm:px-5 sm:py-3.5 font-bold whitespace-nowrap min-w-30">Rol</th>
-                            <th className="px-4 py-3 sm:px-5 sm:py-3.5 font-bold whitespace-nowrap min-w-27.5">Estado</th>
-                            <th className="px-4 py-3 sm:px-5 sm:py-3.5 font-bold whitespace-nowrap text-right min-w-40">Acciones</th>
+                            <th className="px-4 py-3 sm:px-5 sm:py-3.5 font-bold whitespace-nowrap w-[30%] min-w-0">Usuario</th>
+                            <th className="px-4 py-3 sm:px-5 sm:py-3.5 font-bold whitespace-nowrap w-[18%] min-w-0">DNI / Teléfono</th>
+                            <th className="px-4 py-3 sm:px-5 sm:py-3.5 font-bold whitespace-nowrap w-[15%] min-w-0">Rol</th>
+                            <th className="px-4 py-3 sm:px-5 sm:py-3.5 font-bold whitespace-nowrap w-[15%] min-w-0">Estado</th>
+                            <th className="px-4 py-3 sm:px-5 sm:py-3.5 font-bold whitespace-nowrap text-right w-[22%] min-w-0">Acciones</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800/60">

@@ -62,7 +62,7 @@ export default function Sidebar() {
         </Link>
 
         {/* Menú de Navegación con Links de React Router */}
-        <nav className="space-y-1 text-sm font-medium">
+        <nav className="space-y-1 text-sm font-medium pb-4">
           <Link 
             to="/dashboard" 
             className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
