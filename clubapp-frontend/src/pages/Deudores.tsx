@@ -214,13 +214,20 @@ const estaVencida = (periodo?: string | null, dueDayOfMonth = 10): boolean => {
 };
 
 /**
+ * Devuelve la lista de períodos vencidos válidos (sin vacíos) de un deudor.
+ */
+function getPeriodosValidos(deudor: CuotaVencida): string[] {
+  return Array.isArray(deudor?.periodosVencidos)
+    ? deudor.periodosVencidos.filter((p) => p && String(p).trim() !== '')
+    : [];
+}
+
+/**
  * Obtiene el texto formateado para mostrar en la columna "PERÍODOS ADEUDADOS".
  * Si no hay períodos válidos, devuelve "Adeuda cuota".
  */
 function getTextoPeriodos(deudor: CuotaVencida): string {
-  const periodosValidos = Array.isArray(deudor?.periodosVencidos)
-    ? deudor.periodosVencidos.filter(p => p && String(p).trim() !== '')
-    : [];
+  const periodosValidos = getPeriodosValidos(deudor);
 
   if (periodosValidos.length > 0) {
     return periodosValidos.join(', ');
@@ -631,10 +638,10 @@ export default function Deudores() {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex selection:bg-emerald-500 selection:text-slate-950">
       <Sidebar />
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-64">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-60">
         <Header />
 
-        <main className="flex-1 p-6 md:p-8 overflow-y-auto scrollbar-thin">
+        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-24 md:pt-6 md:px-6 md:pb-6">
           {!isStaff ? (
             <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-10 text-center max-w-lg mx-auto mt-10">
               <AlertTriangle className="mx-auto text-amber-400" size={40} />
@@ -840,21 +847,21 @@ export default function Deudores() {
                     {/* Tabla de deudores — pantallas md en adelante */}
                     <div className="hidden md:block rounded-3xl border border-slate-800 bg-slate-900/80 overflow-hidden">
                       <div className="overflow-x-auto scrollbar-thin">
-                        <table className="w-full text-left text-sm min-w-245">
+                        <table className="w-full text-left text-xs md:text-sm">
                       <thead>
                         <tr className="border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-500">
-                          <th className="px-4 py-3 sm:px-5 sm:py-3.5 text-center font-bold text-slate-500 whitespace-nowrap min-w-55">SOCIO</th>
-                          <th className="px-4 py-3 sm:px-5 sm:py-3.5 text-center font-bold text-slate-500 whitespace-nowrap min-w-37.5">DNI / Teléfono</th>
-                          <th className="px-4 py-3 sm:px-5 sm:py-3.5 text-center font-bold text-slate-500 whitespace-nowrap min-w-50">Períodos adeudados</th>
-                          <th className="px-4 py-3 sm:px-5 sm:py-3.5 text-center font-bold text-slate-500 whitespace-nowrap min-w-30">Monto</th>
-                          <th className="px-4 py-3 sm:px-5 sm:py-3.5 text-center font-bold text-slate-500 whitespace-nowrap min-w-27.5">DÍAS EN MORA</th>
-                          <th className="px-4 py-3 sm:px-5 sm:py-3.5 text-center font-bold text-slate-500 whitespace-nowrap min-w-55">Acciones</th>
+                          <th className="px-3 py-3 text-center font-bold text-slate-500 whitespace-nowrap">SOCIO</th>
+                          <th className="px-3 py-3 text-center font-bold text-slate-500 whitespace-nowrap">DNI / Teléfono</th>
+                          <th className="px-3 py-3 text-center font-bold text-slate-500 whitespace-nowrap">Períodos adeudados</th>
+                          <th className="px-3 py-3 text-center font-bold text-slate-500 whitespace-nowrap">Monto</th>
+                          <th className="px-3 py-3 text-center font-bold text-slate-500 whitespace-nowrap">DÍAS EN MORA</th>
+                          <th className="px-3 py-3 text-center font-bold text-slate-500 whitespace-nowrap">Acciones</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800/60">
                         {sorted.map((d) => (
                           <tr key={d.socioId} className="hover:bg-slate-800/20 transition-colors">
-                            <td className="px-4 py-3 sm:px-5 sm:py-4 min-w-55">
+                            <td className="px-3 py-3">
                               <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-linear-to-tr from-slate-800 to-slate-700 border border-slate-700 flex items-center justify-center text-emerald-400 font-bold text-xs shrink-0">
                                   {getInitials(d.nombre, d.apellido)}
@@ -867,7 +874,7 @@ export default function Deudores() {
                                 </div>
                               </div>
                             </td>
-                            <td className="px-6 py-4 text-center align-middle">
+                            <td className="px-3 py-3 text-center align-middle">
                               <div className="flex flex-col items-center gap-1.5">
                                 <div className="flex items-center gap-1.5 text-slate-300">
                                   <IdCard className="w-4 h-4 text-slate-400" />
@@ -878,27 +885,44 @@ export default function Deudores() {
                                 </div>
                               </div>
                             </td>
-                            <td className="px-4 py-3 sm:px-5 sm:py-4 text-center">
-                              <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                                {getTextoPeriodos(d)}
-                              </span>
+                            <td className="px-3 py-3 text-center">
+                              <div className="flex flex-wrap justify-center gap-1 max-w-[200px] mx-auto">
+                                {(() => {
+                                  const periodos = getPeriodosValidos(d);
+                                  if (periodos.length === 0) {
+                                    return (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                                        Adeuda cuota
+                                      </span>
+                                    );
+                                  }
+                                  return periodos.map((p) => (
+                                    <span
+                                      key={p}
+                                      className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20 whitespace-nowrap"
+                                    >
+                                      {formatPeriodo(p)}
+                                    </span>
+                                  ));
+                                })()}
+                              </div>
                             </td>
-                            <td className="px-4 py-3 sm:px-5 sm:py-4 text-center whitespace-nowrap">
+                            <td className="px-3 py-3 text-center whitespace-nowrap">
                               <p className="font-black text-rose-400">{formatCurrency(d.montoTotalAdeudado)}</p>
                               <p className="text-[10px] text-slate-500">
                                 {d.cantidadCuotasImpagas} cuota{d.cantidadCuotasImpagas !== 1 ? 's' : ''}
                               </p>
                             </td>
-                            <td className="px-4 py-3 sm:px-5 sm:py-4 text-center whitespace-nowrap">
+                            <td className="px-3 py-3 text-center whitespace-nowrap">
                               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/20 text-[10px] font-bold">
                                 <Clock size={11} /> {d.diasDeAtraso} día{d.diasDeAtraso !== 1 ? 's' : ''}
                               </span>
                             </td>
-                            <td className="px-4 py-3 sm:px-5 sm:py-4">
-                              <div className="flex items-center justify-center gap-2">
+                            <td className="px-3 py-3">
+                              <div className="flex items-center justify-end gap-1.5">
                                 <button
                                   onClick={() => openPaymentModal(d)}
-                                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition-all"
+                                  className="inline-flex items-center gap-1 px-2.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition-all whitespace-nowrap shrink-0"
                                 >
                                   <CreditCard size={13} /> Registrar Pago
                                 </button>

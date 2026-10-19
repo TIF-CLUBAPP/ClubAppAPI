@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, User as UserIcon, LogIn, AlertCircle, CheckCircle2, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Lock, User as UserIcon, LogIn, AlertCircle, CheckCircle2, Loader2, Eye, EyeOff, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
@@ -15,6 +15,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [remember, setRemember] = useState(true);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -22,7 +23,7 @@ export default function Login() {
     setLoading(true);
 
     try {
-      await login({ email, password });
+      await login({ email, password }, remember);
       setSuccess(true);
 
       setTimeout(() => {
@@ -97,7 +98,7 @@ export default function Login() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="ej: superadmin1@clubapp.com"
+                placeholder="Ej: correo@email.com"
                 className="w-full bg-slate-950/60 border border-slate-800 rounded-xl py-3 pl-11 pr-4 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all text-sm"
               />
             </div>
@@ -127,6 +128,26 @@ export default function Login() {
               </button>
             </div>
           </div>
+
+          {/* Recordar sesión */}
+          <label className="flex items-center gap-2.5 cursor-pointer select-none group">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+              className="sr-only peer"
+            />
+            <span
+              className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
+                remember
+                  ? 'bg-emerald-500 border-emerald-500'
+                  : 'border-slate-700 bg-slate-950/60 group-hover:border-emerald-500/60'
+              }`}
+            >
+              {remember && <Check size={13} className="text-slate-950" />}
+            </span>
+            <span className="text-sm text-slate-300">Recordar sesión</span>
+          </label>
 
           {/* Botón Submit Animado */}
           <motion.button

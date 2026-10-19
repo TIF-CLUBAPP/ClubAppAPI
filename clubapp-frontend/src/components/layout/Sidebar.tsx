@@ -1,4 +1,4 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom'; 
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { 
   Activity, 
@@ -45,12 +45,12 @@ export default function Sidebar() {
         };
 
   return (
-    <aside className="fixed top-0 left-0 z-40 h-screen w-64 overflow-y-auto border-r border-slate-800 bg-slate-900/50 p-6 flex-col justify-between hidden md:flex">
+    <aside className="hidden md:flex fixed inset-y-0 left-0 z-40 w-60 overflow-y-auto border-r border-slate-800 bg-slate-900/50 p-5 flex-col justify-between">
       <div>
-        {/* Logo ClubApp */}
+          {/* Logo ClubApp */}
         <Link 
           to="/dashboard"
-          className="flex items-center gap-3 mb-8 px-2 cursor-pointer hover:opacity-90 transition-opacity"
+          className="flex items-center gap-2.5 mb-6 px-2 cursor-pointer hover:opacity-90 transition-opacity"
         >
           <div className="w-9 h-9 rounded-xl bg-linear-to-tr from-emerald-500 to-teal-400 flex items-center justify-center font-black text-slate-950 text-lg shadow-lg shadow-emerald-500/20">
             C
@@ -62,10 +62,10 @@ export default function Sidebar() {
         </Link>
 
         {/* Menú de Navegación con Links de React Router */}
-        <nav className="space-y-1 text-sm font-medium">
+        <nav className="space-y-1 text-[13px] font-medium pb-4">
           <Link 
             to="/dashboard" 
-            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
+            className={`flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all ${
               location.pathname === '/dashboard'
                 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
@@ -78,7 +78,7 @@ export default function Sidebar() {
           {isAuthenticated && (
             <Link 
               to="/reservas" 
-              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all ${
                 location.pathname === '/reservas'
                   ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
@@ -91,7 +91,7 @@ export default function Sidebar() {
           {isAuthenticated && (
             <Link 
               to="/canchas" 
-              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all ${
                 location.pathname === '/canchas'
                   ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
@@ -104,7 +104,7 @@ export default function Sidebar() {
           {isAuthenticated && (
             <Link 
               to="/actividades" 
-              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all ${
                 location.pathname === '/actividades'
                   ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
@@ -117,7 +117,7 @@ export default function Sidebar() {
           {isAuthenticated && (
             <Link 
               to="/mis-cuotas" 
-              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all ${
                 location.pathname === '/mis-cuotas'
                   ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
@@ -130,7 +130,7 @@ export default function Sidebar() {
           {isAuthenticated && (role === 'TEACHER' || role === 'ADMIN' || role === 'SUPERADMIN') && (
             <Link 
               to="/asistencia" 
-              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all ${
                 location.pathname === '/asistencia'
                   ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
@@ -143,7 +143,7 @@ export default function Sidebar() {
           {isAuthenticated && (role === 'ADMIN' || role === 'SUPERADMIN') && (
             <Link 
               to="/pagos" 
-              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all ${
                 location.pathname === '/pagos'
                   ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
@@ -156,7 +156,7 @@ export default function Sidebar() {
           {isAuthenticated && (role === 'SUPERADMIN') && (
             <Link
               to="/deudores"
-              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all ${
                 location.pathname === '/deudores'
                   ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20 shadow-sm'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
@@ -169,7 +169,7 @@ export default function Sidebar() {
           {isAuthenticated && (role === 'TEACHER' || role === 'ADMIN' || role === 'SUPERADMIN') && (
             <Link
               to="/gestion-actividades"
-              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all ${
                 location.pathname === '/gestion-actividades'
                   ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
@@ -183,7 +183,7 @@ export default function Sidebar() {
           {isAuthenticated && (role === 'ADMIN' || role === 'SUPERADMIN') && (
             <Link 
               to="/espacios" 
-              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all ${
                 location.pathname === '/espacios'
                   ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
@@ -196,7 +196,7 @@ export default function Sidebar() {
           {isAuthenticated && (role === 'ADMIN' || role === 'SUPERADMIN') && (
             <Link 
               to="/socios" 
-              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all ${
                 location.pathname === '/socios'
                   ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/50'

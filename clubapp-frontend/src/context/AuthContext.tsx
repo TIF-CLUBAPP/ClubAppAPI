@@ -8,14 +8,18 @@ interface AuthContextType {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (credentials: AuthenticationRequest) => Promise<void>;
-  setSession: (token: string, user: User | null) => void;
+  login: (credentials: AuthenticationRequest, remember?: boolean) => Promise<void>;
+  setSession: (token: string, user: User | null, remember?: boolean) => void;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const getStoredItem = (key: string) => localStorage.getItem(key) ?? sessionStorage.getItem(key);
+
+/** Devuelve el storage (local o session) donde está persistido el token actual. */
+const resolveSessionStorage = (): Storage =>
+  localStorage.getItem('token') !== null ? localStorage : sessionStorage;
 
 /**
  * Decodifica el payload (claims) de un JWT sin librerías externas.
@@ -129,8 +133,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (parsedUser && mounted) {
           setUser(parsedUser);
-          // Sincronizamos el usuario en localStorage para futuras recargas
-          localStorage.setItem('user', JSON.stringify(parsedUser));
+          // Sincronizamos el usuario en el mismo storage donde está el token
+          resolveSessionStorage().setItem('user', JSON.stringify(parsedUser));
         } else if (mounted) {
           setUser(null);
         }
@@ -160,31 +164,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /**
    * Persiste la sesión de forma atómica: guarda el token y el usuario
-   * en localStorage y actualiza el estado global de inmediato.
+   * en localStorage (si `remember` es true) o en sessionStorage en caso
+   * contrario, y actualiza el estado global de inmediato.
    */
-  const setSession = (newToken: string, newUser: User | null) => {
+  const setSession = (newToken: string, newUser: User | null, remember = true) => {
     const sessionUser = newUser ?? decodeJwt(newToken);
+    const target = remember ? localStorage : sessionStorage;
+    const other = remember ? sessionStorage : localStorage;
 
-    localStorage.setItem('token', newToken);
+    // Evitamos dejar un token obsoleto en el storage que no corresponde.
+    other.removeItem('token');
+    other.removeItem('user');
+
+    target.setItem('token', newToken);
     setToken(newToken);
 
     if (sessionUser) {
-      localStorage.setItem('user', JSON.stringify(sessionUser));
+      target.setItem('user', JSON.stringify(sessionUser));
       setUser(sessionUser);
     } else {
-      localStorage.removeItem('user');
+      target.removeItem('user');
       setUser(null);
     }
   };
 
-  const login = async (credentials: AuthenticationRequest) => {
+  const login = async (credentials: AuthenticationRequest, remember = true) => {
     const data: AuthenticationResponse = await authService.login(credentials);
 
     if (!data.token) {
       throw new Error('No se recibió un token de autenticación.');
     }
 
-    setSession(data.token, data.user ?? null);
+    setSession(data.token, data.user ?? null, remember);
   };
 
   const logout = () => {
