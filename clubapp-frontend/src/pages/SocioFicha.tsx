@@ -67,9 +67,9 @@ export default function SocioFicha() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex">
       <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-64">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-60">
         <Header />
-        <main className="flex-1 p-6 md:p-8 overflow-y-auto scrollbar-thin">
+        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-24 md:pt-6 md:px-6 md:pb-6">
           <div className="max-w-3xl mx-auto space-y-6">
             <button
               type="button"
@@ -86,7 +86,7 @@ export default function SocioFicha() {
             ) : !member ? (
               <p className="text-sm text-slate-400">Socio no encontrado.</p>
             ) : (
-              <div className="rounded-3xl bg-slate-900/80 border border-slate-800 p-6 md:p-8 shadow-2xl">
+              <div className="rounded-3xl bg-slate-900/80 border border-slate-800 p-4 md:p-5 shadow-2xl">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="flex items-center gap-4">
                     <div className="h-14 w-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-300 font-bold text-xl">

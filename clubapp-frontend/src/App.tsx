@@ -31,6 +31,8 @@ import PagoFallido from './pages/PagoFallido';
 import PagoPendiente from './pages/PagoPendiente';
 // Dev test menu
 import ErrorTestMenu from './pages/ErrorTestMenu';
+import MobileHeader from './components/layout/MobileHeader';
+import MobileNavbar from './components/layout/MobileNavbar';
 
 export default function App() {
   return (
@@ -70,6 +72,7 @@ export default function App() {
               <Route path="/actividades" element={<InscripcionActividades />} />
               <Route path="/gestion-actividades" element={<GestionActividades />} />
               <Route path="/canchas" element={<ReservaCanchas />} />
+              <Route path="/reservar-cancha" element={<ReservaCanchas />} />
               <Route path="/asistencia" element={<PanelAsistencia />} />
               <Route path="/deudores" element={<Deudores />} />
               <Route path="/socios" element={<Socios />} />
@@ -84,7 +87,9 @@ export default function App() {
           </Routes>
           {/* Menú de pruebas flotante - controlado por guard clause en el componente */}
           <ErrorTestMenu />
-        </BrowserRouter>
+          <MobileHeader />
+          <MobileNavbar />
+          </BrowserRouter>
       </NotificationProvider>
     </AuthProvider>
   );

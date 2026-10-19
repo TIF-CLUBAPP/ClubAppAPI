@@ -92,17 +92,17 @@ export const MisCuotas: React.FC = () => {
       <div data-print-hide className="print-hidden">
         <Sidebar />
       </div>
-      <div className="app-main flex-1 flex flex-col min-w-0 overflow-hidden md:pl-64">
+      <div className="app-main flex-1 flex flex-col min-w-0 overflow-hidden md:pl-60">
         <div data-print-hide className="print-hidden">
           <Header />
         </div>
-        <main className="flex-1 p-6 md:p-8 overflow-y-auto scrollbar-thin space-y-8">
+        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-24 md:pt-6 md:px-6 md:pb-6 space-y-8">
           <div className="max-w-6xl mx-auto space-y-8">
             {/* Encabezado */}
             <div data-print-hide className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-                  <CreditCard className="w-8 h-8 text-emerald-400" />
+                <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white flex items-center gap-2.5">
+                  <CreditCard className="w-6 h-6 text-emerald-400" />
                   Mis Cuotas
                 </h1>
                 <p className="text-slate-400 text-sm mt-1">
