@@ -24,7 +24,7 @@ export const AccountStatusCard: React.FC<AccountStatusCardProps> = ({
   formatCurrency,
 }) => {
   return (
-    <div className="relative overflow-hidden bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl">
+    <div className="relative overflow-hidden bg-slate-900 border border-slate-800 rounded-3xl p-4 md:p-5 shadow-2xl">
       {/* Glowing background FX */}
       <div
         className={`absolute -top-24 -right-24 w-72 h-72 rounded-full blur-3xl opacity-20 pointer-events-none ${
@@ -66,7 +66,7 @@ export const AccountStatusCard: React.FC<AccountStatusCardProps> = ({
             <div>
               <span className="text-xs text-slate-400">Monto Total Pendiente</span>
               <p
-                className={`text-3xl md:text-4xl font-extrabold tracking-tight mt-0.5 ${
+                className={`text-2xl md:text-3xl font-extrabold tracking-tight mt-0.5 ${
                   totalPendingAmount > 0
                     ? globalStatus === 'EN_MORA'
                       ? 'text-rose-400'

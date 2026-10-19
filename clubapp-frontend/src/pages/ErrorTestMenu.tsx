@@ -37,7 +37,7 @@ export default function ErrorTestMenu() {
         whileTap={{ scale: 0.95 }}
         onClick={() => setIsOpen(!isOpen)}
         data-print-hide
-        className="fixed bottom-6 right-6 z-50 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-xl backdrop-blur-md transition-all hover:bg-emerald-500/20 print:hidden"
+        className="fixed top-20 md:top-auto md:bottom-4 right-4 z-50 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-xl backdrop-blur-md transition-all hover:bg-emerald-500/20 print:hidden"
         aria-label="Menú de pruebas de errores"
       >
         <Bug size={22} className={isOpen ? 'animate-spin' : ''} />
@@ -52,7 +52,7 @@ export default function ErrorTestMenu() {
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
             data-print-hide
-            className="fixed bottom-16 right-6 z-50 w-72 bg-slate-900/95 backdrop-blur-xl border border-slate-800 rounded-3xl shadow-2xl shadow-black/50 overflow-hidden print:hidden"
+            className="fixed top-32 md:top-auto md:bottom-20 right-4 z-50 w-72 bg-slate-900/95 backdrop-blur-xl border border-slate-800 rounded-3xl shadow-2xl shadow-black/50 overflow-hidden print:hidden"
           >
             {/* Header del panel */}
             <div className="p-4 border-b border-slate-800 flex items-center justify-between">

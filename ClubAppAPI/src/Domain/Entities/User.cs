@@ -43,6 +43,10 @@ public class User : BaseEntity
     // Exención de cuotas: si es true, el usuario no genera cuotas mensuales
     public bool IsExemptFromFees { get; set; } = false;
 
+    // Indica si el usuario es Socio del club (abona cuota / tiene membresía) o No Socio/Seguidor.
+    // Los alumnos "No Socios" se registran como usuarios pero no abonan la cuota social.
+    public bool IsMember { get; set; } = true;
+
     // ========== Configuración de cobro (split payments) ==========
     // Aplica a profesores que cobran sus clases de forma directa.
     public bool AllowsDirectPayment { get; set; } = false;

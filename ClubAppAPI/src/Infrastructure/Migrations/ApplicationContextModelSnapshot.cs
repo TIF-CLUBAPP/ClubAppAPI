@@ -828,6 +828,11 @@ namespace Infrastructure.Migrations
                     b.Property<bool>("IsExemptFromFees")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("IsMember")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(true);
+
                     b.Property<string>("LastName")
                         .IsRequired()
                         .HasColumnType("TEXT");

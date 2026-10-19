@@ -37,16 +37,16 @@ export default function Dashboard() {
       <Sidebar />
 
       {/* 2. Área principal de contenido */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-64">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-60">
         {/* Header superior */}
         <Header />
 
         {/* 3. Vista dinámica según el Rol (incluye los widgets y las métricas) */}
-        <main className="flex-1 w-full max-w-full p-6 md:p-8 overflow-y-auto overflow-x-hidden">
+        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-24 md:pt-6 md:px-6 md:pb-6">
           {isAuthenticated ? (
             <div className="space-y-6">
-              <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6">
-                <h1 className="text-3xl font-extrabold text-white sm:text-4xl">Bienvenido, {firstName}</h1>
+              <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 md:p-5">
+                <h1 className="text-xl md:text-2xl font-extrabold text-white">Bienvenido, {firstName}</h1>
                 <p className="mt-2 text-sm text-slate-400 max-w-3xl">
                   Aquí tenés tu resumen de reservas, instalaciones y clima en tiempo real para gestionar tu club con facilidad.
                 </p>
@@ -56,11 +56,11 @@ export default function Dashboard() {
           ) : (
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
               <section className="space-y-6">
-                <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-10">
+                <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 md:p-8">
                   <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-300 text-xs font-bold uppercase tracking-wider">
                     ClubApp
                   </span>
-                  <h1 className="mt-6 text-4xl font-extrabold text-white leading-tight sm:text-5xl">
+                  <h1 className="mt-6 text-2xl md:text-3xl font-extrabold text-white leading-tight">
                     Bienvenido a ClubApp 🏟️
                   </h1>
                   <p className="mt-4 max-w-2xl text-base leading-7 text-slate-400">

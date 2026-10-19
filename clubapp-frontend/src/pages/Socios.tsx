@@ -821,10 +821,10 @@ export default function Socios() {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex selection:bg-emerald-500 selection:text-slate-950">
       <Sidebar />
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-64">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-60">
         <Header />
 
-        <main className="flex-1 p-6 md:p-8 overflow-y-auto scrollbar-thin">
+        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-24 md:pt-6 md:px-6 md:pb-6">
           {!isStaff ? (
             <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-10 text-center max-w-lg mx-auto mt-10">
               <AlertTriangle className="mx-auto text-amber-400" size={40} />
@@ -1022,20 +1022,20 @@ export default function Socios() {
                   {/* Tabla de usuarios — pantallas md en adelante */}
                   <div className="hidden md:block rounded-3xl border border-slate-800 bg-slate-900/80 overflow-hidden">
                     <div className="overflow-x-auto scrollbar-thin">
-                      <table className="w-full table-fixed text-left text-sm">
+                      <table className="w-full table-fixed text-left text-xs md:text-sm">
                         <thead>
                           <tr className="border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-500">
-                            <th className="px-4 py-3 sm:px-5 sm:py-3.5 font-bold whitespace-nowrap w-[30%] min-w-0">Usuario</th>
-                            <th className="px-4 py-3 sm:px-5 sm:py-3.5 font-bold whitespace-nowrap w-[18%] min-w-0">DNI / Teléfono</th>
-                            <th className="px-4 py-3 sm:px-5 sm:py-3.5 font-bold whitespace-nowrap w-[15%] min-w-0">Rol</th>
-                            <th className="px-4 py-3 sm:px-5 sm:py-3.5 font-bold whitespace-nowrap w-[15%] min-w-0">Estado</th>
-                            <th className="px-4 py-3 sm:px-5 sm:py-3.5 font-bold whitespace-nowrap text-right w-[22%] min-w-0">Acciones</th>
+                            <th className="px-3 py-2 font-bold whitespace-nowrap w-[30%] min-w-0">Usuario</th>
+                            <th className="px-3 py-2 font-bold whitespace-nowrap w-[18%] min-w-0">DNI / Teléfono</th>
+                            <th className="px-3 py-2 font-bold whitespace-nowrap w-[15%] min-w-0">Rol</th>
+                            <th className="px-3 py-2 font-bold whitespace-nowrap w-[15%] min-w-0">Estado</th>
+                            <th className="px-3 py-2 font-bold whitespace-nowrap text-right w-[22%] min-w-0">Acciones</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800/60">
                           {filtered.map((u) => (
                             <tr key={u.id} className="hover:bg-slate-800/20 transition-colors">
-                              <td className="px-4 py-3 sm:px-5 sm:py-4">
+                              <td className="px-3 py-2">
                                 <div className="flex items-center gap-3">
                                   <div className="w-10 h-10 rounded-full bg-linear-to-tr from-slate-800 to-slate-700 border border-slate-700 flex items-center justify-center text-emerald-400 font-bold text-xs shrink-0">
                                     {getInitials(u.fullName)}
@@ -1046,7 +1046,7 @@ export default function Socios() {
                                   </div>
                                 </div>
                               </td>
-                              <td className="px-4 py-3 sm:px-5 sm:py-4">
+                              <td className="px-3 py-2">
                                 <div className="flex flex-col gap-1 text-xs">
                                   <span className="text-slate-300 font-semibold inline-flex items-center gap-1.5">
                                     <FileText size={12} className="text-slate-500 shrink-0" />
@@ -1058,13 +1058,13 @@ export default function Socios() {
                                   </span>
                                 </div>
                               </td>
-                              <td className="px-4 py-3 sm:px-5 sm:py-4">
+                              <td className="px-3 py-2">
                                 <RoleBadge role={u.role} />
                               </td>
-                              <td className="px-4 py-3 sm:px-5 sm:py-4">
+                              <td className="px-3 py-2">
                                 <StatusBadge active={u.isActive} />
                               </td>
-                              <td className="px-4 py-3 sm:px-5 sm:py-4">
+                              <td className="px-3 py-2">
                                 <div className="flex justify-end">
                                   <ActionButtons
                                     item={u}

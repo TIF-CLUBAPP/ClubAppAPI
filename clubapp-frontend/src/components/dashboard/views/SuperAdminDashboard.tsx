@@ -44,7 +44,7 @@ function KpiCard({
         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{label}</span>
         <div className={`p-2 rounded-xl border ${iconClass}`}>{icon}</div>
       </div>
-      <p className={`text-3xl font-black ${highlight ?? 'text-white'}`}>{value}</p>
+      <p className={`text-2xl font-black ${highlight ?? 'text-white'}`}>{value}</p>
       {children && <div className="mt-1">{children}</div>}
     </div>
   );
@@ -77,7 +77,7 @@ function MembersStatsCard({ stats }: { stats: DashboardStats | null }) {
         {/* Métrica principal + indicador de crecimiento */}
         <div className="flex items-end justify-between gap-3">
           <div>
-            <p className="text-3xl font-black text-white">{stats ? formatNumber(activos) : '—'}</p>
+            <p className="text-2xl font-black text-white">{stats ? formatNumber(activos) : '—'}</p>
             <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mt-0.5">Activos</p>
           </div>
           <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold whitespace-nowrap">
@@ -140,7 +140,7 @@ function OverdueFeesCard({ stats }: { stats: DashboardStats | null }) {
           {/* Métricas: cuota impaga y total adeudado */}
           <div className="grid grid-cols-2 gap-4 mt-3">
             <div>
-              <p className="text-3xl font-bold text-rose-500">{stats ? formatNumber(vencidas) : '—'}</p>
+              <p className="text-2xl font-bold text-rose-500">{stats ? formatNumber(vencidas) : '—'}</p>
               <p className="text-xs text-slate-400 mt-1">
                 cuota{vencidas !== 1 ? 's' : ''} impaga{vencidas !== 1 ? 's' : ''}
               </p>

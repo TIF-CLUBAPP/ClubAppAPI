@@ -427,6 +427,7 @@ namespace ClubApp.Infrastructure.Data
             // No destructivo: solo agrega los socios que falten (chequeo por Email/DNI).
             // No toca ni borra los usuarios existentes (SuperAdmin, Profesores, Usuario1-8, etc.).
             SeedTestSocios(context);
+            SeedSpaces(context);
             SeedCommercialActivities(context);
 
         }
@@ -624,6 +625,347 @@ namespace ClubApp.Infrastructure.Data
 
         }
 
+        /// <summary>
+        /// Inserta (si no existen) los espacios físicos del club (canchas, salones,
+        /// gimnasio, pileta, etc.) con su configuración exacta de reservas/alquiler.
+        /// Idempotente: verifica por Name antes de insertar para evitar duplicados.
+        /// </summary>
+        private static void SeedSpaces(ApplicationContext context)
+        {
+            // ==========================================
+            // Migración idempotente de nombres con erratas de ortografía.
+            // Los espacios ya guardados en la BD (p. ej. clubapp_v3.db) tienen nombres con
+            // erratas ("Chanca", "Chincho", "Olimpica", "Padel", "Futbol", "Practica",
+            // "Salon", "Italia1400"). Los renombramos una única vez a su forma correcta para
+            // que el chequeo por Name (EnsureSpace) siga siendo estable y no se generen
+            // duplicados al comparar por nombre.
+            // ==========================================
+            var renameSpaces = new Dictionary<string, string>
+            {
+                ["Pileta Olimpica Peñarol"] = "Pileta Olímpica Peñarol",
+                ["Salon Quincho 1"] = "Salón Quincho 1",
+                ["Cancha Futbol Practica 1 Italia 1400"] = "Cancha Fútbol Práctica 1 Italia 1400",
+                ["Chanca Futbol Oficial 1 Italia 1400"] = "Cancha Fútbol Oficial 1 Italia 1400",
+                ["Chincho Exterior Italia1400"] = "Quincho Exterior Italia 1400",
+                ["Padel Cancha 1"] = "Pádel Cancha 1",
+                ["Padel Chancha 2"] = "Pádel Cancha 2",
+                ["Cancha Futbol Practica 2 Alvear 1300"] = "Cancha Fútbol Práctica 2 Alvear 1300",
+                ["Chanca Futbol Oficial 2 Alvear 1300"] = "Cancha Fútbol Oficial 2 Alvear 1300",
+            };
+
+            foreach (var rename in renameSpaces)
+            {
+                var oldName = rename.Key;
+                var newName = rename.Value;
+
+                // Solo renombra si el nombre viejo existe y el nuevo todavía no, para evitar
+                // colisiones o duplicados. Idempotente: en ejecuciones posteriores el nombre
+                // viejo ya no existe y no se hace nada.
+                var space = context.Spaces.FirstOrDefault(s => s.Name == oldName);
+                if (space != null && !context.Spaces.Any(s => s.Name == newName))
+                {
+                    space.Name = newName;
+                }
+            }
+            context.SaveChanges();
+
+
+            void EnsureSpace(Space desired)
+            {
+                if (context.Spaces.Any(s => s.Name == desired.Name)) return;
+
+                context.Spaces.Add(desired);
+                context.SaveChanges();
+            }
+
+            // ==========================================
+            // Basket / Bochas
+            // ==========================================
+            EnsureSpace(new Space
+            {
+                Name = "Basket Peñarol CANCHA 1",
+                SportCategory = "Básquet",
+                Location = "San Martín 1351, Elortondo, Provincia de Santa Fe",
+                IsActive = true,
+                AllowReservationsDuringClasses = false, // Bloqueo de alquileres privados
+                RequiresApproval = false,
+                PermitirSuperposicion = false,
+                PricePerHour = 0m,
+                SlotDurationMinutes = 60,
+                Is24Hours = false,
+                OpenTime = "08:00",
+                CloseTime = "23:00"
+            });
+
+            EnsureSpace(new Space
+            {
+                Name = "Bochas Peñarol 1",
+                SportCategory = "Bochas",
+                Location = "Austria 601, Elortondo, Provincia de Santa Fe",
+                IsActive = true,
+                AllowReservationsDuringClasses = true, // Permite reservas
+                RequiresApproval = false,
+                PermitirSuperposicion = false,
+                PricePerHour = 1000m,
+                SlotDurationMinutes = 60,
+                Is24Hours = false,
+                OpenTime = "08:00",
+                CloseTime = "22:00"
+            });
+
+            EnsureSpace(new Space
+            {
+                Name = "Bochas Peñarol 2",
+                SportCategory = "Bochas",
+                Location = "Austria 601, Elortondo, Provincia de Santa Fe",
+                IsActive = true,
+                AllowReservationsDuringClasses = true,
+                RequiresApproval = false,
+                PermitirSuperposicion = false,
+                PricePerHour = 1000m,
+                SlotDurationMinutes = 60,
+                Is24Hours = false,
+                OpenTime = "08:00",
+                CloseTime = "22:00"
+            });
+
+            EnsureSpace(new Space
+            {
+                Name = "Bochas Peñarol 3",
+                SportCategory = "Bochas",
+                Location = "Austria 601, Elortondo, Provincia de Santa Fe",
+                IsActive = true,
+                AllowReservationsDuringClasses = true,
+                RequiresApproval = false,
+                PermitirSuperposicion = false,
+                PricePerHour = 1000m,
+                SlotDurationMinutes = 60,
+                Is24Hours = false,
+                OpenTime = "08:00",
+                CloseTime = "22:00"
+            });
+
+            EnsureSpace(new Space
+            {
+                Name = "Bochas Peñarol 4",
+                SportCategory = "Bochas",
+                Location = "Austria 601, Elortondo, Provincia de Santa Fe",
+                IsActive = true,
+                AllowReservationsDuringClasses = true,
+                RequiresApproval = false,
+                PermitirSuperposicion = false,
+                PricePerHour = 1000m,
+                SlotDurationMinutes = 60,
+                Is24Hours = false,
+                OpenTime = "08:00",
+                CloseTime = "22:00"
+            });
+
+            // ==========================================
+            // Predio San Martín 1351
+            // ==========================================
+            EnsureSpace(new Space
+            {
+                Name = "GYM Peñarol",
+                SportCategory = "Gimnasio / Musculación",
+                Location = "San Martín 1351, Elortondo, Provincia de Santa Fe",
+                IsActive = true,
+                AllowReservationsDuringClasses = false,
+                RequiresApproval = false,
+                PermitirSuperposicion = true,
+                PricePerHour = 0m,
+                SlotDurationMinutes = 60,
+                Is24Hours = false,
+                OpenTime = "08:00",
+                CloseTime = "23:00"
+            });
+
+            EnsureSpace(new Space
+            {
+                Name = "Pileta Olímpica Peñarol",
+                SportCategory = "Natación (Piscina)",
+                Location = "San Martín 1351, Elortondo, Provincia de Santa Fe",
+                IsActive = true,
+                AllowReservationsDuringClasses = false,
+                RequiresApproval = false,
+                PermitirSuperposicion = false,
+                PricePerHour = 0m,
+                SlotDurationMinutes = 60,
+                Is24Hours = false,
+                OpenTime = "08:00",
+                CloseTime = "23:00"
+            });
+
+            EnsureSpace(new Space
+            {
+                Name = "Salón Quincho 1",
+                SportCategory = "SUM / Salón de Eventos",
+                Location = "San Martín 1351, Elortondo, Provincia de Santa Fe",
+                IsActive = true,
+                AllowReservationsDuringClasses = true,
+                RequiresApproval = true,
+                PermitirSuperposicion = false,
+                PricePerHour = 1500m,
+                SlotDurationMinutes = 60,
+                Is24Hours = true,
+                OpenTime = "08:00",
+                CloseTime = "23:00"
+            });
+
+            // ==========================================
+            // Italia 1401
+            // ==========================================
+            EnsureSpace(new Space
+            {
+                Name = "Cancha Fútbol Práctica 1 Italia 1400",
+                SportCategory = "Fútbol 11",
+                Location = "Italia 1401, Elortondo, Provincia de Santa Fe",
+                IsActive = true,
+                AllowReservationsDuringClasses = false,
+                RequiresApproval = false,
+                PermitirSuperposicion = true,
+                PricePerHour = 0m,
+                SlotDurationMinutes = 0,
+                Is24Hours = false,
+                OpenTime = null,
+                CloseTime = null
+            });
+
+            EnsureSpace(new Space
+            {
+                Name = "Cancha Fútbol Oficial 1 Italia 1400",
+                SportCategory = "Fútbol 11",
+                Location = "Italia 1401, Elortondo, Provincia de Santa Fe",
+                IsActive = true,
+                AllowReservationsDuringClasses = false,
+                RequiresApproval = false,
+                PermitirSuperposicion = true,
+                PricePerHour = 0m,
+                SlotDurationMinutes = 0,
+                Is24Hours = false,
+                OpenTime = null,
+                CloseTime = null
+            });
+
+            EnsureSpace(new Space
+            {
+                Name = "Quincho Exterior Italia 1400",
+                SportCategory = "Quincho / Parrilla",
+                Location = "Italia 1401, Elortondo, Provincia de Santa Fe",
+                IsActive = true,
+                AllowReservationsDuringClasses = true,
+                RequiresApproval = true,
+                PermitirSuperposicion = false,
+                PricePerHour = 1500m,
+                SlotDurationMinutes = 60,
+                Is24Hours = true,
+                OpenTime = "08:00",
+                CloseTime = "23:00"
+            });
+
+            // ==========================================
+            // Italia 1360
+            // ==========================================
+            EnsureSpace(new Space
+            {
+                Name = "Pádel Cancha 1",
+                SportCategory = "Pádel",
+                Location = "Italia 1360, Elortondo, Provincia de Santa Fe",
+                IsActive = true,
+                AllowReservationsDuringClasses = true,
+                RequiresApproval = false,
+                PermitirSuperposicion = false,
+                PricePerHour = 1200.03m,
+                SlotDurationMinutes = 60,
+                Is24Hours = false,
+                OpenTime = "08:00",
+                CloseTime = "20:00"
+            });
+
+            EnsureSpace(new Space
+            {
+                Name = "Pádel Cancha 2",
+                SportCategory = "Pádel",
+                Location = "Italia 1360, Elortondo, Provincia de Santa Fe",
+                IsActive = true,
+                AllowReservationsDuringClasses = true,
+                RequiresApproval = false,
+                PermitirSuperposicion = false,
+                PricePerHour = 1200m,
+                SlotDurationMinutes = 60,
+                Is24Hours = false,
+                OpenTime = "08:00",
+                CloseTime = "20:00"
+            });
+
+            EnsureSpace(new Space
+            {
+                Name = "Tenis 1 Peñarol",
+                SportCategory = "Tenis",
+                Location = "Italia 1360, Elortondo, Provincia de Santa Fe",
+                IsActive = true,
+                AllowReservationsDuringClasses = true,
+                RequiresApproval = false,
+                PermitirSuperposicion = false,
+                PricePerHour = 1600m,
+                SlotDurationMinutes = 60,
+                Is24Hours = false,
+                OpenTime = "08:00",
+                CloseTime = "20:00"
+            });
+
+            EnsureSpace(new Space
+            {
+                Name = "Tenis 2 Peñarol",
+                SportCategory = "Tenis",
+                Location = "Italia 1360, Elortondo, Provincia de Santa Fe",
+                IsActive = true,
+                AllowReservationsDuringClasses = true,
+                RequiresApproval = false,
+                PermitirSuperposicion = false,
+                PricePerHour = 1600m,
+                SlotDurationMinutes = 60,
+                Is24Hours = false,
+                OpenTime = "08:00",
+                CloseTime = "20:00"
+            });
+
+            // ==========================================
+            // Alvear 1300
+            // ==========================================
+            EnsureSpace(new Space
+            {
+                Name = "Cancha Fútbol Práctica 2 Alvear 1300",
+                SportCategory = "Fútbol 11",
+                Location = "Marcelo T. de Alvear 1300, Elortondo, Provincia de Santa Fe",
+                IsActive = true,
+                AllowReservationsDuringClasses = false,
+                RequiresApproval = false,
+                PermitirSuperposicion = true,
+                PricePerHour = 0m,
+                SlotDurationMinutes = 0,
+                Is24Hours = false,
+                OpenTime = null,
+                CloseTime = null
+            });
+
+            EnsureSpace(new Space
+            {
+                Name = "Cancha Fútbol Oficial 2 Alvear 1300",
+                SportCategory = "Fútbol 11",
+                Location = "Marcelo T. de Alvear 1300, Elortondo, Provincia de Santa Fe",
+                IsActive = true,
+                AllowReservationsDuringClasses = false,
+                RequiresApproval = false,
+                PermitirSuperposicion = false,
+                PricePerHour = 0m,
+                SlotDurationMinutes = 0,
+                Is24Hours = false,
+                OpenTime = null,
+                CloseTime = null
+            });
+        }
+
         // ==========================================
         // 8. SEEDING DE ACTIVIDADES COMERCIALES + INSCRIPCIONES + LIQUIDACIÓN DE CANON
         // ==========================================
@@ -632,6 +974,31 @@ namespace ClubApp.Infrastructure.Data
         private static void SeedCommercialActivities(ApplicationContext context)
         {
             string hashedPassword = BCrypt.Net.BCrypt.HashPassword("1234");
+
+            // ==========================================
+            // 8.0 Renombrado idempotente de actividades (nombres anteriores → actuales).
+            // Los registros ya guardados con el nombre viejo se renombran una única vez
+            // para que EnsureActivity (que chequea por Name) no cree duplicados.
+            // ==========================================
+            var renameActivities = new Dictionary<string, string>
+            {
+                ["Clases de Tenis"] = "Tenis Adultos",
+                ["Pádel Avanzado"] = "Pádel Nivel 6",
+            };
+
+            foreach (var rename in renameActivities)
+            {
+                var activity = context.Activities.FirstOrDefault(a => a.Name == rename.Key);
+                if (activity != null && !context.Activities.Any(a => a.Name == rename.Value))
+                {
+                    activity.Name = rename.Value;
+                }
+            }
+            context.SaveChanges();
+
+            // Resuelve el Id del espacio físico por nombre. Los espacios ya fueron
+            // asegurados por SeedSpaces antes de llegar a este punto.
+            int? ResolveSpaceId(string name) => context.Spaces.FirstOrDefault(s => s.Name == name)?.Id;
 
             User EnsureUser(User seed)
             {
@@ -658,6 +1025,7 @@ namespace ClubApp.Infrastructure.Data
 
                 var changed = false;
                 if (existing.Category != desired.Category) { existing.Category = desired.Category; changed = true; }
+                if (existing.Description != desired.Description) { existing.Description = desired.Description; changed = true; }
                 if (existing.PriceMember != desired.PriceMember) { existing.PriceMember = desired.PriceMember; changed = true; }
                 if (existing.PriceNonMember != desired.PriceNonMember) { existing.PriceNonMember = desired.PriceNonMember; changed = true; }
                 if (existing.PaymentCollector != desired.PaymentCollector) { existing.PaymentCollector = desired.PaymentCollector; changed = true; }
@@ -667,6 +1035,7 @@ namespace ClubApp.Infrastructure.Data
                 if (existing.ProfessorMercadoPagoAccessToken != desired.ProfessorMercadoPagoAccessToken) { existing.ProfessorMercadoPagoAccessToken = desired.ProfessorMercadoPagoAccessToken; changed = true; }
                 if (existing.MaxCapacity != desired.MaxCapacity) { existing.MaxCapacity = desired.MaxCapacity; changed = true; }
                 if (existing.TeacherId != desired.TeacherId) { existing.TeacherId = desired.TeacherId; changed = true; }
+                if (existing.SpaceId != desired.SpaceId) { existing.SpaceId = desired.SpaceId; changed = true; }
                 if (existing.Schedule != desired.Schedule) { existing.Schedule = desired.Schedule; changed = true; }
                 if (existing.IsActive != desired.IsActive) { existing.IsActive = desired.IsActive; changed = true; }
 
@@ -710,7 +1079,7 @@ namespace ClubApp.Infrastructure.Data
                 });
             }
 
-            // 8.1 Profesores de prueba (2, con credenciales de acceso)
+            // 8.1 Profesores de prueba (4, con credenciales de acceso "1234")
             var teacherTenis = EnsureUser(new User
             {
                 BadgeNum = "P-001",
@@ -739,39 +1108,91 @@ namespace ClubApp.Infrastructure.Data
                 CreatedAt = DateTime.UtcNow
             });
 
-            // 8.2 Alumnos: 6 socios (membresía activa) + 6 no socios (sin membresía)
+            var teacherGym = EnsureUser(new User
+            {
+                BadgeNum = "P-003",
+                FirstName = "Carlos",
+                LastName = "Rodríguez",
+                Email = "profesor.gym@clubapp.com",
+                PasswordHash = hashedPassword,
+                Role = UserRole.TEACHER,
+                Dni = "40000003",
+                Phone = "+54900000003",
+                BirthDate = new DateTime(1985, 2, 14),
+                CreatedAt = DateTime.UtcNow
+            });
+
+            var teacherFutbol = EnsureUser(new User
+            {
+                BadgeNum = "P-004",
+                FirstName = "Diego",
+                LastName = "Fernández",
+                Email = "profesor.futbol@clubapp.com",
+                PasswordHash = hashedPassword,
+                Role = UserRole.TEACHER,
+                Dni = "40000004",
+                Phone = "+54900000004",
+                BirthDate = new DateTime(1987, 11, 3),
+                CreatedAt = DateTime.UtcNow
+            });
+
+            // 8.2 Alumnos: 12 socios (membresía activa) + 6 no socios (sin membresía).
+            // IsMember distingue de forma explícita Socio (true) vs No Socio/Seguidor (false).
+            var socioNames = new (string First, string Last)[]
+            {
+                ("Martín", "Álvarez"), ("Sofía", "Benítez"), ("Lautaro", "Castro"),
+                ("Valentina", "Díaz"), ("Joaquín", "Escobar"), ("Camila", "Fernández"),
+                ("Matías", "González"), ("Agustina", "Herrera"), ("Bruno", "Ibarra"),
+                ("Julieta", "Juárez"), ("Nicolás", "Krause"), ("Milagros", "Ledesma"),
+            };
+
+            var noSocioNames = new (string First, string Last)[]
+            {
+                ("Tomás", "Méndez"), ("Florencia", "Navarro"), ("Santiago", "Ocampo"),
+                ("Renata", "Paz"), ("Gonzalo", "Quintero"), ("Ailén", "Romero"),
+            };
+
             var socios = new List<User>();
             var noSocios = new List<User>();
 
-            for (int i = 1; i <= 6; i++)
+            for (int i = 0; i < socioNames.Length; i++)
             {
-                socios.Add(EnsureUser(new User
+                var socio = EnsureUser(new User
                 {
-                    BadgeNum = $"S-{i:000}",
-                    FirstName = $"Socio{i}",
-                    LastName = "Prueba",
-                    Email = $"socio{i}@clubapp.com",
+                    BadgeNum = $"S-{i + 1:000}",
+                    FirstName = socioNames[i].First,
+                    LastName = socioNames[i].Last,
+                    Email = $"socio{i + 1}@clubapp.com",
                     PasswordHash = hashedPassword,
                     Role = UserRole.MEMBER,
-                    Dni = $"450000{i:00}",
-                    Phone = $"+549555000{i:000}",
-                    BirthDate = new DateTime(1990, 1, 1).AddDays(i),
+                    IsMember = true,
+                    Dni = $"450000{i + 1:00}",
+                    Phone = $"+549555000{i + 1:000}",
+                    BirthDate = new DateTime(1990, 1, 1).AddDays(i + 1),
                     CreatedAt = DateTime.UtcNow
-                }));
+                });
+                socio.IsMember = true; // backfill idempotente por si el registro ya existía
+                socios.Add(socio);
+            }
 
-                noSocios.Add(EnsureUser(new User
+            for (int i = 0; i < noSocioNames.Length; i++)
+            {
+                var noSocio = EnsureUser(new User
                 {
-                    BadgeNum = $"NS-{i:000}",
-                    FirstName = $"NoSocio{i}",
-                    LastName = "Prueba",
-                    Email = $"nosocio{i}@clubapp.com",
+                    BadgeNum = $"NS-{i + 1:000}",
+                    FirstName = noSocioNames[i].First,
+                    LastName = noSocioNames[i].Last,
+                    Email = $"nosocio{i + 1}@clubapp.com",
                     PasswordHash = hashedPassword,
                     Role = UserRole.MEMBER,
-                    Dni = $"460000{i:00}",
-                    Phone = $"+549666000{i:000}",
-                    BirthDate = new DateTime(1992, 2, 1).AddDays(i),
+                    IsMember = false,
+                    Dni = $"460000{i + 1:00}",
+                    Phone = $"+549666000{i + 1:000}",
+                    BirthDate = new DateTime(1992, 2, 1).AddDays(i + 1),
                     CreatedAt = DateTime.UtcNow
-                }));
+                });
+                noSocio.IsMember = false; // backfill idempotente
+                noSocios.Add(noSocio);
             }
 
             // Membresía ACTIVA solo para los socios (los no socios no tienen membresía).
@@ -792,10 +1213,10 @@ namespace ClubApp.Infrastructure.Data
             }
             context.SaveChanges();
 
-            // 8.3 Actividades comerciales
+            // 8.3 Actividades comerciales (cupos variados para probar la UI de inscripción)
             var tenis = EnsureActivity(new Activity
             {
-                Name = "Clases de Tenis",
+                Name = "Tenis Adultos",
                 Description = "Clases de tenis para adultos, nivel inicial y avanzado.",
                 Category = "Deportes",
                 Price = 8000m,
@@ -808,6 +1229,7 @@ namespace ClubApp.Infrastructure.Data
                 ProfessorMercadoPagoAccessToken = "APP_USR-1111111111111111-010101-aaaaaaaaaaaa",
                 MaxCapacity = 8,
                 TeacherId = teacherTenis.Id,
+                SpaceId = ResolveSpaceId("Tenis 1 Peñarol"),
                 RequiresBooking = false,
                 Schedule = "Lunes y Miércoles 18:00 hs",
                 IsActive = true,
@@ -828,17 +1250,62 @@ namespace ClubApp.Infrastructure.Data
                 ProfessorMercadoPagoPublicKey = null,
                 ProfessorMercadoPagoAccessToken = null,
                 MaxCapacity = 30,
-                TeacherId = null,
+                TeacherId = teacherFutbol.Id,
+                SpaceId = ResolveSpaceId("Cancha Fútbol Práctica 1 Italia 1400"),
                 RequiresBooking = false,
                 Schedule = "Martes y Jueves 17:00 hs",
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
             });
 
+            var spinning = EnsureActivity(new Activity
+            {
+                Name = "Spinning / GYM",
+                Description = "Clases de ciclismo indoor y acondicionamiento físico en el gimnasio.",
+                Category = "Fitness",
+                Price = 6000m,
+                PriceMember = 6000m,
+                PriceNonMember = 9000m,
+                PaymentCollector = PaymentCollectorType.CLUB,
+                ProfessorFacilityFeeMember = 1000m,
+                ProfessorFacilityFeeNonMember = 2000m,
+                ProfessorMercadoPagoPublicKey = null,
+                ProfessorMercadoPagoAccessToken = null,
+                MaxCapacity = 12,
+                TeacherId = teacherGym.Id,
+                SpaceId = ResolveSpaceId("GYM Peñarol"),
+                RequiresBooking = false,
+                Schedule = "Martes y Jueves 09:00 hs",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            });
+
+            var basquet = EnsureActivity(new Activity
+            {
+                Name = "Básquet Juvenil",
+                Description = "Entrenamiento de básquet para categorías juveniles.",
+                Category = "Deportes",
+                Price = 5500m,
+                PriceMember = 5500m,
+                PriceNonMember = 8500m,
+                PaymentCollector = PaymentCollectorType.CLUB,
+                ProfessorFacilityFeeMember = 1000m,
+                ProfessorFacilityFeeNonMember = 2000m,
+                ProfessorMercadoPagoPublicKey = null,
+                ProfessorMercadoPagoAccessToken = null,
+                MaxCapacity = 15,
+                TeacherId = teacherFutbol.Id,
+                SpaceId = ResolveSpaceId("Basket Peñarol CANCHA 1"),
+                RequiresBooking = false,
+                Schedule = "Miércoles y Viernes 16:00 hs",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            });
+
             var padel = EnsureActivity(new Activity
             {
-                Name = "Pádel Avanzado",
-                Description = "Entrenamiento de pádel para jugadores avanzados.",
+                Name = "Pádel Nivel 6",
+                Description = "Entrenamiento de pádel para jugadores de nivel 6.",
                 Category = "Deportes",
                 Price = 9000m,
                 PriceMember = 9000m,
@@ -848,41 +1315,44 @@ namespace ClubApp.Infrastructure.Data
                 ProfessorFacilityFeeNonMember = 3500m,
                 ProfessorMercadoPagoPublicKey = "APP_USR-padel-public-key",
                 ProfessorMercadoPagoAccessToken = "APP_USR-2222222222222222-020202-bbbbbbbbbbbb",
-                MaxCapacity = 12,
+                MaxCapacity = 10,
                 TeacherId = teacherPadel.Id,
+                SpaceId = ResolveSpaceId("Pádel Cancha 1"),
                 RequiresBooking = false,
                 Schedule = "Viernes 19:00 hs",
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
             });
 
-            // 8.4 Horarios estructurados
+            // 8.4 Horarios estructurados (días ocupados en la semana)
             EnsureSchedules(tenis.Id, (1, "18:00", "19:00"), (3, "18:00", "19:00"));
             EnsureSchedules(futbol.Id, (2, "17:00", "18:30"), (4, "17:00", "18:30"));
+            EnsureSchedules(spinning.Id, (2, "09:00", "10:00"), (4, "09:00", "10:00"), (6, "10:00", "11:00"));
+            EnsureSchedules(basquet.Id, (3, "16:00", "17:30"), (5, "16:00", "17:30"));
             EnsureSchedules(padel.Id, (5, "19:00", "20:00"));
 
-            // 8.5 Inscripciones
-            // Clases de Tenis: 8 inscripciones (cupo completo → "Sin Cupo"): 3 socios + 5 no socios.
+            // 8.5 Inscripciones (idempotentes por UserId + ActivityId + Estado ACTIVE)
+            // Tenis Adultos: cupo 8 → 8 inscripciones (SIN CUPO disponible). 3 socios + 5 no socios.
             EnsureEnrollment(socios[0].Id, tenis.Id);
             EnsureEnrollment(socios[1].Id, tenis.Id);
             EnsureEnrollment(socios[2].Id, tenis.Id);
-            EnsureEnrollment(noSocios[0].Id, tenis.Id);
-            EnsureEnrollment(noSocios[1].Id, tenis.Id);
-            EnsureEnrollment(noSocios[2].Id, tenis.Id);
-            EnsureEnrollment(noSocios[3].Id, tenis.Id);
-            EnsureEnrollment(noSocios[4].Id, tenis.Id);
+            for (int i = 0; i < 5; i++) EnsureEnrollment(noSocios[i].Id, tenis.Id);
 
-            // Fútbol Sub 15: 10 inscripciones (5 socios + 5 no socios).
-            for (int i = 0; i < 5; i++)
-            {
-                EnsureEnrollment(socios[i].Id, futbol.Id);
-                EnsureEnrollment(noSocios[i].Id, futbol.Id);
-            }
+            // Pádel Nivel 6: cupo 10 → 9 inscripciones (1 solo cupo restante). 5 socios + 4 no socios.
+            for (int i = 0; i < 5; i++) EnsureEnrollment(socios[i].Id, padel.Id);
+            for (int i = 0; i < 4; i++) EnsureEnrollment(noSocios[i].Id, padel.Id);
 
-            // Pádel Avanzado: 4 socios + 2 no socios.
-            for (int i = 0; i < 4; i++) EnsureEnrollment(socios[i].Id, padel.Id);
-            EnsureEnrollment(noSocios[0].Id, padel.Id);
-            EnsureEnrollment(noSocios[1].Id, padel.Id);
+            // Spinning / GYM: cupo 12 → 7 inscripciones (5 cupos disponibles). 4 socios + 3 no socios.
+            for (int i = 0; i < 4; i++) EnsureEnrollment(socios[i].Id, spinning.Id);
+            for (int i = 0; i < 3; i++) EnsureEnrollment(noSocios[i].Id, spinning.Id);
+
+            // Básquet Juvenil: cupo 15 → 10 inscripciones (5 cupos disponibles). 6 socios + 4 no socios.
+            for (int i = 0; i < 6; i++) EnsureEnrollment(socios[i].Id, basquet.Id);
+            for (int i = 0; i < 4; i++) EnsureEnrollment(noSocios[i].Id, basquet.Id);
+
+            // Fútbol Sub 15: cupo 30 → 12 inscripciones (18 cupos disponibles). 8 socios + 4 no socios.
+            for (int i = 0; i < 8; i++) EnsureEnrollment(socios[i].Id, futbol.Id);
+            for (int i = 0; i < 4; i++) EnsureEnrollment(noSocios[i].Id, futbol.Id);
 
             context.SaveChanges();
         }

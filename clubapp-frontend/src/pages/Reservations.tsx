@@ -157,10 +157,10 @@ export default function Reservations() {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex selection:bg-emerald-500 selection:text-slate-950">
       <Sidebar />
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-64">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-60">
         <Header />
 
-        <main className="flex-1 p-6 md:p-8 overflow-y-auto scrollbar-thin">
+        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-24 md:pt-6 md:px-6 md:pb-6">
           <div className="space-y-8 max-w-7xl mx-auto">
             {/* ============ SECCIÓN SUPERIOR: MI CRONOGRAMA DE ACTIVIDADES ============ */}
             <section>

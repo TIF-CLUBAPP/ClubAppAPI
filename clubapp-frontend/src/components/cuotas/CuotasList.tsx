@@ -27,7 +27,7 @@ export const CuotasList: React.FC<CuotasListProps> = ({
   formatCurrency,
 }) => {
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-xl space-y-6">
+    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 md:p-5 shadow-xl space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
         <h2 className="text-lg font-bold text-white flex items-center gap-2">
           <Calendar className="w-5 h-5 text-emerald-400" />

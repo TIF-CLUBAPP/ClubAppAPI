@@ -97,7 +97,7 @@ function CalendarPicker({ value, min, onChange }: CalendarPickerProps) {
       <button
         type="button"
         onClick={openCalendar}
-        className="w-full flex items-center justify-between gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-emerald-500 hover:border-slate-700 transition-colors"
+        className="w-full flex items-center justify-between gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-3 text-sm text-white outline-none focus:border-emerald-500 hover:border-slate-700 transition-colors"
       >
         <span className="flex items-center gap-2">
           <Calendar size={15} className="text-emerald-400" />
@@ -108,8 +108,12 @@ function CalendarPicker({ value, min, onChange }: CalendarPickerProps) {
 
       {open && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute z-50 left-0 mt-2 w-70 rounded-2xl border border-emerald-500/40 bg-slate-900 p-3 shadow-2xl">
+          <div
+            className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-sm md:bg-transparent md:backdrop-blur-none"
+            onClick={() => setOpen(false)}
+          />
+          <div className="fixed md:absolute z-50 inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] md:inset-x-auto md:bottom-auto md:left-0 md:mt-2 md:w-70 rounded-t-3xl md:rounded-2xl border border-emerald-500/40 bg-slate-900 p-4 md:p-3 shadow-2xl pb-[calc(1rem+env(safe-area-inset-bottom))] md:pb-3">
+            <div className="md:hidden mx-auto mb-3 h-1.5 w-10 rounded-full bg-slate-700" aria-hidden="true" />
             <div className="flex items-center justify-between mb-2">
               <button
                 type="button"
@@ -451,10 +455,10 @@ export default function ReservaCanchas() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex selection:bg-emerald-500 selection:text-slate-950">
       <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-64">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-60">
         <Header />
-        <main className="flex-1 p-6 md:p-8 overflow-y-auto scrollbar-thin">
-          <div className="space-y-6 max-w-5xl mx-auto">
+        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-40 md:pt-6 md:px-6 md:pb-6">
+          <div className="space-y-6 w-full">
             {/* Encabezado */}
             <div>
               <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -485,7 +489,7 @@ export default function ReservaCanchas() {
                       const matches = activeSpaces.filter((s) => s.sportCategory === category);
                       setSelectedSpaceId(matches.length === 1 ? matches[0].id : null);
                     }}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-emerald-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-3 text-sm text-white outline-none focus:border-emerald-500"
                   >
                     <option value="">Seleccioná un deporte</option>
                     {categories.map((c) => (
@@ -502,7 +506,7 @@ export default function ReservaCanchas() {
                     value={selectedSpaceId ?? ''}
                     onChange={(e) => setSelectedSpaceId(e.target.value ? Number(e.target.value) : null)}
                     disabled={selectedCategory === '' || filteredSpaces.length === 0}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-emerald-500 disabled:opacity-50"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-3 text-sm text-white outline-none focus:border-emerald-500 disabled:opacity-50"
                   >
                     <option value="">Seleccioná un espacio / cancha</option>
                     {filteredSpaces.map((s) => (
@@ -668,20 +672,20 @@ export default function ReservaCanchas() {
       </div>
 
       {selectedSlots.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-slate-900/95 backdrop-blur-md border border-slate-700/60 rounded-full px-6 py-3 shadow-2xl shadow-emerald-950/40">
-          <span className="text-sm text-slate-300 whitespace-nowrap">
+        <div className="fixed z-50 md:z-40 bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] md:w-auto flex items-center justify-between md:justify-center gap-2 md:gap-4 bg-slate-900/95 backdrop-blur-md border border-slate-800 rounded-full px-4 py-3 md:px-6 shadow-2xl shadow-emerald-950/40">
+          <span className="min-w-0 text-sm text-slate-300 whitespace-nowrap truncate">
             <span className="font-bold text-white">{selectedSlots.length}</span>{' '}
-            {selectedSlots.length === 1 ? 'turno seleccionado' : 'turnos seleccionados'}
+            {selectedSlots.length === 1 ? 'turno' : 'turnos'}
           </span>
-          <span className="h-6 w-px bg-slate-700/60" />
-          <span className="text-sm font-black text-emerald-400 whitespace-nowrap">
+          <span className="hidden md:inline-block h-6 w-px bg-slate-700/60 shrink-0" />
+          <span className="text-sm font-black text-emerald-400 whitespace-nowrap shrink-0">
             {fmt(selectedSlots.length * (selectedSpace?.pricePerHour ?? 0))}
           </span>
           <button
             type="button"
             onClick={handleCheckout}
             disabled={isBatchProcessing}
-            className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-5 py-2.5 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm px-5 py-2.5 rounded-full whitespace-nowrap transition disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
           >
             {isBatchProcessing ? <RefreshCw size={16} className="animate-spin" /> : <ArrowRight size={16} />}
             Ir a Pagar
@@ -689,7 +693,7 @@ export default function ReservaCanchas() {
           <button
             type="button"
             onClick={() => setSelectedSlots([])}
-            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition"
+            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition shrink-0"
             aria-label="Limpiar selección"
           >
             <X size={16} />

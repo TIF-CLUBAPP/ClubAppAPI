@@ -41,7 +41,7 @@ export default function Header() {
   const pageTitle = pageTitles[location.pathname] || '';
 
   return (
-    <header className="h-20 border-b border-slate-800/80 bg-slate-950/50 backdrop-blur-md px-6 md:px-8 flex items-center justify-between gap-4 shrink-0 relative z-10">
+    <header className="hidden md:flex h-16 border-b border-slate-800/80 bg-slate-950/50 backdrop-blur-md px-4 md:px-6 items-center justify-between gap-4 shrink-0 relative z-10">
       <div className="flex-1 min-w-0">
         <h2 className="text-xl md:text-2xl font-extrabold text-white flex items-center gap-2 truncate">
           {isDashboard ? randomGreeting : pageTitle}
