@@ -454,7 +454,7 @@ export default function ReservaCanchas() {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-64">
         <Header />
         <main className="flex-1 p-6 md:p-8 overflow-y-auto scrollbar-thin">
-          <div className="space-y-6 max-w-5xl mx-auto">
+          <div className="space-y-6 w-full">
             {/* Encabezado */}
             <div>
               <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -668,20 +668,20 @@ export default function ReservaCanchas() {
       </div>
 
       {selectedSlots.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-slate-900/95 backdrop-blur-md border border-slate-700/60 rounded-full px-6 py-3 shadow-2xl shadow-emerald-950/40">
-          <span className="text-sm text-slate-300 whitespace-nowrap">
+        <div className="fixed z-50 md:z-40 bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] md:w-auto flex items-center justify-between md:justify-center gap-2 md:gap-4 bg-slate-900/95 backdrop-blur-md border border-slate-800 rounded-full px-4 py-3 md:px-6 shadow-2xl shadow-emerald-950/40">
+          <span className="min-w-0 text-sm text-slate-300 whitespace-nowrap truncate">
             <span className="font-bold text-white">{selectedSlots.length}</span>{' '}
             {selectedSlots.length === 1 ? 'turno seleccionado' : 'turnos seleccionados'}
           </span>
-          <span className="h-6 w-px bg-slate-700/60" />
-          <span className="text-sm font-black text-emerald-400 whitespace-nowrap">
+          <span className="hidden md:inline-block h-6 w-px bg-slate-700/60 shrink-0" />
+          <span className="text-sm font-black text-emerald-400 whitespace-nowrap shrink-0">
             {fmt(selectedSlots.length * (selectedSpace?.pricePerHour ?? 0))}
           </span>
           <button
             type="button"
             onClick={handleCheckout}
             disabled={isBatchProcessing}
-            className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-5 py-2.5 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-5 py-2.5 rounded-full whitespace-nowrap transition disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
           >
             {isBatchProcessing ? <RefreshCw size={16} className="animate-spin" /> : <ArrowRight size={16} />}
             Ir a Pagar
@@ -689,7 +689,7 @@ export default function ReservaCanchas() {
           <button
             type="button"
             onClick={() => setSelectedSlots([])}
-            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition"
+            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition shrink-0"
             aria-label="Limpiar selección"
           >
             <X size={16} />
