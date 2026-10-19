@@ -99,9 +99,9 @@ export default function PanelAsistencia() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex selection:bg-emerald-500 selection:text-slate-950">
       <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-64">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-60">
         <Header />
-        <main className="flex-1 p-4 md:p-8 overflow-y-auto scrollbar-thin">
+        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-24 md:pt-6 md:px-6 md:pb-6">
           <div className="space-y-6 max-w-3xl mx-auto">
             {/* Encabezado */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 md:p-6">

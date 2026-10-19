@@ -614,12 +614,12 @@ export const PagosCuotas: React.FC = () => {
       {/* Sidebar Fijo */}
       <Sidebar />
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-64">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-60">
         {/* Header Superior */}
         <Header />
 
         {/* Contenido Principal */}
-        <main className="flex-1 p-6 md:p-8 overflow-y-auto scrollbar-thin">
+        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-24 md:pt-6 md:px-6 md:pb-6">
           {loading ? (
             <div className="flex flex-col items-center justify-center h-64 text-slate-400 gap-3">
               <RefreshCw className="w-8 h-8 animate-spin text-emerald-400" />
@@ -1384,7 +1384,7 @@ export const PagosCuotas: React.FC = () => {
                 </div>
 
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
+                  <table className="w-full text-left text-xs md:text-sm">
                     <thead className="bg-slate-950 text-slate-400 uppercase text-xs">
                       <tr>
                         <th className="p-3.5 rounded-l-xl">Socio</th>

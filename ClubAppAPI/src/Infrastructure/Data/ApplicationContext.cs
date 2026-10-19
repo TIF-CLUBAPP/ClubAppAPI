@@ -40,6 +40,12 @@ namespace ClubApp.Infrastructure.Data
                 .HasIndex(u => u.Dni)
                 .IsUnique();
 
+            // Por defecto todo usuario nuevo/ya existente se considera Socio (true).
+            // Solo los "No Socios/Seguidores" se marcan explícitamente como IsMember = false.
+            modelBuilder.Entity<User>()
+                .Property(u => u.IsMember)
+                .HasDefaultValue(true);
+
             // Configuración explícita de la relación Membership -> User para evitar FKs duplicadas
             modelBuilder.Entity<Membership>()
                 .HasOne(m => m.User)

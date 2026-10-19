@@ -428,9 +428,9 @@ export default function EspaciosConfig() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex">
       <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0 md:pl-64">
+      <div className="flex-1 flex flex-col min-w-0 md:pl-60">
         <Header />
-        <main className="p-8">
+        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-24 md:pt-6 md:px-6 md:pb-6">
           <p className="text-sm text-slate-400">Gestioná canchas/espacios y su configuración de reservas.</p>
 
           {/* Sección interactiva de ayuda y buenas prácticas */}
