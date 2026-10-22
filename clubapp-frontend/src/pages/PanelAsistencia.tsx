@@ -95,7 +95,7 @@ export default function PanelAsistencia() {
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-60">
         <Header />
-        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-24 md:pt-6 md:px-6 md:pb-6">
+        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-32 md:pt-6 md:px-6 md:pb-6">
           <div className="space-y-6 max-w-3xl mx-auto">
             {/* Encabezado */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 md:p-6">
@@ -117,7 +117,7 @@ export default function PanelAsistencia() {
                   type="date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-emerald-500 max-w-[240px]"
+                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-emerald-500 max-w-60"
                 />
               </div>
             </div>

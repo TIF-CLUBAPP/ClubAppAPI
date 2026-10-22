@@ -69,7 +69,7 @@ export default function SocioFicha() {
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-60">
         <Header />
-        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-24 md:pt-6 md:px-6 md:pb-6">
+        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-32 md:pt-6 md:px-6 md:pb-6">
           <div className="max-w-3xl mx-auto space-y-6">
             <button
               type="button"

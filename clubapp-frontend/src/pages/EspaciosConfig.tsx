@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Trash2, Edit2, X, Save, ChevronDown, MapPin, LocateFixed, ExternalLink, CheckCircle2, Wrench } from 'lucide-react';
+import { Plus, Trash2, Edit2, X, Save, ChevronDown, MapPin, LocateFixed, ExternalLink, CheckCircle2, Wrench, Lightbulb } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -129,6 +129,71 @@ const MapClickHandler = ({ onClick }: { onClick: (lat: number, lng: number) => v
   return null;
 };
 
+interface HelpModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  dontShowAgain: boolean;
+  setDontShowAgain: (val: boolean) => void;
+}
+
+const SpacesHelpModal = ({ isOpen, onClose, dontShowAgain, setDontShowAgain }: HelpModalProps) => (
+  <AnimatePresence>
+    {isOpen && (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 z-60">
+        <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+          <div className="sm:hidden w-10 h-1.5 rounded-full bg-slate-700 mx-auto mt-3" aria-hidden="true" />
+          <div className="flex items-center justify-between p-6 pb-4 border-b border-slate-800 shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-lg">💡</div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Guía de Configuración de Espacios</h3>
+                <p className="text-xs text-slate-400">Recomendaciones para organizar tus instalaciones</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="text-slate-400 hover:text-white p-1"><X size={20} /></button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-6 space-y-4 text-sm text-slate-300">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 text-emerald-400 font-bold">•</span>
+              <p><strong className="text-white">Canchas Individuales:</strong> Crea cada superficie de juego como un espacio independiente (ej. "Bochas 1", "Bochas 2") para gestionar reservas precisas y evitar sobreturnos.</p>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 text-emerald-400 font-bold">•</span>
+              <p><strong className="text-white">Espacios Comodín:</strong> Usa categorías como <code className="px-1.5 py-0.5 rounded bg-slate-800 text-emerald-300 text-xs">"Espacio Cubierto"</code> o <code className="px-1.5 py-0.5 rounded bg-slate-800 text-emerald-300 text-xs">"Espacio al Aire Libre"</code> para entrenamientos generales o eventos.</p>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 text-emerald-400 font-bold">•</span>
+              <p><strong className="text-white">Espacios Compartidos:</strong> Si deportes distintos usan la misma instalación física (ej. Hockey y Fútbol), no dupliques el espacio. Selecciona el existente al crear la actividad.</p>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 text-emerald-400 font-bold">•</span>
+              <div>
+                <p className="mb-2"><strong className="text-white">Superposición de Horarios:</strong></p>
+                <ul className="space-y-2 pl-1 text-xs">
+                  <li>• <strong className="text-emerald-300">Deshabilitada (Recomendado):</strong> Evita cruces. Los bloques ocupados se marcan en <strong className="text-red-400">ROJO</strong>.</li>
+                  <li>• <strong className="text-amber-300">Habilitada:</strong> Permite que actividades del mismo deporte compartan espacio (aviso en <strong className="text-amber-400">AMARILLO</strong>).</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 sm:p-6 border-t border-slate-800 bg-slate-950/60 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
+            <label className="flex items-center gap-2.5 cursor-pointer text-xs text-slate-400 hover:text-slate-300">
+              <input type="checkbox" checked={dontShowAgain} onChange={(e) => setDontShowAgain(e.target.checked)} className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-emerald-500" />
+              No volver a mostrar automáticamente
+            </label>
+            <button type="button" onClick={onClose} className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm transition-all">
+              ¡Entendido, comenzar!
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    )}
+  </AnimatePresence>
+);
+
+
 export default function EspaciosConfig() {
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [loading, setLoading] = useState(true);
@@ -145,8 +210,23 @@ export default function EspaciosConfig() {
   const [flyTarget, setFlyTarget] = useState<[number, number] | null>(null);
   const [locationQuery, setLocationQuery] = useState('');
   const [suggestions, setSuggestions] = useState<MapboxFeature[]>([]);
-  const [helpOpen, setHelpOpen] = useState(true);
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+  const [dontShowAgain, setDontShowAgain] = useState(false);
   const [togglingId, setTogglingId] = useState<number | null>(null);
+
+  useEffect(() => {
+    const hasSeen = localStorage.getItem('hasSeenSpacesGuide');
+    if (hasSeen !== 'true') {
+      setIsHelpModalOpen(true);
+    }
+  }, []);
+
+  const handleCloseHelpModal = () => {
+    if (dontShowAgain) {
+      localStorage.setItem('hasSeenSpacesGuide', 'true');
+    }
+    setIsHelpModalOpen(false);
+  };
 
   const currentLat = formData.lat ?? -34.6037;
   const currentLng = formData.lng ?? -58.3816;
@@ -433,110 +513,60 @@ export default function EspaciosConfig() {
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0 md:pl-60">
         <Header />
-        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-24 md:pt-6 md:px-6 md:pb-6">
-          <p className="text-sm text-slate-400">Gestioná canchas/espacios y su configuración de reservas.</p>
-
-          {/* Sección interactiva de ayuda y buenas prácticas */}
-          <div className="mt-6 rounded-2xl border border-slate-800/80 bg-slate-900/60 overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setHelpOpen((v) => !v)}
-              className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left hover:bg-slate-800/40 transition-colors"
-            >
-              <span className="flex items-center gap-2.5 text-sm font-bold text-white">
-                <span className="text-base">💡</span> Consejos y Recomendaciones de Configuración
-              </span>
-              <ChevronDown size={18} className={`text-slate-400 transition-transform duration-200 ${helpOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            <AnimatePresence initial={false}>
-              {helpOpen && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.25 }}
-                  className="overflow-hidden"
-                >
-                  <div className="px-5 pb-5 pt-1 space-y-4 text-sm text-slate-300">
-                    <div className="flex items-start gap-3">
-                      <span className="mt-0.5 text-emerald-400 font-bold">•</span>
-                      <p>
-                        <strong className="text-white">Canchas Individuales:</strong> Se recomienda crear cada superficie
-                        de juego como un espacio independiente.{' '}
-                        <em className="text-slate-400">
-                          Ejemplo: Si el club tiene 4 canchas de bochas, crea 4 espacios separados ("Bochas 1", "Bochas 2",
-                          "Bochas 3" y "Bochas 4") para gestionar sus reservas de forma precisa y evitar sobreturnos.
-                        </em>
-                      </p>
-                    </div>
-
-                    <div className="flex items-start gap-3">
-                      <span className="mt-0.5 text-emerald-400 font-bold">•</span>
-                      <p>
-                        <strong className="text-white">Espacios Comodín:</strong> Usa categorías como{' '}
-                        <code className="px-1.5 py-0.5 rounded bg-slate-800 text-emerald-300 text-xs">"Espacio Cubierto"</code> o{' '}
-                        <code className="px-1.5 py-0.5 rounded bg-slate-800 text-emerald-300 text-xs">"Espacio al Aire Libre"</code>{' '}
-                        para actividades generales (entrenamientos físicos, preparación o eventos) que no ocupen una cancha específica.
-                      </p>
-                    </div>
-
-                    <div className="flex items-start gap-3">
-                      <span className="mt-0.5 text-emerald-400 font-bold">•</span>
-                      <p>
-                        <strong className="text-white">Espacios Compartidos:</strong> Si dos o más deportes comparten la
-                        misma instalación física (por ejemplo, Hockey y Fútbol en la misma cancha sintética),{' '}
-                        <strong className="text-white">no crees un espacio duplicado</strong>. Esto evitará problemas de
-                        sobreturnos y solapamiento de horarios. Al crear la actividad (ej. Hockey), simplemente
-                        selecciona el espacio físico ya existente.
-                      </p>
-                    </div>
-
-                    <div className="flex items-start gap-3">
-                      <span className="mt-0.5 text-emerald-400 font-bold">•</span>
-                      <div>
-                        <p className="mb-2"><strong className="text-white">Superposición de Horarios:</strong></p>
-                        <ul className="space-y-2 pl-1">
-                          <li className="flex items-start gap-2">
-                            <span className="text-emerald-400 font-bold">–</span>
-                            <span>
-                              <strong className="text-emerald-300">Deshabilitada (Recomendado):</strong> Evita que dos
-                              actividades compartan espacio y hora. Los bloques ocupados se marcarán en{' '}
-                              <strong className="text-red-400">ROJO</strong>.
-                            </span>
-                          </li>
-                          <li className="flex items-start gap-2">
-                            <span className="text-amber-400 font-bold">–</span>
-                            <span>
-                              <strong className="text-amber-300">Habilitada:</strong> Permite que actividades del{' '}
-                              <strong>mismo deporte</strong> compartan el espacio (se advertirá en{' '}
-                              <strong className="text-amber-400">AMARILLO</strong>).{' '}
-                              <em className="text-slate-400">Nota: Por seguridad, deportes distintos nunca se pueden superponer.</em>
-                            </span>
-                          </li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-32 md:pt-6 md:px-6 md:pb-6">
+          <div className="mb-6">
+            <h1 className="text-xl sm:text-2xl font-bold text-white">Espacios y Canchas</h1>
+            <p className="text-xs text-slate-400 mt-0.5">Gestioná canchas y configuración de reservas</p>
           </div>
 
-          <div className="mt-6 flex items-center justify-between gap-4">
+          {/* Banner de Consejos Rediseñado (Compacto & Minimalista) */}
+          <div className="mb-6">
+            <div
+              onClick={() => setIsHelpModalOpen(true)}
+              className="flex items-center justify-between p-3 rounded-2xl bg-slate-900/60 border border-emerald-500/20 backdrop-blur-sm cursor-pointer hover:bg-slate-900/80 transition-all group shadow-md"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                  <Lightbulb size={18} />
+                </div>
+                <div className="min-w-0">
+                  <h4 className="text-xs font-bold text-white group-hover:text-emerald-300 transition-colors truncate">
+                    ¿Cómo configurar espacios?
+                  </h4>
+                  <p className="text-[11px] text-slate-400 truncate">
+                    Buenas prácticas para crear canchas, espacios comodín y evitar solapamientos.
+                  </p>
+                </div>
+              </div>
+              <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-xl shrink-0 group-hover:bg-emerald-500/20 transition-colors">
+                Ver Guía
+              </span>
+            </div>
+          </div>
+
+          <SpacesHelpModal
+            isOpen={isHelpModalOpen}
+            onClose={handleCloseHelpModal}
+            dontShowAgain={dontShowAgain}
+            setDontShowAgain={setDontShowAgain}
+          />
+
+          <div className="flex items-center justify-between gap-3 my-4">
             {loading ? (
               <div />
             ) : (
-              <div className="text-xs px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 font-semibold">
+              <div className="px-3 py-1 text-xs font-semibold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 Activos: {spaces.filter(s => s.isActive).length}/{spaces.length}
               </div>
             )}
 
             <button
+              type="button"
               onClick={() => handleOpenModal('create')}
-              className="px-4 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20 font-bold text-xs flex items-center gap-2"
+              className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition-all cursor-pointer"
             >
-              <Plus size={14} /> Nuevo Espacio
+              <Plus size={16} /> Nuevo Espacio
             </button>
           </div>
 
@@ -551,10 +581,10 @@ export default function EspaciosConfig() {
               {spaces.map((s) => (
                 <div
                   key={s.id}
-                  className="bg-slate-900 p-4 rounded-lg flex items-center justify-between border border-slate-800"
+                  className="bg-slate-900 p-4 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 border border-slate-800"
                 >
                   <div className="min-w-0">
-                    <h3 className="font-bold text-white truncate">{s.name}</h3>
+                    <h3 className="font-bold text-white truncate text-base">{s.name}</h3>
                     <p className="text-sm text-slate-400 mt-1">
                       {s.sportCategory} • {s.location}
                     </p>
@@ -565,8 +595,8 @@ export default function EspaciosConfig() {
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-4 shrink-0">
-                    <div className="flex flex-col items-center justify-center gap-1.5 w-40 shrink-0">
+                  <div className="flex flex-wrap items-center justify-between md:justify-end gap-4 pt-3 md:pt-0 border-t md:border-t-0 border-slate-800/80 shrink-0">
+                    <div className="flex flex-col items-start md:items-center justify-center gap-1.5 w-full sm:w-40 shrink-0">
                       <span className={`flex items-center gap-1 text-[11px] font-bold whitespace-nowrap transition-all duration-300 ease-in-out ${s.isActive ? 'text-emerald-400' : 'text-amber-400'}`}>
                         {s.isActive ? (
                           <><CheckCircle2 size={12} /> Activo</>
@@ -585,22 +615,21 @@ export default function EspaciosConfig() {
                         <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-300 ease-in-out ${s.isActive ? 'translate-x-5' : 'translate-x-0'}`} />
                       </button>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-
-                    <button 
-                      onClick={() => handleOpenModal('edit', s)}
-                      className="p-2 bg-slate-800 rounded-md hover:bg-slate-700 border border-slate-700" title="Editar"
-                    >
-                      <Edit2 size={16} />
-                    </button>
-                    <button
-                      onClick={() => setSpaceToDelete(s)}
-                      className="p-2 bg-red-900/20 text-red-400 rounded-md hover:bg-red-900/40 border border-red-900/20"
-                      title="Eliminar"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
+                    <div className="flex items-center gap-2 shrink-0 ml-auto md:ml-0">
+                      <button 
+                        onClick={() => handleOpenModal('edit', s)}
+                        className="p-2 bg-slate-800 rounded-xl hover:bg-slate-700 border border-slate-700 text-slate-200" title="Editar"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button
+                        onClick={() => setSpaceToDelete(s)}
+                        className="p-2 bg-red-900/20 text-red-400 rounded-xl hover:bg-red-900/40 border border-red-900/20"
+                        title="Eliminar"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -904,20 +933,21 @@ export default function EspaciosConfig() {
 
                   </form>
 
-                  <div className="p-4 border-t border-slate-800 bg-slate-900 shrink-0 flex gap-3">
+                  <div className="p-4 bg-slate-950/80 backdrop-blur-md border-t border-slate-800 shrink-0 flex flex-row gap-3 w-full">
                     <button
                       type="button"
                       onClick={() => setModalMode(null)}
-                      className="flex-1 py-2.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 text-sm font-bold transition-all"
+                      className="flex-1 py-3 px-4 font-medium rounded-xl text-sm transition-all border border-slate-700 bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 whitespace-nowrap"
                     >
                       Cancelar
                     </button>
                     <button
                       type="submit"
                       form="space-form"
-                      className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-2.5 rounded-lg flex items-center justify-center gap-2"
+                      className="flex-1 py-3 px-4 rounded-xl text-sm transition-all bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold flex items-center justify-center gap-2 whitespace-nowrap shadow-lg shadow-emerald-500/20"
                     >
-                      <Save size={16} /> Guardar Cambios
+                      <Save size={16} className="shrink-0" />
+                      <span>Guardar Cambios</span>
                     </button>
                   </div>
                 </motion.div>

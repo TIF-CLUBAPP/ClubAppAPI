@@ -955,7 +955,7 @@ export default function Socios() {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-60">
         <Header />
 
-        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-24 md:pt-6 md:px-6 md:pb-6">
+        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-32 md:pt-6 md:px-6 md:pb-6">
           {!isStaff ? (
             <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-10 text-center max-w-lg mx-auto mt-10">
               <AlertTriangle className="mx-auto text-amber-400" size={40} />

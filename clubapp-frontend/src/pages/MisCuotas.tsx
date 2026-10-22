@@ -98,7 +98,7 @@ export const MisCuotas: React.FC = () => {
         <div data-print-hide className="print-hidden">
           <Header />
         </div>
-        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-24 md:pt-6 md:px-6 md:pb-6 space-y-8">
+        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-32 md:pt-6 md:px-6 md:pb-6 space-y-8">
           <div className="max-w-6xl mx-auto space-y-8">
             {/* Encabezado */}
             <div data-print-hide className="flex flex-col md:flex-row md:items-center justify-between gap-4">

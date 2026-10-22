@@ -42,7 +42,7 @@ export default function Dashboard() {
         <Header />
 
         {/* 3. Vista dinámica según el Rol (incluye los widgets y las métricas) */}
-        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-24 md:pt-6 md:px-6 md:pb-6">
+        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-32 md:pt-6 md:px-6 md:pb-6">
           {isAuthenticated ? (
             <div className="space-y-6">
               <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 md:p-5">
