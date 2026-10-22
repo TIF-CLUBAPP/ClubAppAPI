@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
+import { ToastProvider } from './context/ToastContext';
 import ProtectedRoute from './routes/ProtectedRoute';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -38,6 +39,7 @@ export default function App() {
   return (
     <AuthProvider>
       <NotificationProvider>
+        <ToastProvider>
         <BrowserRouter>
           <Routes>
             {/* Redirección de la raíz */}
@@ -90,6 +92,7 @@ export default function App() {
           <MobileHeader />
           <MobileNavbar />
           </BrowserRouter>
+        </ToastProvider>
       </NotificationProvider>
     </AuthProvider>
   );

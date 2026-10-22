@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
+import { useToast } from '../context/ToastContext';
 import { bookingService } from '../services/bookingService';
 import { activityService } from '../services/activityService';
 import type { Booking } from '../types/booking';
@@ -70,6 +71,7 @@ const groupSchedules = (schedules: ActivitySchedule[]): { days: string; time: st
 
 export default function Reservations() {
   const navigate = useNavigate();
+  const toast = useToast();
 
   const [enrollments, setEnrollments] = useState<MyEnrollment[]>([]);
   const [enrollmentsLoading, setEnrollmentsLoading] = useState(true);
@@ -126,9 +128,10 @@ export default function Reservations() {
     try {
       await bookingService.cancelBooking(id);
       setBookingToCancel(null);
+      toast.success('Reserva cancelada correctamente.');
       await loadBookings();
     } catch (err: any) {
-      window.alert(err?.response?.data?.message || 'No se pudo cancelar la reserva.');
+      toast.error(err?.response?.data?.message || 'No se pudo cancelar la reserva.');
       setBookingToCancel(null);
     } finally {
       setCancellingId(null);

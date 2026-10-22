@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, AlertCircle, CheckCircle2, Loader2, ArrowLeft, ShieldCheck, Eye, EyeOff } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Lock, Loader2, ArrowLeft, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { authService } from '../services/authService';
+import { useToast } from '../context/ToastContext';
 
 export default function ResetPassword() {
   const navigate = useNavigate();
@@ -16,31 +17,32 @@ export default function ResetPassword() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  const toast = useToast();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setError(null);
     if (!email || !token) {
-      setError('El enlace de restablecimiento es inválido (falta token o email).');
+      toast.error('El enlace de restablecimiento es inválido (falta token o email).');
       return;
     }
     if (newPassword.length < 4) {
-      setError('La nueva contraseña debe tener al menos 4 caracteres.');
+      toast.error('La nueva contraseña debe tener al menos 4 caracteres.');
       return;
     }
     if (newPassword !== confirmPassword) {
-      setError('Las contraseñas no coinciden.');
+      toast.error('Las contraseñas no coinciden.');
       return;
     }
     setLoading(true);
     try {
       await authService.resetPassword({ email, token, newPassword });
       setSuccess(true);
+      toast.success('¡Contraseña actualizada con éxito! Redirigiendo al Login...');
       setTimeout(() => navigate('/login'), 2000);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'No se pudo restablecer la contraseña.');
+      toast.error(err.response?.data?.message || 'No se pudo restablecer la contraseña.');
     } finally {
       setLoading(false);
     }
@@ -62,21 +64,6 @@ export default function ResetPassword() {
           <h2 className="text-2xl font-extrabold text-white">Restablecer Contraseña</h2>
           <p className="text-slate-400 text-sm mt-1">{email ? `Nueva contraseña para ${email}` : 'Ingresá tu nueva contraseña'}</p>
         </div>
-
-        <AnimatePresence>
-          {error && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm flex items-center gap-3">
-              <AlertCircle size={20} className="shrink-0" />
-              <span>{error}</span>
-            </motion.div>
-          )}
-          {success && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm flex items-center gap-3">
-              <CheckCircle2 size={20} className="shrink-0" />
-              <span>¡Contraseña actualizada con éxito! Redirigiendo al Login...</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">

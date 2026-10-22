@@ -11,6 +11,12 @@ public enum UserRole
     SUPERADMIN
 }
 
+public enum TipoProfesor
+{
+    CLUB,
+    INDEPENDIENTE
+}
+
 public class User : BaseEntity
 {
     public string BadgeNum { get; set; } = string.Empty;
@@ -46,6 +52,9 @@ public class User : BaseEntity
     // Indica si el usuario es Socio del club (abona cuota / tiene membresía) o No Socio/Seguidor.
     // Los alumnos "No Socios" se registran como usuarios pero no abonan la cuota social.
     public bool IsMember { get; set; } = true;
+
+    // Tipo de profesor: CLUB (empleado del club) o INDEPENDIENTE (paga canon/convenio al club).
+    public TipoProfesor TipoProfesor { get; set; } = TipoProfesor.CLUB;
 
     // ========== Configuración de cobro (split payments) ==========
     // Aplica a profesores que cobran sus clases de forma directa.

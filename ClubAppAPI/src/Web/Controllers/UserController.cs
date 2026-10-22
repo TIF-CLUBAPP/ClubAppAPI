@@ -284,6 +284,22 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
+    /// Actualiza el tipo de profesor (CLUB / INDEPENDIENTE) de un usuario TEACHER.
+    /// </summary>
+    [HttpPatch("{id:int}/teacher-type")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN")]
+    public async Task<IActionResult> UpdateTeacherType(int id, [FromBody] UpdateTeacherTypeDto dto)
+    {
+        if (dto == null || string.IsNullOrWhiteSpace(dto.TipoProfesor))
+            return BadRequest(new { message = "El tipo de profesor es obligatorio." });
+
+        var result = await _userService.UpdateTeacherTypeAsync(id, dto);
+        if (!result) return NotFound(new { message = "Profesor no encontrado" });
+
+        return Ok(new { message = "Tipo de profesor actualizado correctamente." });
+    }
+
+    /// <summary>
     /// Configuración de cobro directo del usuario autenticado (Alias/CBU + estado de Mercado Pago).
     /// </summary>
     [HttpGet("profile/payment-info")]
@@ -359,6 +375,7 @@ public class UsersController : ControllerBase
             fullName = user.FullName,
             email = user.Email,
             role = user.Role.ToString(),
+            tipoProfesor = user.TipoProfesor.ToString(),
             dni = user.Dni,
             phone = user.Phone,
             birthDate = user.BirthDate

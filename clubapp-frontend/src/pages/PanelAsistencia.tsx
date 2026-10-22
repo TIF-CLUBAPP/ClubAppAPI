@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
-import { ClipboardCheck, Users, Check, X, RefreshCw, CheckCircle2, AlertCircle, Sparkles, CalendarDays } from 'lucide-react';
+import { ClipboardCheck, Users, Check, X, RefreshCw, Sparkles, CalendarDays } from 'lucide-react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
+import { useToast } from '../context/ToastContext';
 import { attendanceService } from '../services/attendanceService';
 import type { TeacherClass } from '../types/attendance';
 
@@ -21,7 +21,7 @@ export default function PanelAsistencia() {
   const [attendance, setAttendance] = useState<Record<number, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
+  const toast = useToast();
 
   const load = async () => {
     setLoading(true);
@@ -45,7 +45,7 @@ export default function PanelAsistencia() {
         setSelectedId(null);
         setAttendance({});
       } else {
-        setToast({ type: 'error', text: err?.response?.data?.detail ?? 'No se pudieron cargar las clases.' });
+        toast.error(err?.response?.data?.detail ?? 'No se pudieron cargar las clases.');
       }
     } finally {
       setLoading(false);
@@ -55,12 +55,6 @@ export default function PanelAsistencia() {
   useEffect(() => {
     load();
   }, [date]);
-
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3500);
-    return () => clearTimeout(t);
-  }, [toast]);
 
   const selected = classes.find((c) => c.activityScheduleId === selectedId) ?? null;
 
@@ -87,10 +81,10 @@ export default function PanelAsistencia() {
         date,
         attendances: selected.students.map((s) => ({ userId: s.userId, present: attendance[s.userId] ?? false })),
       });
-      setToast({ type: 'ok', text: 'Asistencia guardada correctamente.' });
+      toast.success('Asistencia guardada correctamente.');
       await load();
     } catch (err: any) {
-      setToast({ type: 'error', text: err?.response?.data?.detail ?? 'No se pudo guardar la asistencia.' });
+      toast.error(err?.response?.data?.detail ?? 'No se pudo guardar la asistencia.');
     } finally {
       setSaving(false);
     }
@@ -127,22 +121,6 @@ export default function PanelAsistencia() {
                 />
               </div>
             </div>
-
-            {/* Toast */}
-            {toast && (
-              <motion.div
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`flex items-center gap-2 px-4 py-3 rounded-2xl border text-sm font-medium ${
-                  toast.type === 'ok'
-                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
-                    : 'bg-rose-500/10 border-rose-500/20 text-rose-300'
-                }`}
-              >
-                {toast.type === 'ok' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
-                {toast.text}
-              </motion.div>
-            )}
 
             {loading ? (
               <div className="flex items-center justify-center h-40 text-slate-400 gap-3">

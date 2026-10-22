@@ -29,6 +29,15 @@ export const userService = {
     return response.data;
   },
 
+  /** Actualiza el tipo de profesor (CLUB / INDEPENDIENTE) de un TEACHER. */
+  updateTeacherType: async (
+    id: number,
+    tipoProfesor: 'CLUB' | 'INDEPENDIENTE',
+  ): Promise<{ message: string }> => {
+    const response = await api.patch(`/users/${id}/teacher-type`, { tipoProfesor });
+    return response.data;
+  },
+
   /** Actualiza los datos personales del usuario logueado (PATCH /api/users/{id}/basic-info). */
   updateProfile: async (id: string | number, data: UpdateProfilePayload): Promise<{ message: string }> => {
     const response = await api.patch<{ message: string }>(`/users/${id}/basic-info`, data);

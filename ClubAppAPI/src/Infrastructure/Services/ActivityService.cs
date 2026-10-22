@@ -64,17 +64,41 @@ public class ActivityService : IActivityService
             ? actorId
             : dto.TeacherId ?? (instructorIds.Count > 0 ? instructorIds[0] : (int?)null);
 
+        var teacher = teacherId.HasValue
+            ? await _context.Users.FirstOrDefaultAsync(u => u.Id == teacherId.Value)
+            : null;
+        bool isIndependent = teacher?.TipoProfesor == TipoProfesor.INDEPENDIENTE;
+        decimal facilityCanon = isIndependent ? dto.FacilityCanon : 0m;
+
+        string? estadoNegociacion = null;
+        decimal? proposedPriceMember = null;
+        decimal? proposedFacilityCanon = null;
+        if (isIndependent && actorRole == UserRole.TEACHER)
+        {
+            estadoNegociacion = "PENDIENTE";
+            proposedPriceMember = dto.PriceMember;
+            proposedFacilityCanon = dto.FacilityCanon;
+        }
+
         var activity = new Activity
         {
             Name = dto.Name.Trim(),
             Description = dto.Description?.Trim() ?? string.Empty,
             Category = dto.Category?.Trim() ?? string.Empty,
-            Price = dto.Price,
+            Price = dto.PriceMember,
             PriceMember = dto.PriceMember,
             PriceNonMember = dto.PriceNonMember,
             PaymentCollector = Enum.TryParse<PaymentCollectorType>(dto.PaymentCollector, true, out var pc) ? pc : PaymentCollectorType.CLUB,
-            ProfessorFacilityFeeMember = dto.ProfessorFacilityFeeMember,
-            ProfessorFacilityFeeNonMember = dto.ProfessorFacilityFeeNonMember,
+            ProfessorFacilityFeeMember = facilityCanon,
+            ProfessorFacilityFeeNonMember = facilityCanon,
+            FacilityCanon = facilityCanon,
+            AplicaDescuentoSocios = dto.AplicaDescuentoSocios,
+            TipoDescuentoCanon = Enum.TryParse<TipoDescuentoCanon>(dto.TipoDescuentoCanon, true, out var tdcCreate) ? tdcCreate : TipoDescuentoCanon.MONTO_FIJO,
+            ValorDescuentoPorSocio = dto.ValorDescuentoPorSocio,
+            DescuentoMaximoCanon = dto.DescuentoMaximoCanon,
+            EstadoNegociacion = estadoNegociacion,
+            ProposedPriceMember = proposedPriceMember,
+            ProposedFacilityCanon = proposedFacilityCanon,
             ProfessorMercadoPagoPublicKey = dto.ProfessorMercadoPagoPublicKey,
             ProfessorMercadoPagoAccessToken = dto.ProfessorMercadoPagoAccessToken,
             MaxCapacity = dto.MaxCapacity,
@@ -107,15 +131,45 @@ public class ActivityService : IActivityService
         await EnsureSpaceExistsAsync(dto.SpaceId);
         await ValidateScheduleOverlapsAsync(dto, activityId);
 
+        int? effectiveTeacherId = actorRole == UserRole.TEACHER
+            ? existing.TeacherId
+            : (dto.TeacherId ?? existing.TeacherId);
+        var teacher = effectiveTeacherId.HasValue
+            ? await _context.Users.FirstOrDefaultAsync(u => u.Id == effectiveTeacherId.Value)
+            : null;
+        bool isIndependent = teacher?.TipoProfesor == TipoProfesor.INDEPENDIENTE;
+        decimal facilityCanon = isIndependent ? dto.FacilityCanon : 0m;
+
+        if (isIndependent && actorRole == UserRole.TEACHER)
+        {
+            if (existing.PriceMember != dto.PriceMember || existing.FacilityCanon != facilityCanon)
+            {
+                existing.EstadoNegociacion = "PENDIENTE";
+                existing.ProposedPriceMember = dto.PriceMember;
+                existing.ProposedFacilityCanon = facilityCanon;
+            }
+        }
+        else
+        {
+            existing.EstadoNegociacion = null;
+            existing.ProposedPriceMember = null;
+            existing.ProposedFacilityCanon = null;
+        }
+
         existing.Name = dto.Name.Trim();
         existing.Description = dto.Description?.Trim() ?? string.Empty;
         existing.Category = dto.Category?.Trim() ?? string.Empty;
-        existing.Price = dto.Price;
+        existing.Price = dto.PriceMember;
         existing.PriceMember = dto.PriceMember;
         existing.PriceNonMember = dto.PriceNonMember;
         existing.PaymentCollector = Enum.TryParse<PaymentCollectorType>(dto.PaymentCollector, true, out var pc) ? pc : PaymentCollectorType.CLUB;
-        existing.ProfessorFacilityFeeMember = dto.ProfessorFacilityFeeMember;
-        existing.ProfessorFacilityFeeNonMember = dto.ProfessorFacilityFeeNonMember;
+        existing.ProfessorFacilityFeeMember = facilityCanon;
+        existing.ProfessorFacilityFeeNonMember = facilityCanon;
+        existing.FacilityCanon = facilityCanon;
+        existing.AplicaDescuentoSocios = dto.AplicaDescuentoSocios;
+        existing.TipoDescuentoCanon = Enum.TryParse<TipoDescuentoCanon>(dto.TipoDescuentoCanon, true, out var tdcUpdate) ? tdcUpdate : TipoDescuentoCanon.MONTO_FIJO;
+        existing.ValorDescuentoPorSocio = dto.ValorDescuentoPorSocio;
+        existing.DescuentoMaximoCanon = dto.DescuentoMaximoCanon;
         existing.ProfessorMercadoPagoPublicKey = dto.ProfessorMercadoPagoPublicKey;
         
         // Solo actualizamos el token si se proporciona uno nuevo (para no pisar con vacío en un edit normal si el front no lo manda)
@@ -254,6 +308,14 @@ public class ActivityService : IActivityService
             PaymentCollector = activity.PaymentCollector.ToString(),
             ProfessorFacilityFeeMember = activity.ProfessorFacilityFeeMember,
             ProfessorFacilityFeeNonMember = activity.ProfessorFacilityFeeNonMember,
+            FacilityCanon = activity.FacilityCanon,
+            AplicaDescuentoSocios = activity.AplicaDescuentoSocios,
+            TipoDescuentoCanon = activity.TipoDescuentoCanon.ToString(),
+            ValorDescuentoPorSocio = activity.ValorDescuentoPorSocio,
+            DescuentoMaximoCanon = activity.DescuentoMaximoCanon,
+            EstadoNegociacion = activity.EstadoNegociacion,
+            ProposedPriceMember = activity.ProposedPriceMember,
+            ProposedFacilityCanon = activity.ProposedFacilityCanon,
             ProfessorMercadoPagoPublicKey = activity.ProfessorMercadoPagoPublicKey,
             ProfessorBankAlias = activity.Teacher?.BankAlias,
             ProfessorHasMercadoPago = !string.IsNullOrWhiteSpace(activity.Teacher?.MercadoPagoAccessToken),
@@ -261,6 +323,7 @@ public class ActivityService : IActivityService
             MaxCapacity = activity.MaxCapacity,
             TeacherId = activity.TeacherId,
             TeacherName = activity.Teacher?.FullName,
+            TeacherTipoProfesor = activity.Teacher?.TipoProfesor.ToString(),
             Instructors = instructorUsers
                 .OrderBy(u => u.FullName)
                 .Select(u => new InstructorDto
@@ -478,8 +541,27 @@ public class ActivityService : IActivityService
         int memberCount = usersWithActiveMembership.Count;
         int nonMemberCount = activeEnrollments.Count - memberCount;
 
-        decimal totalSettlement = (memberCount * activity.ProfessorFacilityFeeMember) +
-                                 (nonMemberCount * activity.ProfessorFacilityFeeNonMember);
+        decimal baseTotal = activeEnrollments.Count * activity.FacilityCanon;
+        decimal discountAmount = 0m;
+
+        if (activity.AplicaDescuentoSocios && memberCount > 0)
+        {
+            if (activity.TipoDescuentoCanon == TipoDescuentoCanon.PORCENTAJE)
+            {
+                discountAmount = (activity.FacilityCanon * (activity.ValorDescuentoPorSocio / 100m)) * memberCount;
+            }
+            else // MONTO_FIJO
+            {
+                discountAmount = activity.ValorDescuentoPorSocio * memberCount;
+            }
+
+            if (activity.DescuentoMaximoCanon.HasValue && discountAmount > activity.DescuentoMaximoCanon.Value)
+            {
+                discountAmount = activity.DescuentoMaximoCanon.Value;
+            }
+        }
+
+        decimal totalSettlement = Math.Max(0m, baseTotal - discountAmount);
 
         return new ActivitySettlementDto
         {
@@ -488,9 +570,62 @@ public class ActivityService : IActivityService
             TotalEnrollments = activeEnrollments.Count,
             MemberEnrollments = memberCount,
             NonMemberEnrollments = nonMemberCount,
-            MemberFee = activity.ProfessorFacilityFeeMember,
-            NonMemberFee = activity.ProfessorFacilityFeeNonMember,
-            TotalSettlement = totalSettlement
+            MemberFee = activity.FacilityCanon,
+            NonMemberFee = activity.FacilityCanon,
+            FacilityCanon = activity.FacilityCanon,
+            TotalSettlement = totalSettlement,
+            DiscountApplied = discountAmount
         };
+    }
+
+    public async Task<ActivityDto?> AcceptNegotiationAsync(int activityId, int actorId, UserRole actorRole)
+    {
+        var activity = await _context.Activities
+            .Include(a => a.Teacher)
+            .Include(a => a.Space)
+            .Include(a => a.Schedules)
+            .Include(a => a.Instructors)
+                .ThenInclude(i => i.User)
+            .FirstOrDefaultAsync(a => a.Id == activityId);
+
+        if (activity == null) return null;
+        EnsureCanManage(activity, actorId, actorRole);
+
+        if (activity.ProposedPriceMember.HasValue)
+            activity.PriceMember = activity.ProposedPriceMember.Value;
+        if (activity.ProposedFacilityCanon.HasValue)
+            activity.FacilityCanon = activity.ProposedFacilityCanon.Value;
+
+        activity.ProfessorFacilityFeeMember = activity.FacilityCanon;
+        activity.ProfessorFacilityFeeNonMember = activity.FacilityCanon;
+        activity.EstadoNegociacion = "APROBADO";
+        activity.ProposedPriceMember = null;
+        activity.ProposedFacilityCanon = null;
+
+        await _context.SaveChangesAsync();
+        return await MapAsync(activity);
+    }
+
+    public async Task<ActivityDto?> ProposeNegotiationAsync(int activityId, NegotiationProposalRequest request, int actorId, UserRole actorRole)
+    {
+        var activity = await _context.Activities
+            .Include(a => a.Teacher)
+            .Include(a => a.Space)
+            .Include(a => a.Schedules)
+            .Include(a => a.Instructors)
+                .ThenInclude(i => i.User)
+            .FirstOrDefaultAsync(a => a.Id == activityId);
+
+        if (activity == null) return null;
+        EnsureCanManage(activity, actorId, actorRole);
+
+        if (request.PriceMember.HasValue)
+            activity.ProposedPriceMember = request.PriceMember.Value;
+        if (request.FacilityCanon.HasValue)
+            activity.ProposedFacilityCanon = request.FacilityCanon.Value;
+        activity.EstadoNegociacion = "PENDIENTE";
+
+        await _context.SaveChangesAsync();
+        return await MapAsync(activity);
     }
 }

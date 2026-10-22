@@ -16,6 +16,10 @@ public interface IUserService
     Task<bool> UpdateBasicInfoAsync(int id, UpdateUserBasicRequest request);
     Task<bool> ChangePasswordAsync(int id, ChangePasswordDto dto);
     Task<bool> UpdateUserRoleAsync(int id, UpdateRoleDto dto);
+
+    /// <summary>Actualiza el tipo de profesor (CLUB / INDEPENDIENTE) de un usuario TEACHER.</summary>
+    Task<bool> UpdateTeacherTypeAsync(int id, UpdateTeacherTypeDto dto);
+
     Task<bool> SetUserStatusAsync(int id, bool isActive);
 
     /// <summary>Configuración de cobro directo de un profesor. Null si no existe / no es TEACHER.</summary>

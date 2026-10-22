@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, User as UserIcon, LogIn, AlertCircle, CheckCircle2, Loader2, Eye, EyeOff, Check } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Lock, User as UserIcon, LogIn, Loader2, Eye, EyeOff, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 export default function Login() {
   const { login } = useAuth();
@@ -13,18 +14,19 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [remember, setRemember] = useState(true);
 
+  const toast = useToast();
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setError(null);
     setLoading(true);
 
     try {
       await login({ email, password }, remember);
       setSuccess(true);
+      toast.success('¡Autenticado con éxito! Redirigiendo...');
 
       setTimeout(() => {
         navigate('/dashboard');
@@ -32,7 +34,7 @@ export default function Login() {
 
     } catch (err: any) {
       const msg = err.response?.data?.message || err.response?.data?.title || err.message || 'No se pudo conectar con el servidor.';
-      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -59,33 +61,6 @@ export default function Login() {
           <h2 className="text-3xl font-extrabold tracking-tight text-white">¡Bienvenido!</h2>
           <p className="text-slate-400 text-sm mt-1">Ingresá tus credenciales de ClubApp</p>
         </div>
-
-        {/* Mensaje de Error */}
-        <AnimatePresence>
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm flex items-center gap-3"
-            >
-              <AlertCircle size={20} className="shrink-0" />
-              <span>{error}</span>
-            </motion.div>
-          )}
-
-          {/* Estado Éxito */}
-          {success && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm flex items-center gap-3"
-            >
-              <CheckCircle2 size={20} className="shrink-0" />
-              <span>¡Autenticado con éxito! Redirigiendo...</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Input Email */}

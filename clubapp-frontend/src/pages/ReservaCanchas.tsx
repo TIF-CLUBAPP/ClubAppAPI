@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { Calendar, MapPin, RefreshCw, CheckCircle2, AlertCircle, Sparkles, GraduationCap, Layers, ChevronLeft, ChevronRight, ChevronDown, Check, X, ArrowRight } from 'lucide-react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
+import { useToast } from '../context/ToastContext';
 import { CheckoutModal } from '../components/cuotas/CheckoutModal';
 import { bookingService } from '../services/bookingService';
 import { spaceService } from '../services/spaceService';
@@ -197,7 +197,7 @@ export default function ReservaCanchas() {
   const [pendingBookings, setPendingBookings] = useState<Booking[]>([]);
   const [pendingSlots, setPendingSlots] = useState<Slot[]>([]);
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
-  const [toast, setToast] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
+  const toast = useToast();
   const [checkoutCuota, setCheckoutCuota] = useState<MemberCuota | null>(null);
 
   const loadSpacesAndActivities = async () => {
@@ -209,7 +209,7 @@ export default function ReservaCanchas() {
       setSpaces(spacesData);
       setActivities(activitiesData);
     } catch (err: any) {
-      setToast({ type: 'error', text: err?.response?.data?.detail ?? 'No se pudieron cargar los espacios.' });
+      toast.error(err?.response?.data?.detail ?? 'No se pudieron cargar los espacios.');
     }
   };
 
@@ -219,7 +219,7 @@ export default function ReservaCanchas() {
       const bookingsData = await bookingService.getBookingsByDate(selectedDate);
       setBookings(bookingsData);
     } catch (err: any) {
-      setToast({ type: 'error', text: err?.response?.data?.detail ?? 'No se pudo consultar la disponibilidad.' });
+      toast.error(err?.response?.data?.detail ?? 'No se pudo consultar la disponibilidad.');
     } finally {
       setLoading(false);
     }
@@ -233,12 +233,6 @@ export default function ReservaCanchas() {
     loadBookings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate]);
-
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3500);
-    return () => clearTimeout(t);
-  }, [toast]);
 
   // Limpia la selección múltiple al cambiar de fecha o de espacio/cancha.
   useEffect(() => {
@@ -437,7 +431,7 @@ export default function ReservaCanchas() {
         }
       }
     }
-    setToast({ type: 'ok', text: '¡Reservas confirmadas y pagadas!' });
+    toast.success('¡Reservas confirmadas y pagadas!');
     setCheckoutCuota(null);
     setPendingBookings([]);
     setPendingSlots([]);
@@ -523,22 +517,6 @@ export default function ReservaCanchas() {
                 </div>
               </div>
             </div>
-
-            {/* Toast */}
-            {toast && (
-              <motion.div
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`flex items-center gap-2 px-4 py-3 rounded-2xl border text-sm font-medium ${
-                  toast.type === 'ok'
-                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
-                    : 'bg-rose-500/10 border-rose-500/20 text-rose-300'
-                }`}
-              >
-                {toast.type === 'ok' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
-                {toast.text}
-              </motion.div>
-            )}
 
             {/* Aviso de espacios en mantenimiento */}
             {maintenanceSpaces.length > 0 && (

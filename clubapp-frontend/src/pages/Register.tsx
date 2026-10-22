@@ -4,12 +4,14 @@ import { useNavigate } from 'react-router-dom';
 import { UserPlus, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { authService } from '../services/authService';
 import type { RegisterData } from '../types/auth';
 
 export default function Register() {
   const navigate = useNavigate();
   const { setSession } = useAuth();
+  const toast = useToast();
 
   const [form, setForm] = useState<RegisterData>({
     firstName: '',
@@ -67,7 +69,7 @@ export default function Register() {
       await authService.register(form);
       navigate('/login');
     } catch (err: any) {
-      setErrors({ form: err?.response?.data?.message || 'Error en el registro.' });
+      toast.error(err?.response?.data?.message || 'Error en el registro.');
     } finally {
       setLoading(false);
     }
@@ -75,7 +77,7 @@ export default function Register() {
 
   const handleGoogleSuccess = async (credentialResponse: any) => {
     const idToken = credentialResponse?.credential;
-    if (!idToken) return setErrors({ form: 'No se recibió token de Google.' });
+    if (!idToken) return toast.error('No se recibió token de Google.');
 
     try {
       const res = await authService.googleSignIn(idToken);
@@ -87,12 +89,12 @@ export default function Register() {
         navigate('/dashboard');
       }
     } catch (err: any) {
-      setErrors({ form: err?.response?.data?.message || 'Error autenticando con Google.' });
+      toast.error(err?.response?.data?.message || 'Error autenticando con Google.');
     }
   };
 
   const handleGoogleFailure = () => {
-    setErrors({ form: 'Fallo en autenticación con Google.' });
+    toast.error('Fallo en autenticación con Google.');
   };
 
   const completeProfile = async (dni: string, phone: string, birthDate: string) => {
@@ -107,7 +109,7 @@ export default function Register() {
         navigate('/login');
       }
     } catch (err: any) {
-      setErrors({ form: err?.response?.data?.message || 'Error completando perfil.' });
+      toast.error(err?.response?.data?.message || 'Error completando perfil.');
     }
   };
 
@@ -204,8 +206,6 @@ export default function Register() {
             </div>
             {errors.confirmPassword && <p className="text-xs text-rose-400 mt-1">{errors.confirmPassword}</p>}
           </div>
-
-          {errors.form && <p className="text-sm text-rose-400">{errors.form}</p>}
 
           <button disabled={loading} type="submit" className="w-full py-3 rounded-2xl bg-linear-to-r from-emerald-500 to-teal-500 text-slate-950 font-semibold">
             Crear cuenta

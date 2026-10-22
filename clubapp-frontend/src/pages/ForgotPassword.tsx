@@ -1,28 +1,26 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, ArrowLeft, AlertCircle, CheckCircle2, Loader2, KeyRound } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Mail, ArrowLeft, Loader2, KeyRound } from 'lucide-react';
 import { authService } from '../services/authService';
+import { useToast } from '../context/ToastContext';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const toast = useToast();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setSuccessMessage(null);
     setLoading(true);
 
     try {
       await authService.forgotPassword(email);
-      setSuccessMessage("Se ha enviado un correo para restablecer su contraseña.");
+      toast.success('Se ha enviado un correo para restablecer su contraseña.');
     } catch (err: any) {
       const msg = err.response?.data?.message || err.response?.data?.title || 'Ocurrió un error al procesar tu solicitud.';
-      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -51,33 +49,6 @@ export default function ForgotPassword() {
             Ingresá tu correo electrónico y te enviaremos las instrucciones para restablecerla.
           </p>
         </div>
-
-        {/* Mensaje de Error */}
-        <AnimatePresence>
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm flex items-center gap-3"
-            >
-              <AlertCircle size={20} className="shrink-0" />
-              <span>{error}</span>
-            </motion.div>
-          )}
-
-          {/* Estado Éxito */}
-          {successMessage && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm flex items-center gap-3"
-            >
-              <CheckCircle2 size={20} className="shrink-0" />
-              <span>{successMessage}</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Input Email */}

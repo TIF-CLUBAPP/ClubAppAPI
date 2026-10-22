@@ -12,6 +12,14 @@ public class ActivityDto
     public string PaymentCollector { get; set; } = "CLUB";
     public decimal ProfessorFacilityFeeMember { get; set; }
     public decimal ProfessorFacilityFeeNonMember { get; set; }
+    public decimal FacilityCanon { get; set; }
+    public bool AplicaDescuentoSocios { get; set; }
+    public string TipoDescuentoCanon { get; set; } = "MONTO_FIJO";
+    public decimal ValorDescuentoPorSocio { get; set; }
+    public decimal? DescuentoMaximoCanon { get; set; }
+    public string? EstadoNegociacion { get; set; }
+    public decimal? ProposedPriceMember { get; set; }
+    public decimal? ProposedFacilityCanon { get; set; }
     public string? ProfessorMercadoPagoPublicKey { get; set; }
 
     /// <summary>Alias/CBU/CVU del profesor que cobra directamente (solo PROFESSOR_DIRECT).</summary>
@@ -25,6 +33,9 @@ public class ActivityDto
     public int MaxCapacity { get; set; }
     public int? TeacherId { get; set; }
     public string? TeacherName { get; set; }
+
+    /// <summary>Tipo del profesor a cargo: "CLUB" o "INDEPENDIENTE" (null si no hay profesor).</summary>
+    public string? TeacherTipoProfesor { get; set; }
 
     /// <summary>Profesores/administradores a cargo de dictar la actividad.</summary>
     public List<InstructorDto> Instructors { get; set; } = new();

@@ -5,6 +5,7 @@ import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import type { MemberCuota } from '../types/cuotas';
 import { useMisCuotas } from '../hooks/useMisCuotas';
+import { useToast } from '../context/ToastContext';
 import { AccountStatusCard } from '../components/cuotas/AccountStatusCard';
 import { CuotasList } from '../components/cuotas/CuotasList';
 import { CheckoutModal } from '../components/cuotas/CheckoutModal';
@@ -16,6 +17,7 @@ const fmt = (val: number) =>
 
 export const MisCuotas: React.FC = () => {
   const [searchParams] = useSearchParams();
+  const { success, error, info } = useToast();
 
   useEffect(() => {
     const status = searchParams.get('status');
@@ -23,17 +25,17 @@ export const MisCuotas: React.FC = () => {
 
     if (status) {
       if (status === 'success') {
-        alert(`¡Pago registrado exitosamente! ${paymentId ? `(ID: ${paymentId})` : ''}`);
+        success(`¡Pago registrado exitosamente! ${paymentId ? `(ID: ${paymentId})` : ''}`);
       } else if (status === 'failure') {
-        alert('El pago no pudo completarse. Por favor, intenta nuevamente.');
+        error('El pago no pudo completarse. Por favor, intenta nuevamente.');
       } else if (status === 'pending') {
-        alert('Tu pago está pendiente de procesamiento.');
+        info('Tu pago está pendiente de procesamiento.');
       }
       
       // Limpiar URL eliminando los parámetros de consulta
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, [searchParams]);
+  }, [searchParams, success, error, info]);
 
 
   const { loading, settings, exemptionLabel, cuotas, totalPending, globalStatus, updateCuota, updateCuotas } = useMisCuotas();

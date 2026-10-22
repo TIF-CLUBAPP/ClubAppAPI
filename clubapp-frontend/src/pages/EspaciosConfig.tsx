@@ -1,6 +1,6 @@
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Trash2, Edit2, X, Save, ChevronDown, MapPin, LocateFixed, ExternalLink, CheckCircle2, AlertCircle, Wrench } from 'lucide-react';
+import { Plus, Trash2, Edit2, X, Save, ChevronDown, MapPin, LocateFixed, ExternalLink, CheckCircle2, Wrench } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -11,6 +11,7 @@ import { spaceService } from '../services/spaceService';
 import { buildNavigationLinks } from '../utils/navigation';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
+import { useToast } from '../context/ToastContext';
 
 // Limpia ceros a la izquierda en inputs numéricos (ej. "046456" -> "46456").
 const parseNumericInput = (raw: string): number => {
@@ -30,6 +31,11 @@ const getNewSpaceData = (): SaveSpaceRequest => ({
   requiresApproval: false,
   permitir_superposicion: false,
   pricePerHour: 0,
+  canonBase: 0,
+  aplicaDescuentoSocios: false,
+  tipoDescuentoCanon: 'MONTO_FIJO',
+  valorDescuentoPorSocio: 0,
+  descuentoMaximoCanon: null,
   slotDurationMinutes: 60,
   is24Hours: false,
   openTime: '08:00',
@@ -130,8 +136,7 @@ export default function EspaciosConfig() {
   const [selectedSpace, setSelectedSpace] = useState<Space | null>(null);
   const [spaceToDelete, setSpaceToDelete] = useState<Space | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const toastTimer = useRef<number | null>(null);
+  const toast = useToast();
 
   const [formData, setFormData] = useState<SaveSpaceRequest>(getNewSpaceData());
 
@@ -197,12 +202,6 @@ export default function EspaciosConfig() {
     };
   }, []);
 
-  useEffect(() => {
-    return () => {
-      if (toastTimer.current) window.clearTimeout(toastTimer.current);
-    };
-  }, []);
-
   const handleOpenModal = (mode: ModalMode, space: Space | null = null) => {
     setModalMode(mode);
     setSelectedSpace(space);
@@ -218,6 +217,11 @@ export default function EspaciosConfig() {
         requiresApproval: space.requiresApproval,
         permitir_superposicion: space.permitir_superposicion,
         pricePerHour: space.pricePerHour,
+        canonBase: space.canonBase,
+        aplicaDescuentoSocios: space.aplicaDescuentoSocios,
+        tipoDescuentoCanon: space.tipoDescuentoCanon,
+        valorDescuentoPorSocio: space.valorDescuentoPorSocio,
+        descuentoMaximoCanon: space.descuentoMaximoCanon,
         slotDurationMinutes: space.slotDurationMinutes,
         is24Hours: space.is24Hours,
         openTime: space.openTime ?? '08:00',
@@ -322,7 +326,7 @@ export default function EspaciosConfig() {
 
   const centerOnUserLocation = () => {
     if (!navigator.geolocation) {
-      alert('Tu navegador no soporta geolocalización.');
+      toast.error('Tu navegador no soporta geolocalización.');
       return;
     }
     navigator.geolocation.getCurrentPosition(
@@ -332,7 +336,7 @@ export default function EspaciosConfig() {
         setMapPosition([latitude, longitude]);
         setFlyTarget([latitude, longitude]);
       },
-      () => alert('No se pudo obtener tu ubicación.'),
+      () => toast.error('No se pudo obtener tu ubicación.'),
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
@@ -349,7 +353,7 @@ export default function EspaciosConfig() {
       if (modalMode === 'create') {
         const created = await spaceService.createSpace(formData);
         setSpaces((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
-        showToast('Espacio creado correctamente');
+        toast.success('Espacio creado correctamente');
       } else if (modalMode === 'edit' && selectedSpace) {
         const updated = await spaceService.updateSpace(selectedSpace.id, formData);
         setSpaces((prev) =>
@@ -357,19 +361,13 @@ export default function EspaciosConfig() {
             .map((s) => (s.id === updated.id ? updated : s))
             .sort((a, b) => a.name.localeCompare(b.name)),
         );
-        showToast('Espacio actualizado correctamente');
+        toast.success('Espacio actualizado correctamente');
       }
       setModalMode(null);
     } catch (err) {
       console.error(err);
-      showToast('Error al guardar el espacio', 'error');
+      toast.error('Error al guardar el espacio');
     }
-  };
-
-  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
-    setToast({ message, type });
-    if (toastTimer.current) window.clearTimeout(toastTimer.current);
-    toastTimer.current = window.setTimeout(() => setToast(null), 4500);
   };
 
   const handleDeleteSpace = async () => {
@@ -380,10 +378,10 @@ export default function EspaciosConfig() {
       await spaceService.deleteSpace(spaceId);
       setSpaces((prev) => prev.filter((s) => s.id !== spaceId));
       setSpaceToDelete(null);
-      showToast('Espacio eliminado correctamente');
+      toast.success('Espacio eliminado correctamente');
     } catch (err) {
       console.error(err);
-      showToast('Error al eliminar el espacio', 'error');
+      toast.error('Error al eliminar el espacio');
     } finally {
       setDeleting(false);
     }
@@ -408,18 +406,23 @@ export default function EspaciosConfig() {
         requiresApproval: space.requiresApproval,
         permitir_superposicion: space.permitir_superposicion,
         pricePerHour: space.pricePerHour,
+        canonBase: space.canonBase,
+        aplicaDescuentoSocios: space.aplicaDescuentoSocios,
+        tipoDescuentoCanon: space.tipoDescuentoCanon,
+        valorDescuentoPorSocio: space.valorDescuentoPorSocio,
+        descuentoMaximoCanon: space.descuentoMaximoCanon,
         slotDurationMinutes: space.slotDurationMinutes,
         is24Hours: space.is24Hours,
         openTime: space.openTime ?? '08:00',
         closeTime: space.closeTime ?? '23:00',
       });
-      showToast(nextActive ? 'Espacio activado' : 'Espacio desactivado (mantenimiento)');
+      toast.success(nextActive ? 'Espacio activado' : 'Espacio desactivado (mantenimiento)');
     } catch (err) {
       console.error(err);
       setSpaces((prev) =>
         prev.map((s) => (s.id === space.id ? { ...s, isActive: space.isActive } : s)),
       );
-      showToast('No se pudo actualizar el estado del espacio', 'error');
+      toast.error('No se pudo actualizar el estado del espacio');
     } finally {
       setTogglingId(null);
     }
@@ -782,6 +785,72 @@ export default function EspaciosConfig() {
                               </div>
                             </div>
 
+                            <div className="mt-3">
+                              <label className="block text-xs font-bold text-slate-400 mb-1">Canon Base de Instalaciones ($)</label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={formData.canonBase === 0 ? '' : formData.canonBase}
+                                onChange={(e) => setFormData({...formData, canonBase: parseNumericInput(e.target.value)})}
+                                className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                              />
+                              <p className="text-[11px] text-slate-500 mt-1">
+                                Se precompleta como canon por defecto en las actividades de profesores independientes.
+                              </p>
+                            </div>
+
+                            <div className="mt-3 pt-3 border-t border-slate-800 space-y-3">
+                              <Toggle
+                                label="Descuento por Volumen de Socios"
+                                description="Aplica un descuento en el canon por cada alumno que sea socio activo."
+                                checked={formData.aplicaDescuentoSocios}
+                                onChange={(val) => setFormData({...formData, aplicaDescuentoSocios: val})}
+                              />
+
+                              {formData.aplicaDescuentoSocios && (
+                                <div className="space-y-3 pl-2 border-l-2 border-emerald-500/30">
+                                  <div>
+                                    <label className="block text-xs font-bold text-slate-400 mb-1">Tipo de Descuento</label>
+                                    <select
+                                      value={formData.tipoDescuentoCanon}
+                                      onChange={(e) => setFormData({...formData, tipoDescuentoCanon: e.target.value as 'MONTO_FIJO' | 'PORCENTAJE'})}
+                                      className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                                    >
+                                      <option value="MONTO_FIJO">Monto Fijo ($ por socio)</option>
+                                      <option value="PORCENTAJE">Porcentaje (% del canon por socio)</option>
+                                    </select>
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-xs font-bold text-slate-400 mb-1">
+                                      {formData.tipoDescuentoCanon === 'PORCENTAJE' ? 'Porcentaje de Descuento por Socio (%)' : 'Monto de Descuento por Socio ($)'}
+                                    </label>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={formData.valorDescuentoPorSocio === 0 ? '' : formData.valorDescuentoPorSocio}
+                                      onChange={(e) => setFormData({...formData, valorDescuentoPorSocio: parseNumericInput(e.target.value)})}
+                                      className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-xs font-bold text-slate-400 mb-1">Descuento Máximo Total ($ o vacío)</label>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={formData.descuentoMaximoCanon == null ? '' : formData.descuentoMaximoCanon}
+                                      onChange={(e) => setFormData({...formData, descuentoMaximoCanon: e.target.value === '' ? null : parseNumericInput(e.target.value)})}
+                                      className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
                             <Toggle
                               label="Abierto 24 Horas"
                               description="Ignora el rango horario y permite reservar a cualquier hora del día."
@@ -977,28 +1046,6 @@ export default function EspaciosConfig() {
 
         </main>
 
-        {/* Toast de confirmación */}
-        <AnimatePresence>
-          {toast && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 20 }}
-              className={`fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl text-sm font-semibold shadow-2xl backdrop-blur-md ${
-                toast.type === 'success'
-                  ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300'
-                  : 'bg-red-500/10 border border-red-500/30 text-red-300'
-              }`}
-            >
-              {toast.type === 'success' ? (
-                <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
-              ) : (
-                <AlertCircle size={18} className="text-red-400 shrink-0" />
-              )}{' '}
-              {toast.message}
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     </div>
   );

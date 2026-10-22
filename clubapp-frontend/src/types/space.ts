@@ -10,6 +10,11 @@ export interface Space {
   requiresApproval: boolean;
   permitir_superposicion: boolean;
   pricePerHour: number;
+  canonBase: number;
+  aplicaDescuentoSocios: boolean;
+  tipoDescuentoCanon: 'PORCENTAJE' | 'MONTO_FIJO';
+  valorDescuentoPorSocio: number;
+  descuentoMaximoCanon?: number | null;
   slotDurationMinutes: number;
   is24Hours: boolean;
   openTime?: string | null;
@@ -27,6 +32,11 @@ export interface SaveSpaceRequest {
   requiresApproval: boolean;
   permitir_superposicion: boolean;
   pricePerHour: number;
+  canonBase: number;
+  aplicaDescuentoSocios: boolean;
+  tipoDescuentoCanon: 'PORCENTAJE' | 'MONTO_FIJO';
+  valorDescuentoPorSocio: number;
+  descuentoMaximoCanon?: number | null;
   slotDurationMinutes: number;
   is24Hours: boolean;
   openTime?: string | null;

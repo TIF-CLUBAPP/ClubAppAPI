@@ -17,6 +17,7 @@ export interface User {
   fullName?: string;
   email?: string;
   role?: UserRole;
+  tipoProfesor?: 'CLUB' | 'INDEPENDIENTE';
   dni?: string;
   phone?: string;
   birthDate?: string; // ISO date string

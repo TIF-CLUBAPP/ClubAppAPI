@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo, useCallback, useRef, type ReactNode } from 'react';
+import { useState, useEffect, useMemo, useCallback, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   AlertCircle,
   AlertTriangle,
+  Building2,
   CheckCircle2,
   FileText,
   Inbox,
@@ -24,8 +25,9 @@ import {
 import Header from '../components/layout/Header';
 import Sidebar from '../components/layout/Sidebar';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { userService } from '../services/userService';
-import { ROLE_OPTIONS, getRoleConfig, type RoleOption, type UserListItem } from '../types/user';
+import { ROLE_OPTIONS, getRoleConfig, TEACHER_TYPE_OPTIONS, type RoleOption, type UserListItem, type TipoProfesor } from '../types/user';
 import type { UserRole } from '../types/auth';
 
 const getInitials = (fullName: string) => {
@@ -98,6 +100,7 @@ function ActionButtons({
   onStatus,
   onDelete,
   onPayout,
+  onTeacherType,
 }: {
   item: UserListItem;
   isSelf: boolean;
@@ -106,6 +109,7 @@ function ActionButtons({
   onStatus: (u: UserListItem) => void;
   onDelete: (u: UserListItem) => void;
   onPayout: (u: UserListItem) => void;
+  onTeacherType: (u: UserListItem) => void;
 }) {
   const disabled = isSelf || !canManage;
   const disabledTooltip = isSelf
@@ -117,6 +121,16 @@ function ActionButtons({
 
   return (
     <div className="flex items-center gap-1.5">
+      {item.role === 'TEACHER' && (
+        <button
+          onClick={() => onTeacherType(item)}
+          disabled={disabled}
+          title={disabled ? disabledTooltip : 'Configurar tipo de profesor (Club / Independiente)'}
+          className={`${baseClass} hover:bg-violet-500/15 hover:text-violet-400`}
+        >
+          <Building2 size={16} className="text-violet-400" />
+        </button>
+      )}
       {item.role === 'TEACHER' && (
         <button
           onClick={() => onPayout(item)}
@@ -168,6 +182,7 @@ function UserCard({
   onStatus,
   onDelete,
   onPayout,
+  onTeacherType,
 }: {
   item: UserListItem;
   isSelf: boolean;
@@ -176,6 +191,7 @@ function UserCard({
   onStatus: (u: UserListItem) => void;
   onDelete: (u: UserListItem) => void;
   onPayout: (u: UserListItem) => void;
+  onTeacherType: (u: UserListItem) => void;
 }) {
   return (
     <div className="p-4 rounded-3xl border border-slate-800 bg-slate-900/80">
@@ -211,6 +227,7 @@ function UserCard({
           onStatus={onStatus}
           onDelete={onDelete}
           onPayout={onPayout}
+          onTeacherType={onTeacherType}
         />
       </div>
     </div>
@@ -238,6 +255,98 @@ function ModalShell({ onClose, children }: { onClose: () => void; children: Reac
         {children}
       </motion.div>
     </motion.div>
+  );
+}
+
+/** Modal para configurar el tipo de profesor (CLUB / INDEPENDIENTE). */
+function TeacherTypeModal({
+  user,
+  value,
+  onChange,
+  processing,
+  error,
+  onConfirm,
+  onClose,
+}: {
+  user: UserListItem;
+  value: TipoProfesor;
+  onChange: (t: TipoProfesor) => void;
+  processing: boolean;
+  error: string | null;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <ModalShell onClose={onClose}>
+      <div className="flex items-start justify-between">
+        <div className="p-2.5 rounded-2xl bg-violet-500/10 border border-violet-500/20 text-violet-300">
+          <Building2 size={20} />
+        </div>
+        <button
+          onClick={onClose}
+          className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
+        >
+          <X size={18} />
+        </button>
+      </div>
+
+      <h3 className="mt-4 text-lg font-black text-white">Tipo de Profesor</h3>
+      <p className="mt-1 text-xs text-slate-400">
+        Definí cómo se relaciona <strong className="text-slate-200">{user.fullName}</strong> con el club.
+      </p>
+
+      <label className="mt-5 block text-[10px] uppercase tracking-wider text-slate-500 font-bold">
+        Tipo
+      </label>
+      <div className="mt-1.5 space-y-2">
+        {TEACHER_TYPE_OPTIONS.map((opt) => (
+          <label
+            key={opt.value}
+            className={`flex items-start gap-3 rounded-2xl border p-3 cursor-pointer transition-all ${
+              value === opt.value
+                ? 'border-violet-500/50 bg-violet-500/5'
+                : 'border-slate-800 bg-slate-950 hover:border-slate-700'
+            }`}
+          >
+            <input
+              type="radio"
+              name="teacherType"
+              checked={value === opt.value}
+              onChange={() => onChange(opt.value)}
+              className="mt-0.5 accent-violet-500"
+            />
+            <span>
+              <span className="block text-sm font-semibold text-slate-200">{opt.label}</span>
+              <span className="block text-xs text-slate-500 mt-0.5">{opt.hint}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+
+      {error && (
+        <div className="mt-4 flex items-center gap-2 px-4 py-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300">
+          <AlertCircle size={15} className="shrink-0" /> {error}
+        </div>
+      )}
+
+      <div className="mt-6 grid grid-cols-2 gap-3">
+        <button
+          onClick={onClose}
+          disabled={processing}
+          className="py-3 rounded-2xl border border-slate-700 text-slate-300 hover:text-white text-sm font-bold transition-all disabled:opacity-50"
+        >
+          Cancelar
+        </button>
+        <button
+          onClick={onConfirm}
+          disabled={processing}
+          className="py-3 rounded-2xl bg-violet-500 hover:bg-violet-400 text-slate-950 text-sm font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+        >
+          {processing ? <Loader2 size={15} className="animate-spin" /> : <ShieldCheck size={15} />}
+          Guardar
+        </button>
+      </div>
+    </ModalShell>
   );
 }
 
@@ -585,6 +694,12 @@ export default function Socios() {
   const [deleteProcessing, setDeleteProcessing] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  // Modal de tipo de profesor (CLUB / INDEPENDIENTE)
+  const [teacherTypeTarget, setTeacherTypeTarget] = useState<UserListItem | null>(null);
+  const [selectedTeacherType, setSelectedTeacherType] = useState<TipoProfesor>('CLUB');
+  const [teacherTypeProcessing, setTeacherTypeProcessing] = useState(false);
+  const [teacherTypeError, setTeacherTypeError] = useState<string | null>(null);
+
   // Modal de cobro directo (profesores)
   const [payoutTarget, setPayoutTarget] = useState<UserListItem | null>(null);
   const [payoutLoading, setPayoutLoading] = useState(false);
@@ -596,8 +711,7 @@ export default function Socios() {
   const [payoutMpUserId, setPayoutMpUserId] = useState('');
   const [payoutHasMpToken, setPayoutHasMpToken] = useState(false);
 
-  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const toastTimer = useRef<number | null>(null);
+  const toast = useToast();
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -615,16 +729,7 @@ export default function Socios() {
 
   useEffect(() => {
     loadData();
-    return () => {
-      if (toastTimer.current) window.clearTimeout(toastTimer.current);
-    };
   }, [loadData]);
-
-  const showToast = (type: 'success' | 'error', message: string) => {
-    setToast({ type, message });
-    if (toastTimer.current) window.clearTimeout(toastTimer.current);
-    toastTimer.current = window.setTimeout(() => setToast(null), 4500);
-  };
 
   // Filtrado en tiempo real (cliente)
   const filtered = useMemo(() => {
@@ -730,8 +835,7 @@ export default function Socios() {
         mercadoPagoUserId: payoutMpUserId || undefined,
       });
       setPayoutTarget(null);
-      showToast(
-        'success',
+      toast.success(
         payoutAllowsDirect
           ? `${target.fullName} ahora cobra sus clases directamente.`
           : `${target.fullName} ya no cobra sus clases directamente.`
@@ -739,7 +843,7 @@ export default function Socios() {
     } catch (err) {
       const apiMessage = extractApiMessage(err);
       setPayoutError(apiMessage ?? 'No se pudo guardar la configuración de cobro.');
-      showToast('error', 'No se pudo guardar la configuración de cobro.');
+      toast.error('No se pudo guardar la configuración de cobro.');
     } finally {
       setPayoutProcessing(false);
     }
@@ -759,18 +863,46 @@ export default function Socios() {
       const config = getRoleConfig(selectedRole);
       await userService.updateRole(target.id, config.numeric);
       setRoleTarget(null);
-      showToast('success', `Rol de ${target.fullName} actualizado a ${config.label}.`);
+      toast.success(`Rol de ${target.fullName} actualizado a ${config.label}.`);
       loadData();
     } catch (err) {
       const apiMessage = extractApiMessage(err);
       setRoleError(apiMessage ?? 'No se pudo actualizar el rol. Intentá nuevamente.');
-      showToast('error', 'No se pudo actualizar el rol del usuario.');
+      toast.error('No se pudo actualizar el rol del usuario.');
     } finally {
       setRoleProcessing(false);
     }
   };
 
   // Confirmación: bloquear / desbloquear
+  // Apertura / cierre / confirmación del modal de tipo de profesor
+  const openTeacherTypeModal = (u: UserListItem) => {
+    setTeacherTypeTarget(u);
+    setSelectedTeacherType(u.tipoProfesor ?? 'CLUB');
+    setTeacherTypeError(null);
+  };
+  const closeTeacherTypeModal = () => {
+    if (!teacherTypeProcessing) setTeacherTypeTarget(null);
+  };
+  const confirmTeacherType = async () => {
+    if (!teacherTypeTarget) return;
+    const target = teacherTypeTarget;
+    setTeacherTypeProcessing(true);
+    setTeacherTypeError(null);
+    try {
+      await userService.updateTeacherType(target.id, selectedTeacherType);
+      setTeacherTypeTarget(null);
+      toast.success(`Tipo de profesor de ${target.fullName} actualizado.`);
+      loadData();
+    } catch (err) {
+      const apiMessage = extractApiMessage(err);
+      setTeacherTypeError(apiMessage ?? 'No se pudo actualizar el tipo de profesor.');
+      toast.error('No se pudo actualizar el tipo de profesor.');
+    } finally {
+      setTeacherTypeProcessing(false);
+    }
+  };
+
   const confirmStatus = async () => {
     if (!statusTarget) return;
     const target = statusTarget;
@@ -780,8 +912,7 @@ export default function Socios() {
     try {
       await userService.updateStatus(target.id, !target.isActive);
       setStatusTarget(null);
-      showToast(
-        'success',
+      toast.success(
         blocking
           ? `${target.fullName} fue bloqueado. Ya no podrá ingresar a la app.`
           : `${target.fullName} fue desbloqueado.`
@@ -790,7 +921,7 @@ export default function Socios() {
     } catch (err) {
       const apiMessage = extractApiMessage(err);
       setStatusError(apiMessage ?? 'No se pudo cambiar el estado. Intentá nuevamente.');
-      showToast('error', 'No se pudo cambiar el estado del usuario.');
+      toast.error('No se pudo cambiar el estado del usuario.');
     } finally {
       setStatusProcessing(false);
     }
@@ -805,12 +936,12 @@ export default function Socios() {
     try {
       await userService.deleteUser(target.id);
       setDeleteTarget(null);
-      showToast('success', `El usuario ${target.fullName} fue eliminado.`);
+      toast.success(`El usuario ${target.fullName} fue eliminado.`);
       loadData();
     } catch (err) {
       const apiMessage = extractApiMessage(err);
       setDeleteError(apiMessage ?? 'No se pudo eliminar el usuario. Intentá nuevamente.');
-      showToast('error', 'No se pudo eliminar el usuario.');
+      toast.error('No se pudo eliminar el usuario.');
     } finally {
       setDeleteProcessing(false);
     }
@@ -1014,6 +1145,7 @@ export default function Socios() {
                         onStatus={openStatusModal}
                         onDelete={openDeleteModal}
                         onPayout={openPayoutModal}
+                        onTeacherType={openTeacherTypeModal}
                       />
                     ))}
                   </div>
@@ -1074,6 +1206,7 @@ export default function Socios() {
                                     onStatus={openStatusModal}
                                     onDelete={openDeleteModal}
                                     onPayout={openPayoutModal}
+                                    onTeacherType={openTeacherTypeModal}
                                   />
                                 </div>
                               </td>
@@ -1102,6 +1235,21 @@ export default function Socios() {
                 error={roleError}
                 onConfirm={confirmRole}
                 onClose={closeRoleModal}
+              />
+            )}
+          </AnimatePresence>
+
+          {/* Modal: tipo de profesor */}
+          <AnimatePresence>
+            {teacherTypeTarget && (
+              <TeacherTypeModal
+                user={teacherTypeTarget}
+                value={selectedTeacherType}
+                onChange={setSelectedTeacherType}
+                processing={teacherTypeProcessing}
+                error={teacherTypeError}
+                onConfirm={confirmTeacherType}
+                onClose={closeTeacherTypeModal}
               />
             )}
           </AnimatePresence>
@@ -1148,28 +1296,6 @@ export default function Socios() {
             )}
           </AnimatePresence>
 
-          {/* Toast de notificación */}
-          <AnimatePresence>
-            {toast && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 20 }}
-                className={`fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl border text-sm font-semibold shadow-2xl backdrop-blur-md ${
-                  toast.type === 'success'
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                    : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
-                }`}
-              >
-                {toast.type === 'success' ? (
-                  <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
-                ) : (
-                  <AlertCircle size={18} className="text-rose-400 shrink-0" />
-                )}
-                {toast.message}
-              </motion.div>
-            )}
-          </AnimatePresence>
         </main>
       </div>
     </div>
