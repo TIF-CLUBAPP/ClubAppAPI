@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ClubApp.Domain.Entities;
 
@@ -41,6 +42,23 @@ public class Space : BaseEntity
 
     /// <summary>Precio por turno/hora de alquiler particular.</summary>
     public decimal PricePerHour { get; set; }
+
+    /// <summary>Canon base de instalaciones ($) que se precompleta en las actividades dictadas por profesores independientes.</summary>
+    public decimal CanonBase { get; set; }
+
+    /// <summary>Indica si se aplica descuento en el canon por cantidad de socios inscriptos.</summary>
+    public bool AplicaDescuentoSocios { get; set; } = false;
+
+    /// <summary>Tipo de descuento a aplicar: PORCENTAJE o MONTO_FIJO.</summary>
+    public TipoDescuentoCanon TipoDescuentoCanon { get; set; } = TipoDescuentoCanon.MONTO_FIJO;
+
+    /// <summary>Valor del descuento por cada socio inscripto (monto o porcentaje según TipoDescuentoCanon).</summary>
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal ValorDescuentoPorSocio { get; set; }
+
+    /// <summary>Límite máximo de descuento total a aplicar sobre el canon (opcional).</summary>
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? DescuentoMaximoCanon { get; set; }
 
     /// <summary>Duración de cada turno en minutos (ej. 60, 90, 120).</summary>
     public int SlotDurationMinutes { get; set; } = 60;

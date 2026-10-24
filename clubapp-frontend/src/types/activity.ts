@@ -24,6 +24,14 @@ export interface Activity {
   price: number;
   priceMember: number;
   priceNonMember: number;
+  facilityCanon: number;
+  aplicaDescuentoSocios: boolean;
+  tipoDescuentoCanon: 'PORCENTAJE' | 'MONTO_FIJO';
+  valorDescuentoPorSocio: number;
+  descuentoMaximoCanon?: number | null;
+  estadoNegociacion?: string | null;
+  proposedPriceMember?: number | null;
+  proposedFacilityCanon?: number | null;
   paymentCollector: 'CLUB' | 'PROFESSOR_DIRECT';
   professorFacilityFeeMember: number;
   professorFacilityFeeNonMember: number;
@@ -37,6 +45,7 @@ export interface Activity {
   maxCapacity: number;
   teacherId?: number | null;
   teacherName?: string | null;
+  teacherTipoProfesor?: string | null;
   requiresBooking: boolean;
   schedule: string;
   isActive: boolean;
@@ -64,12 +73,17 @@ export interface SaveActivityRequest {
   name: string;
   description: string;
   category: string;
-  price: number;
   priceMember: number;
   priceNonMember: number;
+  facilityCanon: number;
+  aplicaDescuentoSocios: boolean;
+  tipoDescuentoCanon: 'PORCENTAJE' | 'MONTO_FIJO';
+  valorDescuentoPorSocio: number;
+  descuentoMaximoCanon?: number | null;
+  estadoNegociacion?: string | null;
+  proposedPriceMember?: number | null;
+  proposedFacilityCanon?: number | null;
   paymentCollector: 'CLUB' | 'PROFESSOR_DIRECT';
-  professorFacilityFeeMember: number;
-  professorFacilityFeeNonMember: number;
   professorMercadoPagoPublicKey?: string;
   professorMercadoPagoAccessToken?: string;
   maxCapacity: number;
@@ -91,7 +105,9 @@ export interface ActivitySettlement {
   nonMemberEnrollments: number;
   memberFee: number;
   nonMemberFee: number;
+  facilityCanon: number;
   totalSettlement: number;
+  discountApplied: number;
 }
 
 // Inscripción del usuario autenticado (GET /api/enrollments/my)

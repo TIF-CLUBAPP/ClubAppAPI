@@ -18,6 +18,7 @@ import {
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { friendService } from '../services/friendService';
 import { userService, type UpdateProfilePayload } from '../services/userService';
 import { paymentsService } from '../services/paymentsService';
@@ -70,7 +71,7 @@ export default function Cuenta() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actingId, setActingId] = useState<number | null>(null);
-  const [feedback, setFeedback] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
+  const toast = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [profileForm, setProfileForm] = useState<UpdateProfilePayload>({
@@ -95,11 +96,6 @@ export default function Cuenta() {
   const role = roleMeta(user?.role);
   const showRole = isStaffRole(user?.role);
   const initials = initialsOf(displayName, user?.email ?? '');
-
-  const showFeedback = (type: 'ok' | 'error', text: string) => {
-    setFeedback({ type, text });
-    window.setTimeout(() => setFeedback(null), 3000);
-  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -140,7 +136,7 @@ export default function Cuenta() {
 
   const handleSaveProfile = async () => {
     if (!user || user.id == null) {
-      showFeedback('error', 'No pudimos identificar tu cuenta. Volvé a iniciar sesión.');
+      toast.error('No pudimos identificar tu cuenta. Volvé a iniciar sesión.');
       return;
     }
 
@@ -159,9 +155,9 @@ export default function Cuenta() {
       if (token) setSession(token, updatedUser);
 
       setIsEditing(false);
-      showFeedback('ok', 'Tus datos fueron actualizados correctamente.');
+      toast.success('Tus datos fueron actualizados correctamente.');
     } catch {
-      showFeedback('error', 'No se pudieron guardar los cambios. Intentá de nuevo.');
+      toast.error('No se pudieron guardar los cambios. Intentá de nuevo.');
     } finally {
       setSaving(false);
     }
@@ -172,9 +168,9 @@ export default function Cuenta() {
     try {
       await friendService.removeFriend(f.id);
       setFriends((prev) => prev.filter((x) => x.id !== f.id));
-      showFeedback('ok', `${nameOf(f.friend)} fue eliminado de tus amigos.`);
+      toast.success(`${nameOf(f.friend)} fue eliminado de tus amigos.`);
     } catch {
-      showFeedback('error', 'No se pudo eliminar al amigo.');
+      toast.error('No se pudo eliminar al amigo.');
     } finally {
       setActingId(null);
     }
@@ -186,9 +182,9 @@ export default function Cuenta() {
       const friend = await friendService.acceptRequest(id);
       setRequests((prev) => ({ ...prev, received: prev.received.filter((r) => r.id !== id) }));
       setFriends((prev) => [friend, ...prev]);
-      showFeedback('ok', 'Solicitud aceptada. ¡Ahora son amigos!');
+      toast.success('Solicitud aceptada. ¡Ahora son amigos!');
     } catch {
-      showFeedback('error', 'No se pudo aceptar la solicitud.');
+      toast.error('No se pudo aceptar la solicitud.');
     } finally {
       setActingId(null);
     }
@@ -199,9 +195,9 @@ export default function Cuenta() {
     try {
       await friendService.rejectRequest(id);
       setRequests((prev) => ({ ...prev, received: prev.received.filter((r) => r.id !== id) }));
-      showFeedback('ok', 'Solicitud rechazada.');
+      toast.success('Solicitud rechazada.');
     } catch {
-      showFeedback('error', 'No se pudo rechazar la solicitud.');
+      toast.error('No se pudo rechazar la solicitud.');
     } finally {
       setActingId(null);
     }
@@ -212,9 +208,9 @@ export default function Cuenta() {
     try {
       await friendService.cancelRequest(id);
       setRequests((prev) => ({ ...prev, sent: prev.sent.filter((r) => r.id !== id) }));
-      showFeedback('ok', 'Solicitud cancelada.');
+      toast.success('Solicitud cancelada.');
     } catch {
-      showFeedback('error', 'No se pudo cancelar la solicitud.');
+      toast.error('No se pudo cancelar la solicitud.');
     } finally {
       setActingId(null);
     }
@@ -243,11 +239,11 @@ export default function Cuenta() {
     const params = new URLSearchParams(window.location.search);
     const mp = params.get('mp');
     if (mp === 'connected') {
-      showFeedback('ok', 'Cuenta de Mercado Pago vinculada correctamente.');
+      toast.success('Cuenta de Mercado Pago vinculada correctamente.');
       loadPaymentInfo();
       window.history.replaceState({}, '', '/cuenta');
     } else if (mp === 'error') {
-      showFeedback('error', 'No se pudo vincular la cuenta de Mercado Pago. Intentá de nuevo.');
+      toast.error('No se pudo vincular la cuenta de Mercado Pago. Intentá de nuevo.');
       window.history.replaceState({}, '', '/cuenta');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -259,9 +255,9 @@ export default function Cuenta() {
       const info = await userService.saveProfilePaymentInfo(aliasInput.trim());
       setPaymentInfo(info);
       setAliasInput(info.bankAlias ?? '');
-      showFeedback('ok', 'Tu Alias/CBU/CVU fue guardado correctamente.');
+      toast.success('Tu Alias/CBU/CVU fue guardado correctamente.');
     } catch {
-      showFeedback('error', 'No se pudo guardar tu Alias/CBU/CVU.');
+      toast.error('No se pudo guardar tu Alias/CBU/CVU.');
     } finally {
       setPaymentSaving(false);
     }
@@ -273,7 +269,7 @@ export default function Cuenta() {
       const { authorizationUrl } = await paymentsService.connectMercadoPago();
       window.location.href = authorizationUrl;
     } catch {
-      showFeedback('error', 'No se pudo iniciar la vinculación con Mercado Pago.');
+      toast.error('No se pudo iniciar la vinculación con Mercado Pago.');
       setMpConnecting(false);
     }
   };
@@ -292,7 +288,7 @@ export default function Cuenta() {
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-60">
         <Header />
-        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-24 md:pt-6 md:px-6 md:pb-6">
+        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-32 md:pt-6 md:px-6 md:pb-6">
           <div className="space-y-6 max-w-4xl mx-auto">
             {/* Encabezado */}
             <div>
@@ -302,21 +298,6 @@ export default function Cuenta() {
                 Gestioná tus datos, tus amigos y tus solicitudes de amistad.
               </p>
             </div>
-
-            {feedback && (
-              <div
-                className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-sm ${
-                  feedback.type === 'ok'
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
-                    : 'bg-rose-500/10 border-rose-500/30 text-rose-200'
-                }`}
-              >
-                <span>{feedback.text}</span>
-                <button type="button" onClick={() => setFeedback(null)} className="text-slate-400 hover:text-white">
-                  <X size={16} />
-                </button>
-              </div>
-            )}
 
             {/* Tarjeta de perfil */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 flex flex-col sm:flex-row sm:items-center gap-5">

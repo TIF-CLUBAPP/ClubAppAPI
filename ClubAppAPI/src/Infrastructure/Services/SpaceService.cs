@@ -45,6 +45,11 @@ public class SpaceService : ISpaceService
             RequiresApproval = dto.RequiresApproval,
             PermitirSuperposicion = dto.PermitirSuperposicion,
             PricePerHour = dto.PricePerHour,
+            CanonBase = dto.CanonBase,
+            AplicaDescuentoSocios = dto.AplicaDescuentoSocios,
+            TipoDescuentoCanon = Enum.TryParse<TipoDescuentoCanon>(dto.TipoDescuentoCanon, true, out var tdc) ? tdc : TipoDescuentoCanon.MONTO_FIJO,
+            ValorDescuentoPorSocio = dto.ValorDescuentoPorSocio,
+            DescuentoMaximoCanon = dto.DescuentoMaximoCanon,
             SlotDurationMinutes = dto.SlotDurationMinutes <= 0 ? 60 : dto.SlotDurationMinutes,
             Is24Hours = dto.Is24Hours,
             OpenTime = dto.OpenTime,
@@ -73,6 +78,11 @@ public class SpaceService : ISpaceService
         space.RequiresApproval = dto.RequiresApproval;
         space.PermitirSuperposicion = dto.PermitirSuperposicion;
         space.PricePerHour = dto.PricePerHour;
+        space.CanonBase = dto.CanonBase;
+        space.AplicaDescuentoSocios = dto.AplicaDescuentoSocios;
+        space.TipoDescuentoCanon = Enum.TryParse<TipoDescuentoCanon>(dto.TipoDescuentoCanon, true, out var tdc) ? tdc : TipoDescuentoCanon.MONTO_FIJO;
+        space.ValorDescuentoPorSocio = dto.ValorDescuentoPorSocio;
+        space.DescuentoMaximoCanon = dto.DescuentoMaximoCanon;
         space.SlotDurationMinutes = dto.SlotDurationMinutes <= 0 ? 60 : dto.SlotDurationMinutes;
         space.Is24Hours = dto.Is24Hours;
         space.OpenTime = dto.OpenTime;
@@ -135,6 +145,11 @@ public class SpaceService : ISpaceService
         RequiresApproval = s.RequiresApproval,
         PermitirSuperposicion = s.PermitirSuperposicion,
         PricePerHour = s.PricePerHour,
+        CanonBase = s.CanonBase,
+        AplicaDescuentoSocios = s.AplicaDescuentoSocios,
+        TipoDescuentoCanon = s.TipoDescuentoCanon.ToString(),
+        ValorDescuentoPorSocio = s.ValorDescuentoPorSocio,
+        DescuentoMaximoCanon = s.DescuentoMaximoCanon,
         SlotDurationMinutes = s.SlotDurationMinutes,
         Is24Hours = s.Is24Hours,
         OpenTime = s.OpenTime,

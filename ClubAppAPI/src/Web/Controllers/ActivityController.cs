@@ -89,6 +89,29 @@ public class ActivitiesController : ControllerBase
         return Ok(new { message = $"Actividad {activityId} eliminada" });
     }
 
+    [HttpPost("{activityId:int}/negotiation/accept")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN,TEACHER")]
+    public async Task<IActionResult> AcceptNegotiation(int activityId)
+    {
+        var (actorId, actorRole) = GetActorIdentity();
+        var updated = await _activityService.AcceptNegotiationAsync(activityId, actorId, actorRole);
+        if (updated == null) return NotFound(new { message = $"No se encontró la actividad con ID {activityId}" });
+        return Ok(updated);
+    }
+
+    [HttpPost("{activityId:int}/negotiation/propose")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN,TEACHER")]
+    public async Task<IActionResult> ProposeNegotiation(int activityId, [FromBody] NegotiationProposalRequest request)
+    {
+        if (request == null)
+            return BadRequest(new { message = "request inválido" });
+
+        var (actorId, actorRole) = GetActorIdentity();
+        var updated = await _activityService.ProposeNegotiationAsync(activityId, request, actorId, actorRole);
+        if (updated == null) return NotFound(new { message = $"No se encontró la actividad con ID {activityId}" });
+        return Ok(updated);
+    }
+
     [HttpGet("{activityId:int}/settlement")]
     [Authorize(Roles = "ADMIN,SUPERADMIN,TEACHER")]
     public async Task<IActionResult> GetSettlement(int activityId)

@@ -29,6 +29,35 @@ public class Activity : BaseEntity
     [Column(TypeName = "decimal(18,2)")]
     public decimal ProfessorFacilityFeeNonMember { get; set; }
 
+    /// <summary>Canon de instalaciones ($) acordado para la actividad (valor único consolidado).</summary>
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal FacilityCanon { get; set; }
+
+    /// <summary>Indica si se aplica descuento en el canon por cantidad de socios inscriptos.</summary>
+    public bool AplicaDescuentoSocios { get; set; } = false;
+
+    /// <summary>Tipo de descuento a aplicar: PORCENTAJE o MONTO_FIJO.</summary>
+    public TipoDescuentoCanon TipoDescuentoCanon { get; set; } = TipoDescuentoCanon.MONTO_FIJO;
+
+    /// <summary>Valor del descuento por cada socio inscripto (monto o porcentaje según TipoDescuentoCanon).</summary>
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal ValorDescuentoPorSocio { get; set; }
+
+    /// <summary>Límite máximo de descuento total a aplicar sobre el canon (opcional).</summary>
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? DescuentoMaximoCanon { get; set; }
+
+    /// <summary>Estado de la negociación de precios/canon. Null = sin negociación; "PENDIENTE" o "APROBADO".</summary>
+    public string? EstadoNegociacion { get; set; }
+
+    /// <summary>Contraoferta de Precio Socio propuesta durante la negociación.</summary>
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? ProposedPriceMember { get; set; }
+
+    /// <summary>Contraoferta de Canon de instalaciones propuesta durante la negociación.</summary>
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? ProposedFacilityCanon { get; set; }
+
     public string? ProfessorMercadoPagoPublicKey { get; set; }
     public string? ProfessorMercadoPagoAccessToken { get; set; }
 

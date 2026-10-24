@@ -38,6 +38,14 @@ public class SaveActivityRequest
     public string PaymentCollector { get; set; } = "CLUB";
     public decimal ProfessorFacilityFeeMember { get; set; }
     public decimal ProfessorFacilityFeeNonMember { get; set; }
+    public decimal FacilityCanon { get; set; }
+    public bool AplicaDescuentoSocios { get; set; } = false;
+    public string TipoDescuentoCanon { get; set; } = "MONTO_FIJO";
+    public decimal ValorDescuentoPorSocio { get; set; }
+    public decimal? DescuentoMaximoCanon { get; set; }
+    public string? EstadoNegociacion { get; set; }
+    public decimal? ProposedPriceMember { get; set; }
+    public decimal? ProposedFacilityCanon { get; set; }
     public string? ProfessorMercadoPagoPublicKey { get; set; }
     public string? ProfessorMercadoPagoAccessToken { get; set; }
     public int MaxCapacity { get; set; }
@@ -51,4 +59,11 @@ public class SaveActivityRequest
     public bool IsActive { get; set; } = true;
     public string Schedule { get; set; } = string.Empty;
     public List<ActivityScheduleInputDto> Schedules { get; set; } = new();
+}
+
+/// <summary>Contraoferta de negociación de precios/canon (POST /api/activities/{id}/negotiation/propose).</summary>
+public class NegotiationProposalRequest
+{
+    public decimal? PriceMember { get; set; }
+    public decimal? FacilityCanon { get; set; }
 }

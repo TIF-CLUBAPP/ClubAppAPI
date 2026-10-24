@@ -32,7 +32,10 @@ export default function MobileNavbar() {
       .slice(0, 2) || displayName.slice(0, 2).toUpperCase();
 
   return (
-    <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-950/90 backdrop-blur-lg border-t border-slate-800/70 shadow-[0_-8px_24px_rgba(0,0,0,0.4)]">
+    <nav 
+      style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999 }}
+      className="block lg:hidden fixed bottom-0 left-0 right-0 z-9999 w-full bg-slate-900/95 backdrop-blur-md border-t border-slate-800/80 shadow-[0_-12px_32px_rgba(0,0,0,0.6)]"
+    >
       <div className="grid grid-cols-5 items-center h-16 px-1 pb-[env(safe-area-inset-bottom)]">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;

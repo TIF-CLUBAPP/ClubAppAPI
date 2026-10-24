@@ -10,6 +10,7 @@ import { computeDigitalServiceFee } from '../../config/fees';
 import { GroupPaymentPanel } from './GroupPaymentPanel';
 import { groupPaymentService } from '../../services/groupPaymentService';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import type {
   GroupBookingDto,
   GroupParticipant,
@@ -103,6 +104,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   // ========== Pago dividido / reserva grupal ==========
   const { user } = useAuth();
+  const toast = useToast();
   const [payMode, setPayMode] = useState<'total' | 'split'>('total');
   const [group, setGroup] = useState<GroupPaymentState>(() => createEmptyGroup());
   const [refreshingGroup, setRefreshingGroup] = useState(false);
@@ -348,7 +350,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           cuotaIds = [created.paymentId];
         } catch (err: any) {
           setIsProcessing(false);
-          alert(
+          toast.error(
             err?.response?.data?.detail ??
               err?.response?.data?.message ??
               err?.message ??
@@ -362,7 +364,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         console.error('[pago] cuotaId invÃ¡lido. No se enviarÃ¡ la peticiÃ³n.', {
           cuotasList,
         });
-        alert('No se pudo iniciar el pago: no se pudo identificar la cuota.');
+        toast.error('No se pudo iniciar el pago: no se pudo identificar la cuota.');
         return;
       }
 
@@ -436,7 +438,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         }
 
         setIsProcessing(false);
-        alert(result?.message ?? 'El pago no fue aprobado. IntentÃ¡ nuevamente.');
+        toast.error(result?.message ?? 'El pago no fue aprobado. Intentá nuevamente.');
         return;
       }
 
@@ -477,7 +479,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         // Permite registrar transferencia con referencia o con comprobante (o ambos).
         if (!reference && !transferProofFile) {
           setIsProcessing(false);
-          alert('Ingresá el N° de operación O adjuntá una foto/PDF del comprobante para continuar');
+          toast.error('Ingresá el N° de operación O adjuntá una foto/PDF del comprobante para continuar');
           return;
         }
 
@@ -502,13 +504,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           return;
         }
 
-        alert(result?.message ?? 'No se pudo registrar la transferencia. IntentÃ¡ nuevamente.');
+        toast.error(result?.message ?? 'No se pudo registrar la transferencia. Intentá nuevamente.');
         return;
       }
 
       // No deberÃ­a llegar acÃ¡ (mÃ©todo no soportado).
       setIsProcessing(false);
-      alert('MÃ©todo de pago no soportado.');
+      toast.error('Método de pago no soportado.');
     } catch (err: any) {
       console.error('Error antes del POST:', err);
       console.error('Error detallado:', err);
@@ -524,7 +526,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         method,
       });
       setIsProcessing(false);
-      alert(err?.response?.data?.message ?? err?.message ?? 'No se pudo procesar el pago.');
+      toast.error(err?.response?.data?.message ?? err?.message ?? 'No se pudo procesar el pago.');
     }
   };
 
@@ -694,14 +696,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                           const maxBytes = maxSizeMb * 1024 * 1024;
 
                           if (!allowed.includes(file.type)) {
-                            alert('Formato no válido. Solo se aceptan JPG, PNG o PDF.');
+                            toast.error('Formato no válido. Solo se aceptan JPG, PNG o PDF.');
                             e.target.value = '';
                             setTransferProofFile(null);
                             return;
                           }
 
                           if (file.size > maxBytes) {
-                            alert(`El archivo es demasiado grande. Máximo ${maxSizeMb}MB.`);
+                            toast.error(`El archivo es demasiado grande. Máximo ${maxSizeMb}MB.`);
                             e.target.value = '';
                             setTransferProofFile(null);
                             return;

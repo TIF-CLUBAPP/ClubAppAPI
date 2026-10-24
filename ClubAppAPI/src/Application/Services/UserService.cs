@@ -33,6 +33,7 @@ public class UserService : IUserService
             Phone = u.Phone,
             BirthDate = u.BirthDate,
             Role = u.Role,
+            TipoProfesor = u.TipoProfesor,
             IsActive = u.IsActive,
             IsBlocked = !u.IsActive,
             BadgeNum = u.BadgeNum,
@@ -59,6 +60,7 @@ public class UserService : IUserService
             Phone = user.Phone,
             BirthDate = user.BirthDate,
             Role = user.Role,
+            TipoProfesor = user.TipoProfesor,
             IsActive = user.IsActive,
             IsBlocked = !user.IsActive,
             BadgeNum = user.BadgeNum,
@@ -193,6 +195,19 @@ public class UserService : IUserService
         if (user == null) return false;
 
         user.Role = (UserRole)dto.NewRole;
+
+        await _userRepository.UpdateAsync(user);
+        return true;
+    }
+
+    public async Task<bool> UpdateTeacherTypeAsync(int id, UpdateTeacherTypeDto dto)
+    {
+        var user = await _userRepository.GetByIdAsync(id);
+        if (user == null || user.Role != UserRole.TEACHER) return false;
+
+        user.TipoProfesor = Enum.TryParse<TipoProfesor>(dto.TipoProfesor, true, out var tipo)
+            ? tipo
+            : TipoProfesor.CLUB;
 
         await _userRepository.UpdateAsync(user);
         return true;

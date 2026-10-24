@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
+import { useToast } from '../context/ToastContext';
 import { bookingService } from '../services/bookingService';
 import { activityService } from '../services/activityService';
 import type { Booking } from '../types/booking';
@@ -70,6 +71,7 @@ const groupSchedules = (schedules: ActivitySchedule[]): { days: string; time: st
 
 export default function Reservations() {
   const navigate = useNavigate();
+  const toast = useToast();
 
   const [enrollments, setEnrollments] = useState<MyEnrollment[]>([]);
   const [enrollmentsLoading, setEnrollmentsLoading] = useState(true);
@@ -126,9 +128,10 @@ export default function Reservations() {
     try {
       await bookingService.cancelBooking(id);
       setBookingToCancel(null);
+      toast.success('Reserva cancelada correctamente.');
       await loadBookings();
     } catch (err: any) {
-      window.alert(err?.response?.data?.message || 'No se pudo cancelar la reserva.');
+      toast.error(err?.response?.data?.message || 'No se pudo cancelar la reserva.');
       setBookingToCancel(null);
     } finally {
       setCancellingId(null);
@@ -160,7 +163,7 @@ export default function Reservations() {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-60">
         <Header />
 
-        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-24 md:pt-6 md:px-6 md:pb-6">
+        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-32 md:pt-6 md:px-6 md:pb-6">
           <div className="space-y-8 max-w-7xl mx-auto">
             {/* ============ SECCIÓN SUPERIOR: MI CRONOGRAMA DE ACTIVIDADES ============ */}
             <section>
@@ -277,7 +280,7 @@ export default function Reservations() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, ease: 'easeOut' }}
-                    className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-h-[280px]"
+                    className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-h-70"
                   >
                     <AnimatePresence>
                       {visibleBookings.map((b) => {
