@@ -19,13 +19,13 @@ jobs:
           dotnet-version: '10.x'
 
       - name: Restore dependencies
-        run: dotnet restore ClubApp.slnx
+        run: dotnet restore ClubAppAPI/ClubApp.slnx
 
       - name: Build with dotnet
-        run: dotnet build --configuration Release --no-restore
+        run: dotnet build ClubAppAPI/ClubApp.slnx --configuration Release --no-restore
 
       - name: dotnet publish
-        run: dotnet publish src/Web/Web.csproj -c Release -o ./publish
+        run: dotnet publish ClubAppAPI/src/Web/Web.csproj -c Release -o ./publish
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
