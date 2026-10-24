@@ -38,6 +38,30 @@ namespace ClubApp.Infrastructure.Services
             await SendEmailAsync(toEmail, subject, body);
         }
 
+        public async Task SendPasswordResetCodeAsync(string toEmail, string code)
+        {
+            string subject = "Código de verificación - ClubApp";
+            
+            // Log code clearly for developers in case SMTP is not configured or fails
+            _logger.LogInformation("================================================");
+            _logger.LogInformation("CODIGO DE VERIFICACION PARA {ToEmail}: {Code}", toEmail, code);
+            _logger.LogInformation("================================================");
+
+            string body = $@"
+                <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #0f172a; color: #f8fafc; border-radius: 12px;'>
+                    <h2 style='color: #10b981; margin-bottom: 16px;'>Verificación de contraseña</h2>
+                    <p>Hola,</p>
+                    <p>Recibimos una solicitud para restablecer la contraseña de tu cuenta en <strong>ClubApp</strong>.</p>
+                    <p>Usá el siguiente código de verificación para continuar:</p>
+                    <div style='margin: 24px 0;'>
+                        <span style='font-size: 32px; font-weight: bold; letter-spacing: 12px; color: #090d16; background-color: #10b981; padding: 12px 24px; border-radius: 8px; display: inline-block;'>{code}</span>
+                    </div>
+                    <p style='font-size: 12px; color: #94a3b8;'>El código vence en 10 minutos. Si no solicitaste este cambio, podés ignorar este correo de forma segura.</p>
+                </div>";
+
+            await SendEmailAsync(toEmail, subject, body);
+        }
+
         public async Task SendEmailAsync(string toEmail, string subject, string body)
         {
             var smtpServer = _configuration["Smtp:Server"];

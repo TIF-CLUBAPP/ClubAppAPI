@@ -7,6 +7,8 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import ResetPasswordCode from './pages/ResetPasswordCode';
+import NewPasswordModal from './pages/NewPasswordModal';
 import Dashboard from './pages/Dashboard';
 import Reservations from './pages/Reservations'; 
 import Deudores from './pages/Deudores';
@@ -50,6 +52,8 @@ export default function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/reset-password-code" element={<ResetPasswordCode />} />
+            <Route path="/new-password" element={<NewPasswordModal />} />
             <Route path="/dashboard" element={<Dashboard />} />
 
             {/* Rutas de Error - Acceso directo para pruebas */}

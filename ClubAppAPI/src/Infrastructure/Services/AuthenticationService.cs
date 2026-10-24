@@ -30,11 +30,17 @@ namespace ClubApp.Infrastructure.Services
             _emailService = emailService;
         }
 
+        // Normaliza un email para búsquedas/almacenamiento consistentes:
+        // sin espacios en los extremos y en minúsculas.
+        private static string NormalizeEmail(string? email) =>
+            (email ?? string.Empty).Trim().ToLowerInvariant();
+
         public async Task<(string? Token, User? User)> AuthenticationAsync(AuthenticationRequest request)
         {
             var users = await _userRepository.GetAllAsync();
 
-            var user = users.FirstOrDefault(u => u.FirstName == request.Email || u.Email == request.Email);
+            var cleanedEmail = NormalizeEmail(request.Email);
+            var user = users.FirstOrDefault(u => u.FirstName == request.Email || NormalizeEmail(u.Email) == cleanedEmail);
 
             if (user == null || string.IsNullOrEmpty(user.PasswordHash) || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             {
@@ -58,7 +64,7 @@ namespace ClubApp.Infrastructure.Services
             // Los checks sobre suscripción/pagos se deben aplicar en las rutas de suscripción futuras.
 
             var users = await _userRepository.GetAllAsync();
-            if (users.Any(u => u.Email.Equals(dto.Email, StringComparison.OrdinalIgnoreCase)))
+            if (users.Any(u => NormalizeEmail(u.Email) == NormalizeEmail(dto.Email)))
             {
                 return (false, "El correo electrónico ya está registrado.");
             }
@@ -72,7 +78,7 @@ namespace ClubApp.Infrastructure.Services
             {
                 FirstName = dto.FirstName,
                 LastName = dto.LastName,
-                Email = dto.Email,
+                Email = NormalizeEmail(dto.Email),
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
                 Dni = dto.Dni,
                 Phone = dto.Phone,
@@ -108,7 +114,8 @@ namespace ClubApp.Infrastructure.Services
                 return (false, null, false, null, null, "El token de Google no contiene correo electrónico.");
             }
 
-            var existing = await _userRepository.GetUserByEmail(payload.Email);
+            var normalizedGoogleEmail = NormalizeEmail(payload.Email);
+            var existing = await _userRepository.GetUserByEmail(normalizedGoogleEmail);
             if (existing != null)
             {
                 // Asociar GoogleId si aún no está
@@ -132,7 +139,7 @@ namespace ClubApp.Infrastructure.Services
             // Crear usuario base
             var newUser = new User
             {
-                Email = payload.Email,
+                Email = normalizedGoogleEmail,
                 FirstName = payload.GivenName ?? string.Empty,
                 LastName = payload.FamilyName ?? string.Empty,
                 GoogleId = payload.Subject,
@@ -213,42 +220,38 @@ namespace ClubApp.Infrastructure.Services
             return age;
         }
 
-        public async Task<(bool Success, string? ErrorMessage)> ForgotPasswordAsync(ForgotPasswordDto dto)
+        public async Task<(bool Success, bool UserExists, string? ErrorMessage)> ForgotPasswordAsync(ForgotPasswordDto dto)
         {
             var users = await _userRepository.GetAllAsync();
-            var user = users.FirstOrDefault(u => u.Email.Equals(dto.Email, StringComparison.OrdinalIgnoreCase));
+            var user = users.FirstOrDefault(u => NormalizeEmail(u.Email) == NormalizeEmail(dto.Email) && !u.IsDeleted);
 
             if (user == null)
             {
-                // Devolver true para no revelar la existencia de emails por motivos de seguridad
-                return (true, null);
+                // El correo no pertenece a ninguna cuenta activa.
+                // Devolvemos UserExists=false para que el frontend pueda ofrecer el registro.
+                return (true, false, null);
             }
 
-            // Generar token seguro de recuperación
-            var tokenBytes = new byte[32];
-            using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create())
-            {
-                rng.GetBytes(tokenBytes);
-            }
-            string token = Convert.ToHexString(tokenBytes);
+            // Generamos un código numérico de 6 dígitos (más amigable que un enlace).
+            string code = System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, 1000000).ToString("D6");
 
-            user.PasswordResetToken = token;
-            user.PasswordResetTokenExpiration = DateTime.UtcNow.AddHours(24);
+            // Reutilizamos los campos de recuperación de contraseña para almacenar el código.
+            // El código vence a los 10 minutos.
+            user.PasswordResetToken = code;
+            user.PasswordResetTokenExpiration = DateTime.UtcNow.AddMinutes(10);
 
             await _userRepository.UpdateAsync(user);
 
-            string baseUrl = _configuration["FrontendUrl"] ?? "http://localhost:5173";
-            string resetLink = $"{baseUrl}/reset-password?token={Uri.EscapeDataString(token)}&email={Uri.EscapeDataString(user.Email)}";
+            await _emailService.SendPasswordResetCodeAsync(user.Email, code);
 
-            await _emailService.SendPasswordResetEmailAsync(user.Email, resetLink);
-
-            return (true, null);
+            return (true, true, null);
         }
 
         public async Task<(bool Success, string? ErrorMessage)> ResetPasswordAsync(ResetPasswordDto dto)
         {
             var users = await _userRepository.GetAllAsync();
-            var user = users.FirstOrDefault(u => u.Email.Equals(dto.Email, StringComparison.OrdinalIgnoreCase));
+            var cleanedEmail = NormalizeEmail(dto.Email);
+            var user = users.FirstOrDefault(u => NormalizeEmail(u.Email) == cleanedEmail);
 
             if (user == null || string.IsNullOrEmpty(user.PasswordResetToken))
             {
@@ -263,6 +266,60 @@ namespace ClubApp.Infrastructure.Services
             if (!user.PasswordResetTokenExpiration.HasValue || user.PasswordResetTokenExpiration.Value < DateTime.UtcNow)
             {
                 return (false, "El token de recuperación ha expirado.");
+            }
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+            user.PasswordResetToken = null;
+            user.PasswordResetTokenExpiration = null;
+
+            await _userRepository.UpdateAsync(user);
+
+            return (true, null);
+        }
+
+        public async Task<(bool Success, string? ErrorMessage)> VerifyResetCodeAsync(VerifyResetCodeDto dto)
+        {
+            var users = await _userRepository.GetAllAsync();
+            var cleanedEmail = NormalizeEmail(dto.Email);
+            var user = users.FirstOrDefault(u => NormalizeEmail(u.Email) == cleanedEmail);
+
+            if (user == null || string.IsNullOrEmpty(user.PasswordResetToken))
+            {
+                return (false, "El código de verificación es inválido.");
+            }
+
+            if (!string.Equals(user.PasswordResetToken, dto.Code, StringComparison.Ordinal))
+            {
+                return (false, "El código de verificación es incorrecto.");
+            }
+
+            if (!user.PasswordResetTokenExpiration.HasValue || user.PasswordResetTokenExpiration.Value < DateTime.UtcNow)
+            {
+                return (false, "El código de verificación ha expirado. Solicitá uno nuevo.");
+            }
+
+            return (true, null);
+        }
+
+        public async Task<(bool Success, string? ErrorMessage)> ResetPasswordWithCodeAsync(ResetPasswordWithCodeDto dto)
+        {
+            var users = await _userRepository.GetAllAsync();
+            var cleanedEmail = NormalizeEmail(dto.Email);
+            var user = users.FirstOrDefault(u => NormalizeEmail(u.Email) == cleanedEmail);
+
+            if (user == null || string.IsNullOrEmpty(user.PasswordResetToken))
+            {
+                return (false, "El código de verificación es inválido o ha expirado.");
+            }
+
+            if (!string.Equals(user.PasswordResetToken, dto.Code, StringComparison.Ordinal))
+            {
+                return (false, "El código de verificación es incorrecto.");
+            }
+
+            if (!user.PasswordResetTokenExpiration.HasValue || user.PasswordResetTokenExpiration.Value < DateTime.UtcNow)
+            {
+                return (false, "El código de verificación ha expirado. Solicitá uno nuevo.");
             }
 
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);

@@ -17,7 +17,8 @@ public class UserRepository : RepositoryBase<User>, IUserRepository
     // Implementamos el método para buscar por Email de forma asincrónica
     public async Task<User?> GetUserByEmail(string email)
     {
-        return await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+        var cleaned = (email ?? string.Empty).Trim().ToLowerInvariant();
+        return await _context.Users.FirstOrDefaultAsync(u => u.Email.Trim().ToLower() == cleaned);
     }
 
     /// <summary>

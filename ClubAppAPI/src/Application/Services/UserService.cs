@@ -86,7 +86,7 @@ public class UserService : IUserService
         {
             FirstName = userDto.FirstName,
             LastName = userDto.LastName,
-            Email = userDto.Email,
+            Email = userDto.Email.Trim().ToLowerInvariant(),
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(userDto.Password),
             Role = 0,
             BadgeNum = generatedBadgeNum,
@@ -117,7 +117,7 @@ public class UserService : IUserService
 
         existingUser.FirstName = userDto.FirstName;
         existingUser.LastName = userDto.LastName;
-        existingUser.Email = userDto.Email;
+        existingUser.Email = userDto.Email.Trim().ToLowerInvariant();
         existingUser.Role = userDto.Role;
 
         await _userRepository.UpdateAsync(existingUser);
@@ -162,7 +162,7 @@ public class UserService : IUserService
         user.LastName = request.LastName ?? user.LastName;
 
         if (!string.IsNullOrWhiteSpace(request.Email))
-            user.Email = request.Email.Trim();
+            user.Email = request.Email.Trim().ToLowerInvariant();
 
         if (!string.IsNullOrWhiteSpace(request.Phone))
             user.Phone = request.Phone.Trim();

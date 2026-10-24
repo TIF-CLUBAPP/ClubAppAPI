@@ -1,23 +1,32 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, ArrowLeft, Loader2, KeyRound } from 'lucide-react';
+import { Mail, ArrowLeft, Loader2, KeyRound, AlertTriangle, UserPlus } from 'lucide-react';
 import { authService } from '../services/authService';
 import { useToast } from '../context/ToastContext';
 
 export default function ForgotPassword() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  const [notFound, setNotFound] = useState(false);
   const toast = useToast();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setNotFound(false);
 
     try {
-      await authService.forgotPassword(email);
-      toast.success('Se ha enviado un correo para restablecer su contraseña.');
+      const res = await authService.forgotPassword(email);
+
+      if (res.exists) {
+        toast.success('Te enviamos un código de verificación a tu correo.');
+        navigate('/reset-password-code', { state: { email } });
+      } else {
+        setNotFound(true);
+      }
     } catch (err: any) {
       const msg = err.response?.data?.message || err.response?.data?.title || 'Ocurrió un error al procesar tu solicitud.';
       toast.error(msg);
@@ -50,6 +59,27 @@ export default function ForgotPassword() {
           </p>
         </div>
 
+        {notFound && (
+          <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 shrink-0 text-amber-400" size={20} />
+              <div>
+                <p className="text-sm font-semibold text-amber-200">El correo no posee una cuenta</p>
+                <p className="mt-0.5 text-xs text-amber-200/80">
+                  No encontramos una cuenta asociada a <span className="font-medium">{email}</span>. Si querés, podés crear una ahora mismo.
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/register"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-slate-950 transition-colors hover:bg-amber-400"
+            >
+              <UserPlus size={16} />
+              <span>Registrarme</span>
+            </Link>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Input Email */}
           <div className="space-y-2">
@@ -60,7 +90,10 @@ export default function ForgotPassword() {
                 type="email"
                 required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (notFound) setNotFound(false);
+                }}
                 placeholder="ejemplo@clubapp.com"
                 className="w-full bg-slate-950/60 border border-slate-800 rounded-xl py-3 pl-11 pr-4 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all text-sm"
               />

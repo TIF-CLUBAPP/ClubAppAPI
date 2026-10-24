@@ -41,7 +41,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-slate-950 flex items-center justify-center p-4 selection:bg-emerald-500 selection:text-slate-950">
+    <div className="min-h-screen w-full flex items-center justify-center p-4 sm:p-6 lg:p-8 bg-slate-950">
       {/* Glow de fondo animado */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -49,20 +49,20 @@ export default function Login() {
         initial={{ opacity: 0, scale: 0.95, y: 15 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.4, ease: 'easeOut' }}
-        className="relative w-full max-w-md bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-3xl p-8 shadow-2xl shadow-black/50 overflow-hidden"
+        className="w-full max-w-sm sm:max-w-md lg:max-w-lg p-6 sm:p-8 lg:p-10 rounded-3xl bg-slate-900/90 border border-slate-800/80 shadow-2xl backdrop-blur-xl transition-all"
       >
-        <div className="text-center mb-8">
+        <div className="text-center">
           <motion.div 
             whileHover={{ rotate: 10, scale: 1.1 }}
-            className="inline-flex p-4 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-3"
+            className="w-12 h-12 md:w-14 md:h-14 p-2.5 md:p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-2xl mx-auto flex items-center justify-center mb-3 sm:mb-4"
           >
-            <Lock size={32} />
+            <Lock size={22} />
           </motion.div>
-          <h2 className="text-3xl font-extrabold tracking-tight text-white">¡Bienvenido!</h2>
-          <p className="text-slate-400 text-sm mt-1">Ingresá tus credenciales de ClubApp</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white text-center">¡Bienvenido!</h1>
+          <p className="text-xs sm:text-sm text-slate-400 text-center mt-1 mb-6">Ingresá tus credenciales de ClubApp</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
           {/* Input Email */}
           <div className="space-y-2">
             <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Email</label>
@@ -74,7 +74,7 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Ej: correo@email.com"
-                className="w-full bg-slate-950/60 border border-slate-800 rounded-xl py-3 pl-11 pr-4 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all text-sm"
+                className="w-full bg-slate-950/60 border border-slate-800 rounded-xl py-2.5 pl-11 pr-4 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all text-sm"
               />
             </div>
           </div>
@@ -90,7 +90,7 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-slate-950/60 border border-slate-800 rounded-xl py-3 pl-11 pr-11 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all text-sm"
+                className="w-full bg-slate-950/60 border border-slate-800 rounded-xl py-2.5 pl-11 pr-11 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all text-sm"
               />
               <button
                 type="button"
@@ -130,7 +130,7 @@ export default function Login() {
             disabled={loading || success}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className="w-full py-3.5 px-4 bg-linear-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold rounded-xl shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+            className="w-full py-3 sm:py-3.5 px-4 text-sm sm:text-base font-bold rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {loading ? (
               <Loader2 className="animate-spin" size={20} />
@@ -143,17 +143,17 @@ export default function Login() {
           </motion.button>
 
           {/* Enlaces de Recuperación y Registro */}
-          <div className="pt-2 flex flex-col items-center gap-3 text-sm">
+          <div className="mt-6 flex flex-col items-center gap-3 text-xs sm:text-sm text-center">
             <Link
               to="/forgot-password"
-              className="text-slate-400 hover:text-emerald-400 transition-colors text-xs font-medium hover:underline"
+              className="text-slate-400 hover:text-emerald-400 transition-colors font-medium hover:underline"
             >
               ¿Olvidaste tu contraseña?
             </Link>
 
             <div className="w-full border-t border-slate-800/80 my-1" />
 
-            <p className="text-xs text-slate-400">
+            <p className="text-slate-400">
               ¿No tenés cuenta?{' '}
               <Link
                 to="/register"

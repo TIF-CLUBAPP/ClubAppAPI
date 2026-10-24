@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Authorization;
 using ClubApp.Application.Interfaces;
 using ClubApp.Application.Dtos;
 using ClubApp.Domain.Entities;
+using ClubApp.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace ClubApp.Web.Controllers;
 
@@ -12,10 +14,14 @@ namespace ClubApp.Web.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly ICustomAuthenticationService _authService;
+    private readonly ApplicationContext _context; // TEMP: solo para diagnosticar la ruta de la BD
+    private readonly ILogger<AuthController> _logger;
 
-    public AuthController(ICustomAuthenticationService authService)
+    public AuthController(ICustomAuthenticationService authService, ApplicationContext context, ILogger<AuthController> logger)
     {
         _authService = authService;
+        _context = context;
+        _logger = logger;
     }
 
     [HttpPost("register")]
@@ -67,10 +73,44 @@ public class AuthController : ControllerBase
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
 
-        var (success, error) = await _authService.ForgotPasswordAsync(dto);
+        // TEMP (diagnóstico): log del email recibido y de la ruta absoluta de la BD activa.
+        var dbPath = _context.Database.GetDbConnection().DataSource;
+        _logger.LogInformation(
+            "[Diagnóstico ForgotPassword] Email recibido: '{Email}'. BD activa (DataSource): '{DbPath}'.",
+            dto.Email, dbPath);
+
+        var (success, userExists, error) = await _authService.ForgotPasswordAsync(dto);
         if (!success) return BadRequest(new { message = error });
 
-        return Ok(new { message = "Si el correo electrónico existe, se ha enviado un enlace para restablecer la contraseña." });
+        return Ok(new
+        {
+            exists = userExists,
+            message = userExists
+                ? "Te enviamos un código de verificación a tu correo."
+                : "El correo ingresado no posee una cuenta registrada."
+        });
+    }
+
+    [HttpPost("verify-reset-code")]
+    public async Task<IActionResult> VerifyResetCode([FromBody] VerifyResetCodeDto dto)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
+        var (success, error) = await _authService.VerifyResetCodeAsync(dto);
+        if (!success) return BadRequest(new { message = error });
+
+        return Ok(new { message = "Código verificado correctamente." });
+    }
+
+    [HttpPost("reset-password-code")]
+    public async Task<IActionResult> ResetPasswordWithCode([FromBody] ResetPasswordWithCodeDto dto)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
+        var (success, error) = await _authService.ResetPasswordWithCodeAsync(dto);
+        if (!success) return BadRequest(new { message = error });
+
+        return Ok(new { message = "La contraseña ha sido restablecida con éxito." });
     }
 
     [HttpPost("reset-password")]

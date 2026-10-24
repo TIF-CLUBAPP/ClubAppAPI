@@ -2,15 +2,12 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UserPlus, ArrowLeft, Eye, EyeOff } from 'lucide-react';
-import { GoogleLogin } from '@react-oauth/google';
-import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { authService } from '../services/authService';
 import type { RegisterData } from '../types/auth';
 
 export default function Register() {
   const navigate = useNavigate();
-  const { setSession } = useAuth();
   const toast = useToast();
 
   const [form, setForm] = useState<RegisterData>({
@@ -25,13 +22,10 @@ export default function Register() {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  // Estado para completar perfil tras Google
-  const [requiresCompletion, setRequiresCompletion] = useState(false);
-  const [googleUserId, setGoogleUserId] = useState<number | null>(null);
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -72,44 +66,6 @@ export default function Register() {
       toast.error(err?.response?.data?.message || 'Error en el registro.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleGoogleSuccess = async (credentialResponse: any) => {
-    const idToken = credentialResponse?.credential;
-    if (!idToken) return toast.error('No se recibió token de Google.');
-
-    try {
-      const res = await authService.googleSignIn(idToken);
-      if (res.requiresProfileCompletion) {
-        setRequiresCompletion(true);
-        setGoogleUserId(res.userId ?? null);
-      } else if (res.token) {
-        setSession(res.token, res.user ?? null);
-        navigate('/dashboard');
-      }
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Error autenticando con Google.');
-    }
-  };
-
-  const handleGoogleFailure = () => {
-    toast.error('Fallo en autenticación con Google.');
-  };
-
-  const completeProfile = async (dni: string, phone: string, birthDate: string) => {
-    if (!googleUserId) return;
-    try {
-      const res = await authService.completeGoogleProfile({ userId: googleUserId, dni, phone, birthDate });
-      setRequiresCompletion(false);
-      if (res.token) {
-        setSession(res.token, res.user ?? null);
-        navigate('/dashboard');
-      } else {
-        navigate('/login');
-      }
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Error completando perfil.');
     }
   };
 
@@ -211,76 +167,11 @@ export default function Register() {
             Crear cuenta
           </button>
 
-          <div className="text-center text-sm text-slate-300">O registrate con</div>
-
-          <div className="flex justify-center">
-            <GoogleLogin onSuccess={(res: any) => handleGoogleSuccess(res)} onError={handleGoogleFailure} />
-          </div>
-
           <div className="flex gap-3">
             <button type="button" onClick={() => navigate('/login')} className="w-full py-3 rounded-2xl border border-slate-700 text-slate-100 font-semibold">Volver a iniciar sesión</button>
             <button type="button" onClick={() => navigate('/dashboard')} className="w-full py-3 rounded-2xl border border-slate-700 text-slate-100 font-semibold"><ArrowLeft size={14} className="inline-block mr-2"/> Volver</button>
           </div>
         </form>
-
-        {/* Modal / formulario rápido para completar perfil tras Google */}
-        {requiresCompletion && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/60">
-            <div className="bg-slate-900 p-6 rounded-lg w-full max-w-md">
-              <h3 className="text-lg font-bold text-white mb-3">Completar perfil</h3>
-              <p className="text-sm text-slate-400 mb-4">Faltan algunos datos para finalizar tu registro con Google. Sólo necesitamos DNI, Teléfono y Fecha de Nacimiento.</p>
-
-              <QuickCompleteForm onSubmit={async (d) => { await completeProfile(d.dni, d.phone, d.birthDate); }} onCancel={() => setRequiresCompletion(false)} />
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function QuickCompleteForm({ onSubmit, onCancel }: { onSubmit: (d: { dni: string; phone: string; birthDate: string }) => Promise<void>; onCancel: () => void }) {
-  const [dni, setDni] = useState('');
-  const [phone, setPhone] = useState('');
-  const [birthDate, setBirthDate] = useState('');
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const submit = async () => {
-    const e: Record<string, string> = {};
-    if (!/^\d{7,8}$/.test(dni)) e.dni = 'DNI inválido.';
-    if (!/^\+?\d{7,15}$/.test(phone)) e.phone = 'Teléfono inválido.';
-    if (!birthDate) e.birthDate = 'Fecha obligatoria.';
-    else {
-      // Permitimos completar perfil para menores; no bloqueamos aquí.
-    }
-    setErrors(e);
-    if (Object.keys(e).length > 0) return;
-    await onSubmit({ dni, phone, birthDate });
-  };
-
-  return (
-    <div>
-      <div>
-        <label className="block text-sm text-slate-300">DNI</label>
-        <input value={dni} onChange={(e) => setDni(e.target.value)} className="mt-1 w-full rounded-md p-2 bg-slate-800 text-white" />
-        {errors.dni && <p className="text-xs text-rose-400 mt-1">{errors.dni}</p>}
-      </div>
-
-      <div>
-        <label className="block text-sm text-slate-300">Teléfono</label>
-        <input value={phone} onChange={(e) => setPhone(e.target.value)} className="mt-1 w-full rounded-md p-2 bg-slate-800 text-white" />
-        {errors.phone && <p className="text-xs text-rose-400 mt-1">{errors.phone}</p>}
-      </div>
-
-      <div>
-        <label className="block text-sm text-slate-300">Fecha de Nacimiento</label>
-        <input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} className="mt-1 w-full rounded-md p-2 bg-slate-800 text-white" />
-        {errors.birthDate && <p className="text-xs text-rose-400 mt-1">{errors.birthDate}</p>}
-      </div>
-
-      <div className="flex gap-2 mt-4">
-        <button onClick={submit} className="flex-1 py-2 rounded-2xl bg-emerald-500 text-slate-950">Guardar</button>
-        <button onClick={onCancel} className="flex-1 py-2 rounded-2xl border border-slate-700">Cancelar</button>
       </div>
     </div>
   );

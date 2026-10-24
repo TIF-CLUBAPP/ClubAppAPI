@@ -24,6 +24,16 @@ export const authService = {
 
   forgotPassword: async (email: string) => {
     const response = await api.post('/auth/forgot-password', { email });
+    return response.data as { exists: boolean; message: string };
+  },
+
+  verifyResetCode: async (payload: { email: string; code: string }) => {
+    const response = await api.post('/auth/verify-reset-code', payload);
+    return response.data as { message: string };
+  },
+
+  resetPasswordWithCode: async (payload: { email: string; code: string; newPassword: string }) => {
+    const response = await api.post('/auth/reset-password-code', payload);
     return response.data as { message: string };
   },
 
