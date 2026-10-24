@@ -1,5 +1,7 @@
 import type { UserRole } from './auth';
 
+export type TipoProfesor = 'CLUB' | 'INDEPENDIENTE';
+
 // Item de la lista de usuarios de gestión (GET /api/users)
 export interface UserListItem {
   id: number;
@@ -12,6 +14,7 @@ export interface UserListItem {
   phone: string;
   birthDate?: string | null;
   role: UserRole;
+  tipoProfesor: TipoProfesor;
   isActive: boolean;
   createdAt: string;
 }
@@ -55,3 +58,16 @@ export const ROLE_OPTIONS: RoleOption[] = [
 
 export const getRoleConfig = (role: UserRole): RoleOption =>
   ROLE_OPTIONS.find((r) => r.value === role) ?? ROLE_OPTIONS[0];
+
+export const TEACHER_TYPE_OPTIONS: { value: TipoProfesor; label: string; hint: string }[] = [
+  {
+    value: 'CLUB',
+    label: 'Empleado del Club',
+    hint: 'El club define los precios y no se cobra canon de instalaciones.',
+  },
+  {
+    value: 'INDEPENDIENTE',
+    label: 'Independiente',
+    hint: 'Paga canon / convenio al club y negocia Precio Socio y Canon de Instalaciones.',
+  },
+];

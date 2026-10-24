@@ -8,6 +8,7 @@ import {
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { activityService } from '../services/activityService';
 import { spaceService } from '../services/spaceService';
 import { userService } from '../services/userService';
@@ -48,12 +49,14 @@ const emptyForm = (): SaveActivityRequest => ({
   name: '',
   description: '',
   category: SPORT_CATEGORIES[0],
-  price: 0,
   priceMember: 0,
   priceNonMember: 0,
+  facilityCanon: 0,
+  aplicaDescuentoSocios: false,
+  tipoDescuentoCanon: 'MONTO_FIJO',
+  valorDescuentoPorSocio: 0,
+  descuentoMaximoCanon: null,
   paymentCollector: 'CLUB',
-  professorFacilityFeeMember: 0,
-  professorFacilityFeeNonMember: 0,
   maxCapacity: 10,
   teacherId: null,
   instructorIds: [],
@@ -96,11 +99,16 @@ export default function GestionActividades() {
   const [settlement, setSettlement] = useState<ActivitySettlement | null>(null);
   const [settlementLoading, setSettlementLoading] = useState(false);
   const [settlementError, setSettlementError] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [proposeTarget, setProposeTarget] = useState<Activity | null>(null);
+  const [proposePrice, setProposePrice] = useState<number>(0);
+  const [proposeCanon, setProposeCanon] = useState<number>(0);
+  const [proposeSaving, setProposeSaving] = useState(false);
   const [scheduleMode, setScheduleMode] = useState<'detailed' | 'massive'>('detailed');
   const [massiveBlocks, setMassiveBlocks] = useState<WeeklyScheduleBlock[]>([
     { id: '1', days: [1, 2, 3, 4, 5], startTime: '08:00', endTime: '20:00' },
   ]);
+
+  const toast = useToast();
 
   const load = async () => {
     try {
@@ -109,7 +117,7 @@ export default function GestionActividades() {
       setActivities(acts);
       setSpaces(sps);
     } catch (err: any) {
-      setToast({ type: 'error', message: err?.response?.data?.message ?? 'No se pudieron cargar las actividades.' });
+      toast.error(err?.response?.data?.message ?? 'No se pudieron cargar las actividades.');
     } finally {
       setLoading(false);
     }
@@ -140,16 +148,38 @@ export default function GestionActividades() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isStaff]);
 
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 4000);
-    return () => clearTimeout(t);
-  }, [toast]);
-
   const selectedSpace = useMemo(
     () => spaces.find((s) => s.id === form.spaceId) ?? null,
     [spaces, form.spaceId],
   );
+
+  // Determina si el profesor a cargo es INDEPENDIENTE (paga canon/convenio).
+  const isIndependentTeacher = useMemo(() => {
+    const id = form.teacherId ?? form.instructorIds?.[0] ?? editing?.teacherId;
+    if (id != null) {
+      const p = professors.find((x) => x.id === id);
+      if (p?.tipoProfesor === 'INDEPENDIENTE') return true;
+    }
+    if (currentUser?.role === 'TEACHER') {
+      return currentUser.tipoProfesor === 'INDEPENDIENTE';
+    }
+    return false;
+  }, [form.teacherId, form.instructorIds, editing, professors, currentUser]);
+
+  // Precompleta el canon de instalaciones y descuentos con los del espacio al crear.
+  useEffect(() => {
+    if (!editing && selectedSpace) {
+      setForm((f) => ({
+        ...f,
+        facilityCanon: f.facilityCanon === 0 ? selectedSpace.canonBase : f.facilityCanon,
+        aplicaDescuentoSocios: selectedSpace.aplicaDescuentoSocios,
+        tipoDescuentoCanon: selectedSpace.tipoDescuentoCanon,
+        valorDescuentoPorSocio: selectedSpace.valorDescuentoPorSocio,
+        descuentoMaximoCanon: selectedSpace.descuentoMaximoCanon,
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSpace, editing]);
   const scheduleRows = useMemo<ScheduleRow[]>(() => {
     return form.schedules.map((row) => {
       const conflicts: RowConflict[] = [];
@@ -215,12 +245,14 @@ export default function GestionActividades() {
       name: a.name,
       description: a.description,
       category: a.category,
-      price: a.price,
       priceMember: a.priceMember,
       priceNonMember: a.priceNonMember,
+      facilityCanon: a.facilityCanon,
+      aplicaDescuentoSocios: a.aplicaDescuentoSocios,
+      tipoDescuentoCanon: a.tipoDescuentoCanon,
+      valorDescuentoPorSocio: a.valorDescuentoPorSocio,
+      descuentoMaximoCanon: a.descuentoMaximoCanon,
       paymentCollector: a.paymentCollector,
-      professorFacilityFeeMember: a.professorFacilityFeeMember,
-      professorFacilityFeeNonMember: a.professorFacilityFeeNonMember,
       maxCapacity: a.maxCapacity,
       teacherId: a.teacherId ?? null,
       instructorIds: (a.instructors ?? []).map((i) => i.id),
@@ -249,7 +281,7 @@ export default function GestionActividades() {
   const handleAssignMe = () => {
     const myId = currentUser?.id ? Number(currentUser.id) : null;
     if (!myId || Number.isNaN(myId)) {
-      setToast({ type: 'error', message: 'No se pudo identificar tu usuario para asignarte.' });
+      toast.error('No se pudo identificar tu usuario para asignarte.');
       return;
     }
     setForm((f) => ({
@@ -309,11 +341,11 @@ export default function GestionActividades() {
     setDeleting(true);
     try {
       await activityService.deleteActivity(deleteTarget.id);
-      setToast({ type: 'success', message: 'Actividad eliminada correctamente.' });
+      toast.success('Actividad eliminada correctamente.');
       setDeleteTarget(null);
       await load();
     } catch (err: any) {
-      setToast({ type: 'error', message: err?.response?.data?.message ?? 'No se pudo eliminar la actividad.' });
+      toast.error(err?.response?.data?.message ?? 'No se pudo eliminar la actividad.');
     } finally {
       setDeleting(false);
     }
@@ -337,24 +369,58 @@ export default function GestionActividades() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (hasBlocked) {
-      setToast({ type: 'error', message: 'Hay horarios bloqueados. Revisá los conflictos en rojo.' });
+      toast.error('Hay horarios bloqueados. Revisá los conflictos en rojo.');
       return;
     }
     try {
       setSaving(true);
       if (editing) {
         await activityService.updateActivity(editing.id, form);
-        setToast({ type: 'success', message: 'Actividad actualizada correctamente.' });
+        toast.success('Actividad actualizada correctamente.');
       } else {
         await activityService.createActivity(form);
-        setToast({ type: 'success', message: 'Actividad creada correctamente.' });
+        toast.success('Actividad creada correctamente.');
       }
       setModalOpen(false);
       await load();
     } catch (err: any) {
-      setToast({ type: 'error', message: err?.response?.data?.message ?? 'No se pudo guardar la actividad.' });
+      toast.error(err?.response?.data?.message ?? 'No se pudo guardar la actividad.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAcceptNegotiation = async (a: Activity) => {
+    try {
+      await activityService.acceptNegotiation(a.id);
+      toast.success('Acuerdo aprobado correctamente.');
+      await load();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'No se pudo aprobar el acuerdo.');
+    }
+  };
+
+  const openProposeModal = (a: Activity) => {
+    setProposeTarget(a);
+    setProposePrice(a.proposedPriceMember ?? a.priceMember);
+    setProposeCanon(a.proposedFacilityCanon ?? a.facilityCanon);
+  };
+
+  const confirmPropose = async () => {
+    if (!proposeTarget) return;
+    setProposeSaving(true);
+    try {
+      await activityService.proposeNegotiation(proposeTarget.id, {
+        priceMember: proposePrice,
+        facilityCanon: proposeCanon,
+      });
+      toast.success('Contraoferta enviada.');
+      setProposeTarget(null);
+      await load();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'No se pudo proponer el nuevo valor.');
+    } finally {
+      setProposeSaving(false);
     }
   };
 
@@ -375,7 +441,7 @@ export default function GestionActividades() {
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-60">
         <Header />
-        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-24 md:pt-6 md:px-6 md:pb-6">
+        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-32 md:pt-6 md:px-6 md:pb-6">
           <div className="space-y-6 max-w-6xl mx-auto">
             <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
@@ -494,6 +560,38 @@ export default function GestionActividades() {
                         <Receipt size={14} /> Ver Liquidación
                       </button>
                     )}
+
+                    {a.estadoNegociacion === 'PENDIENTE' && (
+                      <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 space-y-2">
+                        <div className="flex items-center gap-2 text-amber-300 text-xs font-bold">
+                          <AlertTriangle size={14} /> Negociación pendiente
+                        </div>
+                        <p className="text-[11px] text-slate-300">
+                          Propuesta: Socio {fmtCurrency(a.proposedPriceMember ?? a.priceMember)} · Canon{' '}
+                          {fmtCurrency(a.proposedFacilityCanon ?? a.facilityCanon)}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            onClick={() => handleAcceptNegotiation(a)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 text-slate-950 text-[11px] font-bold hover:bg-emerald-400 transition"
+                          >
+                            <CheckCircle2 size={13} /> Aceptar Acuerdo
+                          </button>
+                          <button
+                            onClick={() => openProposeModal(a)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 text-[11px] font-bold hover:bg-slate-700 transition"
+                          >
+                            <Banknote size={13} /> Proponer Nuevo Valor
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {a.estadoNegociacion === 'APROBADO' && (
+                      <div className="mt-2 inline-flex items-center gap-1.5 text-emerald-400 text-[11px] font-bold">
+                        <CheckCircle2 size={13} /> Acuerdo aprobado
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -582,17 +680,6 @@ export default function GestionActividades() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Precio ($)</label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={form.price === 0 ? '' : form.price}
-                      onChange={(e) => setForm({ ...form, price: parseNumericInput(e.target.value) })}
-                      className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
-                    />
-                  </div>
-
-                  <div>
                     <label className="block text-xs font-bold text-slate-400 mb-1">Cupo máximo</label>
                     <input
                       type="number"
@@ -640,35 +727,74 @@ export default function GestionActividades() {
                   </div>
                 </div>
 
-                {form.paymentCollector === 'PROFESSOR_DIRECT' && (
+                {isIndependentTeacher && (
                   <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-4 space-y-3">
                     <div>
-                      <h4 className="text-sm font-bold text-violet-300">Canon del Club</h4>
+                      <h4 className="text-sm font-bold text-violet-300">Canon de Instalaciones y Descuentos</h4>
                       <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                        Cuando el profesor cobra directamente a los alumnos, definí el canon que le corresponde al club por cada inscripción.
+                        Canon que el profesor independiente abona al club por el uso del espacio.
+                        {selectedSpace?.canonBase ? ` Base del espacio: ${fmtCurrency(selectedSpace.canonBase)}.` : ''}
                       </p>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-400 mb-1">Canon Club por Socio ($)</label>
-                        <input
-                          type="number"
-                          min={0}
-                          value={form.professorFacilityFeeMember === 0 ? '' : form.professorFacilityFeeMember}
-                          onChange={(e) => setForm({ ...form, professorFacilityFeeMember: parseNumericInput(e.target.value) })}
-                          className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-400 mb-1">Canon Club por No Socio ($)</label>
-                        <input
-                          type="number"
-                          min={0}
-                          value={form.professorFacilityFeeNonMember === 0 ? '' : form.professorFacilityFeeNonMember}
-                          onChange={(e) => setForm({ ...form, professorFacilityFeeNonMember: parseNumericInput(e.target.value) })}
-                          className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
-                        />
-                      </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Canon de Instalaciones ($)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={form.facilityCanon === 0 ? '' : form.facilityCanon}
+                        onChange={(e) => setForm({ ...form, facilityCanon: parseNumericInput(e.target.value) })}
+                        className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                      />
+                    </div>
+
+                    <div className="pt-2 border-t border-violet-500/20 space-y-3">
+                      <Toggle
+                        label="Descuento por Volumen de Socios"
+                        checked={form.aplicaDescuentoSocios}
+                        onChange={(val) => setForm({ ...form, aplicaDescuentoSocios: val })}
+                      />
+
+                      {form.aplicaDescuentoSocios && (
+                        <div className="space-y-3 pl-2 border-l-2 border-emerald-500/30">
+                          <div>
+                            <label className="block text-xs font-bold text-slate-400 mb-1">Tipo de Descuento</label>
+                            <select
+                              value={form.tipoDescuentoCanon}
+                              onChange={(e) => setForm({ ...form, tipoDescuentoCanon: e.target.value as 'MONTO_FIJO' | 'PORCENTAJE' })}
+                              className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                            >
+                              <option value="MONTO_FIJO">Monto Fijo ($ por socio)</option>
+                              <option value="PORCENTAJE">Porcentaje (% del canon por socio)</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-slate-400 mb-1">
+                              {form.tipoDescuentoCanon === 'PORCENTAJE' ? 'Porcentaje de Descuento por Socio (%)' : 'Monto de Descuento por Socio ($)'}
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={form.valorDescuentoPorSocio === 0 ? '' : form.valorDescuentoPorSocio}
+                              onChange={(e) => setForm({ ...form, valorDescuentoPorSocio: parseNumericInput(e.target.value) })}
+                              className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-slate-400 mb-1">Descuento Máximo Total ($ o vacío)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={form.descuentoMaximoCanon == null ? '' : form.descuentoMaximoCanon}
+                              onChange={(e) => setForm({ ...form, descuentoMaximoCanon: e.target.value === '' ? null : parseNumericInput(e.target.value) })}
+                              className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -931,7 +1057,7 @@ export default function GestionActividades() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60]"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-60"
           >
             <motion.div
               initial={{ scale: 0.95 }}
@@ -980,7 +1106,7 @@ export default function GestionActividades() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60]"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-60"
           >
             <motion.div
               initial={{ scale: 0.95 }}
@@ -1034,17 +1160,17 @@ export default function GestionActividades() {
 
                   <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2 text-sm">
                     <div className="flex items-center justify-between text-slate-300">
-                      <span>Socios × Canon Socio</span>
+                      <span>Alumnos × Canon de Instalaciones</span>
                       <span className="font-semibold text-white">
-                        {settlement.memberEnrollments} × {fmtCurrency(settlement.memberFee)}
+                        {settlement.totalEnrollments} × {fmtCurrency(settlement.facilityCanon)}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between text-slate-300">
-                      <span>No Socios × Canon No Socio</span>
-                      <span className="font-semibold text-white">
-                        {settlement.nonMemberEnrollments} × {fmtCurrency(settlement.nonMemberFee)}
-                      </span>
-                    </div>
+                    {settlement.discountApplied > 0 && (
+                      <div className="flex items-center justify-between text-emerald-400 text-xs font-semibold">
+                        <span>Descuento por Socios Aplicado</span>
+                        <span>- {fmtCurrency(settlement.discountApplied)}</span>
+                      </div>
+                    )}
                     <div className="border-t border-slate-800 pt-3 flex items-center justify-between gap-2">
                       <span className="font-bold text-slate-200 flex items-center gap-1.5">
                         <Banknote size={15} className="text-emerald-400" /> Total a Pagar al Club
@@ -1069,29 +1195,73 @@ export default function GestionActividades() {
             </motion.div>
           </motion.div>
         )}
-      </AnimatePresence>
 
-      <AnimatePresence>
-        {toast && (
+        {proposeTarget && (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className={`fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl text-sm font-semibold shadow-2xl backdrop-blur-md ${
-              toast.type === 'success'
-                ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300'
-                : 'bg-red-500/10 border border-red-500/30 text-red-300'
-            }`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50"
           >
-            {toast.type === 'success' ? (
-              <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
-            ) : (
-              <AlertCircle size={18} className="text-red-400 shrink-0" />
-            )}
-            {toast.message}
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-sm shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-bold text-white">Proponer Nuevo Valor</h3>
+                <button onClick={() => setProposeTarget(null)} className="text-slate-400 hover:text-white">
+                  <X size={18} />
+                </button>
+              </div>
+              <p className="text-xs text-slate-400 mb-4">
+                Ingresá tu contraoferta para <strong className="text-slate-200">{proposeTarget.name}</strong>.
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-1">Precio Socio ($)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={proposePrice === 0 ? '' : proposePrice}
+                    onChange={(e) => setProposePrice(parseNumericInput(e.target.value))}
+                    className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-1">Canon de Instalaciones ($)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={proposeCanon === 0 ? '' : proposeCanon}
+                    onChange={(e) => setProposeCanon(parseNumericInput(e.target.value))}
+                    className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 mt-5">
+                <button
+                  onClick={() => setProposeTarget(null)}
+                  disabled={proposeSaving}
+                  className="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold text-slate-300 border border-slate-700 hover:bg-slate-800"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmPropose}
+                  disabled={proposeSaving}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-sm font-bold"
+                >
+                  {proposeSaving ? <RefreshCw size={14} className="animate-spin" /> : <Banknote size={14} />}
+                  Enviar Propuesta
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
+
     </div>
   );
 }

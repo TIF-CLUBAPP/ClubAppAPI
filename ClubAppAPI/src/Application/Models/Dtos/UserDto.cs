@@ -17,6 +17,11 @@ public class UserDto
     // para que coincida con el frontend, pero se mantiene como enum en C#.
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public UserRole Role { get; set; }
+
+    // Tipo de profesor: CLUB (empleado del club) o INDEPENDIENTE (paga canon/convenio).
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public TipoProfesor TipoProfesor { get; set; } = TipoProfesor.CLUB;
+
     public bool IsActive { get; set; } = true;
     public bool IsBlocked { get; set; }
     public DateTime CreatedAt { get; set; }

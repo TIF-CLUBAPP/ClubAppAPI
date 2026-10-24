@@ -6,7 +6,8 @@ import {
   Clock,
   RefreshCw,
   CheckCircle2,
-  AlertCircle,
+  AlertTriangle,
+  Check,
   Sparkles,
   UserCheck,
   Wallet,
@@ -17,28 +18,37 @@ import {
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import { activityService } from '../services/activityService';
-import type { Activity } from '../types/activity';
+import type { Activity, MyEnrollment } from '../types/activity';
+import { useToast } from '../context/ToastContext';
 
 const fmtCurrency = (val: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(val);
 
 export default function InscripcionActividades() {
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [myEnrollments, setMyEnrollments] = useState<MyEnrollment[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
-  const [toast, setToast] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
   const [pendingActivity, setPendingActivity] = useState<Activity | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<{ activity: Activity; enrollmentId: number } | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const load = async () => {
+  const toast = useToast();
+
+  const load = async (showSpinner = true) => {
     try {
-      setLoading(true);
-      const data = await activityService.getActivities();
+      if (showSpinner) setLoading(true);
+      const [data, my] = await Promise.all([
+        activityService.getActivities(),
+        activityService.getMyEnrollments(),
+      ]);
       setActivities(data);
+      setMyEnrollments(my);
     } catch (err: any) {
-      setToast({ type: 'error', text: err?.response?.data?.message ?? 'No se pudieron cargar las actividades.' });
+      toast.error(err?.response?.data?.message ?? 'No se pudieron cargar las actividades.');
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   };
 
@@ -46,15 +56,9 @@ export default function InscripcionActividades() {
     load();
   }, []);
 
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3500);
-    return () => clearTimeout(t);
-  }, [toast]);
-
   const handleEnroll = async (activity: Activity) => {
     if (activity.availableSpots <= 0) {
-      setToast({ type: 'error', text: 'No hay cupos disponibles para esta actividad.' });
+      toast.error('No hay cupos disponibles para esta actividad.');
       return;
     }
 
@@ -71,13 +75,28 @@ export default function InscripcionActividades() {
     try {
       setBusyId(activity.id);
       await activityService.enroll(activity.id);
-      setToast({ type: 'ok', text: `¡Inscripción exitosa en ${activity.name}!` });
+      toast.success(`¡Inscripción exitosa en ${activity.name}!`);
       setPendingActivity(null);
-      await load();
+      await load(false);
     } catch (err: any) {
-      setToast({ type: 'error', text: err?.response?.data?.message ?? 'No se pudo completar la inscripción.' });
+      toast.error(err?.response?.data?.message ?? 'No se pudo completar la inscripción.');
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const confirmCancel = async () => {
+    if (!cancelTarget) return;
+    try {
+      setCancellingId(cancelTarget.enrollmentId);
+      await activityService.cancelEnrollment(cancelTarget.enrollmentId);
+      toast.success(`Baja confirmada en ${cancelTarget.activity.name}.`);
+      setCancelTarget(null);
+      await load(false);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'No se pudo anular la inscripción.');
+    } finally {
+      setCancellingId(null);
     }
   };
 
@@ -98,7 +117,7 @@ export default function InscripcionActividades() {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-60">
         <Header />
 
-        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-24 md:pt-6 md:px-6 md:pb-6">
+        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-32 md:pt-6 md:px-6 md:pb-6">
           <div className="space-y-6 max-w-7xl mx-auto">
             {/* Encabezado */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -113,28 +132,12 @@ export default function InscripcionActividades() {
               </div>
 
               <button
-                onClick={load}
+                onClick={() => load()}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-700 text-slate-300 hover:border-emerald-500 hover:text-white text-xs font-semibold transition-all self-start md:self-auto"
               >
                 <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Actualizar
               </button>
             </div>
-
-            {/* Toast */}
-            {toast && (
-              <motion.div
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`flex items-center gap-2 px-4 py-3 rounded-2xl border text-sm font-medium ${
-                  toast.type === 'ok'
-                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
-                    : 'bg-rose-500/10 border-rose-500/20 text-rose-300'
-                }`}
-              >
-                {toast.type === 'ok' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
-                {toast.text}
-              </motion.div>
-            )}
 
             {loading ? (
               <div className="flex flex-col items-center justify-center h-64 text-slate-400 gap-3">
@@ -150,6 +153,8 @@ export default function InscripcionActividades() {
                 {activities.map((a) => {
                   const full = a.availableSpots <= 0;
                   const inactive = !a.isActive;
+                  const enrollment = myEnrollments.find((e) => e.activityId === a.id && e.status === 'ACTIVE');
+                  const isEnrolled = Boolean(enrollment);
 
                   return (
                     <motion.article
@@ -247,25 +252,40 @@ export default function InscripcionActividades() {
                           </div>
                         </div>
 
-                        <button
-                          onClick={() => handleEnroll(a)}
-                          disabled={full || inactive || busyId === a.id}
-                          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                            full
-                              ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30 cursor-not-allowed'
-                              : inactive
-                                ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                                : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
-                          } disabled:opacity-70 disabled:cursor-not-allowed`}
-                        >
-                          {busyId === a.id ? (
-                            <RefreshCw size={14} className="animate-spin" />
-                          ) : full ? (
-                            'Sin Cupo'
-                          ) : (
-                            'Inscribirme'
-                          )}
-                        </button>
+                        {isEnrolled ? (
+                          <div className="flex flex-col items-end gap-2 shrink-0">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600/30 text-blue-400 border border-blue-500/30 text-xs font-bold">
+                              <Check size={14} /> Inscripto
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setCancelTarget({ activity: a, enrollmentId: enrollment!.id })}
+                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-rose-400 hover:bg-rose-500/20 border border-rose-500/30 transition-all"
+                            >
+                              <AlertTriangle size={14} /> Anular inscripción
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleEnroll(a)}
+                            disabled={full || inactive || busyId === a.id}
+                            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                              full
+                                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30 cursor-not-allowed'
+                                : inactive
+                                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                                  : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
+                            } disabled:opacity-70 disabled:cursor-not-allowed`}
+                          >
+                            {busyId === a.id ? (
+                              <RefreshCw size={14} className="animate-spin" />
+                            ) : full ? (
+                              'Sin Cupo'
+                            ) : (
+                              'Inscribirme'
+                            )}
+                          </button>
+                        )}
                       </div>
                     </motion.article>
                   );
@@ -378,6 +398,62 @@ export default function InscripcionActividades() {
                   <CheckCircle2 size={14} />
                 )}
                 Confirmar inscripción
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Modal de confirmación de anulación de inscripción */}
+      {cancelTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle size={18} className="text-rose-400" />
+                <h3 className="text-lg font-black text-white">
+                  Anular inscripción a {cancelTarget.activity.name}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => !cancellingId && setCancelTarget(null)}
+                className="text-slate-400 hover:text-white transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className="mt-3 text-sm text-slate-300 leading-relaxed">
+              <span className="font-bold text-rose-300">Atención:</span> La baja se aplicará a partir
+              del próximo mes. Mantendrás el beneficio y acceso durante lo que resta del mes en curso.
+            </p>
+
+            <div className="mt-6 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCancelTarget(null)}
+                disabled={cancellingId !== null}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-bold text-slate-300 bg-slate-800 border border-slate-700 hover:bg-slate-700 rounded-xl px-4 py-2.5 transition disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmCancel}
+                disabled={cancellingId !== null}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 rounded-xl px-4 py-2.5 transition disabled:opacity-50"
+              >
+                {cancellingId === cancelTarget.enrollmentId ? (
+                  <RefreshCw size={14} className="animate-spin" />
+                ) : (
+                  <AlertTriangle size={14} />
+                )}
+                Confirmar baja
               </button>
             </div>
           </motion.div>

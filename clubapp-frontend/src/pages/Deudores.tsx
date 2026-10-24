@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef, type ReactNode } from 'react';
+import { useState, useEffect, useMemo, useCallback, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -26,6 +26,7 @@ import {
 import Header from '../components/layout/Header';
 import Sidebar from '../components/layout/Sidebar';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { cuotasService } from '../services/cuotasService';
 import { paymentsService } from '../services/paymentsService';
 import type { CuotaVencida, CuotasVencidasStats } from '../types/deudores';
@@ -373,7 +374,6 @@ export default function Deudores() {
   const [blockTarget, setBlockTarget] = useState<{ debtor: CuotaVencida; status: boolean } | null>(null);
   const [modalStatus, setModalStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
   const [modalError, setModalError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
 
   // IDs de las cuotas seleccionadas para el cobro (permite cobros parciales).
   const [selectedCuotaIds, setSelectedCuotaIds] = useState<number[]>([]);
@@ -386,7 +386,7 @@ export default function Deudores() {
   const [pendingTransfers, setPendingTransfers] = useState<PendingTransfer[]>([]);
   const [transfersLoading, setTransfersLoading] = useState(false);
 
-  const toastTimer = useRef<number | null>(null);
+  const toast = useToast();
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -429,16 +429,7 @@ export default function Deudores() {
   useEffect(() => {
     loadData();
     loadPendingTransfers();
-    return () => {
-      if (toastTimer.current) window.clearTimeout(toastTimer.current);
-    };
   }, [loadData, loadPendingTransfers]);
-
-  const showToast = (message: string) => {
-    setToast(message);
-    if (toastTimer.current) window.clearTimeout(toastTimer.current);
-    toastTimer.current = window.setTimeout(() => setToast(null), 4500);
-  };
 
   // Buscador por nombre / DNI / email
   const filtered = useMemo(() => {
@@ -586,12 +577,12 @@ export default function Deudores() {
     
     try {
       await cuotasService.updateUserStatus(debtor.socioId, !estaBloqueado); // isActive = !estaBloqueado
-      showToast(`Socio ${estaBloqueado ? 'bloqueado' : 'desbloqueado'} correctamente.`);
+      toast.success(`Socio ${estaBloqueado ? 'bloqueado' : 'desbloqueado'} correctamente.`);
       setBlockTarget(null);
       loadData(); // Recargar datos
     } catch (err) {
       console.error('Error al actualizar estado:', err);
-      showToast('Error al actualizar el estado del socio.');
+      toast.error('Error al actualizar el estado del socio.');
       setBlockTarget(null);
     }
   };
@@ -603,7 +594,7 @@ export default function Deudores() {
     setLastPayment(null);
     loadData();
     if (debtor) {
-      showToast(
+      toast.success(
         `Cobro registrado: ${debtor.nombre} ${debtor.apellido} · ${formatCurrency(
           pagado?.monto ?? debtor.montoTotalAdeudado
         )}`
@@ -641,7 +632,7 @@ export default function Deudores() {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-60">
         <Header />
 
-        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-24 md:pt-6 md:px-6 md:pb-6">
+        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-32 md:pt-6 md:px-6 md:pb-6">
           {!isStaff ? (
             <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-10 text-center max-w-lg mx-auto mt-10">
               <AlertTriangle className="mx-auto text-amber-400" size={40} />
@@ -886,7 +877,7 @@ export default function Deudores() {
                               </div>
                             </td>
                             <td className="px-3 py-3 text-center">
-                              <div className="flex flex-wrap justify-center gap-1 max-w-[200px] mx-auto">
+                              <div className="flex flex-wrap justify-center gap-1 max-w-50 mx-auto">
                                 {(() => {
                                   const periodos = getPeriodosValidos(d);
                                   if (periodos.length === 0) {
@@ -1254,19 +1245,6 @@ export default function Deudores() {
         )}
       </AnimatePresence>
 
-      {/* Toast de éxito */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm font-semibold shadow-2xl backdrop-blur-md"
-          >
-            <CheckCircle2 size={18} className="text-emerald-400 shrink-0" /> {toast}
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

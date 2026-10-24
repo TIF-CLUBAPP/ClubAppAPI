@@ -23,6 +23,9 @@ namespace Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("AplicaDescuentoSocios")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Category")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -33,6 +36,15 @@ namespace Infrastructure.Migrations
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("DescuentoMaximoCanon")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("EstadoNegociacion")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("FacilityCanon")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
@@ -68,6 +80,12 @@ namespace Infrastructure.Migrations
                     b.Property<string>("ProfessorMercadoPagoPublicKey")
                         .HasColumnType("TEXT");
 
+                    b.Property<decimal?>("ProposedFacilityCanon")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("ProposedPriceMember")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<bool>("RequiresBooking")
                         .HasColumnType("INTEGER");
 
@@ -80,6 +98,12 @@ namespace Infrastructure.Migrations
 
                     b.Property<int?>("TeacherId")
                         .HasColumnType("INTEGER");
+
+                    b.Property<int>("TipoDescuentoCanon")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("ValorDescuentoPorSocio")
+                        .HasColumnType("decimal(18,2)");
 
                     b.HasKey("Id");
 
@@ -697,11 +721,20 @@ namespace Infrastructure.Migrations
                     b.Property<bool>("AllowReservationsDuringClasses")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("AplicaDescuentoSocios")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("CanonBase")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("CloseTime")
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("DescuentoMaximoCanon")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<bool>("Is24Hours")
                         .HasColumnType("INTEGER");
@@ -735,6 +768,12 @@ namespace Infrastructure.Migrations
                     b.Property<string>("SportCategory")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("TipoDescuentoCanon")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("ValorDescuentoPorSocio")
+                        .HasColumnType("decimal(18,2)");
 
                     b.HasKey("Id");
 
@@ -861,6 +900,9 @@ namespace Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Role")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TipoProfesor")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");

@@ -20,6 +20,12 @@ export const activityService = {
     return response.data;
   },
 
+  /** Cancela (da de baja) una inscripción del usuario autenticado (PATCH /api/enrollments/{id}/cancel). */
+  cancelEnrollment: async (enrollmentId: number): Promise<{ message: string }> => {
+    const response = await api.patch<{ message: string }>(`/enrollments/${enrollmentId}/cancel`);
+    return response.data;
+  },
+
   /** Crea una actividad (POST /api/activities). */
   createActivity: async (data: SaveActivityRequest): Promise<Activity> => {
     const response = await api.post<Activity>('/activities', data);
@@ -47,6 +53,21 @@ export const activityService = {
   /** Obtiene la liquidación de una actividad (GET /api/activities/{id}/settlement). */
   getSettlement: async (activityId: number): Promise<ActivitySettlement> => {
     const response = await api.get<ActivitySettlement>(`/activities/${activityId}/settlement`);
+    return response.data;
+  },
+
+  /** Acepta la contraoferta de negociación pendiente (POST /api/activities/{id}/negotiation/accept). */
+  acceptNegotiation: async (activityId: number): Promise<Activity> => {
+    const response = await api.post<Activity>(`/activities/${activityId}/negotiation/accept`);
+    return response.data;
+  },
+
+  /** Registra una nueva contraoferta de Precio Socio / Canon (POST /api/activities/{id}/negotiation/propose). */
+  proposeNegotiation: async (
+    activityId: number,
+    data: { priceMember?: number; facilityCanon?: number },
+  ): Promise<Activity> => {
+    const response = await api.post<Activity>(`/activities/${activityId}/negotiation/propose`, data);
     return response.data;
   },
 

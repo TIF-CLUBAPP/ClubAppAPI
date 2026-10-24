@@ -24,6 +24,21 @@ public class SpaceDto
     [JsonPropertyName("pricePerHour")]
     public decimal PricePerHour { get; set; }
 
+    [JsonPropertyName("canonBase")]
+    public decimal CanonBase { get; set; }
+
+    [JsonPropertyName("aplicaDescuentoSocios")]
+    public bool AplicaDescuentoSocios { get; set; }
+
+    [JsonPropertyName("tipoDescuentoCanon")]
+    public string TipoDescuentoCanon { get; set; } = "MONTO_FIJO";
+
+    [JsonPropertyName("valorDescuentoPorSocio")]
+    public decimal ValorDescuentoPorSocio { get; set; }
+
+    [JsonPropertyName("descuentoMaximoCanon")]
+    public decimal? DescuentoMaximoCanon { get; set; }
+
     [JsonPropertyName("slotDurationMinutes")]
     public int SlotDurationMinutes { get; set; }
 
@@ -56,6 +71,21 @@ public class SaveSpaceRequest
 
     [JsonPropertyName("pricePerHour")]
     public decimal PricePerHour { get; set; }
+
+    [JsonPropertyName("canonBase")]
+    public decimal CanonBase { get; set; }
+
+    [JsonPropertyName("aplicaDescuentoSocios")]
+    public bool AplicaDescuentoSocios { get; set; } = false;
+
+    [JsonPropertyName("tipoDescuentoCanon")]
+    public string TipoDescuentoCanon { get; set; } = "MONTO_FIJO";
+
+    [JsonPropertyName("valorDescuentoPorSocio")]
+    public decimal ValorDescuentoPorSocio { get; set; }
+
+    [JsonPropertyName("descuentoMaximoCanon")]
+    public decimal? DescuentoMaximoCanon { get; set; }
 
     [JsonPropertyName("slotDurationMinutes")]
     public int SlotDurationMinutes { get; set; } = 60;

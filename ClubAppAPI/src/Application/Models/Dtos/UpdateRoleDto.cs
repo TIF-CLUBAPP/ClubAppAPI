@@ -4,4 +4,9 @@ namespace ClubApp.Application.DTOs
     {
         public int NewRole { get; set; }
     }
+
+    public class UpdateTeacherTypeDto
+    {
+        public string TipoProfesor { get; set; } = "CLUB";
+    }
 }

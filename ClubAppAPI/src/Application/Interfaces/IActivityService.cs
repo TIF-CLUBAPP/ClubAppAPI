@@ -14,4 +14,10 @@ public interface IActivityService
     Task<ActivityDto?> AssignInstructorAsync(int activityId, int userId);
     Task<ActivitySettlementDto> GetActivitySettlementAsync(int activityId);
 
+    /// <summary>Acepta la contraoferta de negociación pendiente y aplica los valores propuestos.</summary>
+    Task<ActivityDto?> AcceptNegotiationAsync(int activityId, int actorId, UserRole actorRole);
+
+    /// <summary>Registra una nueva contraoferta de Precio Socio / Canon de instalaciones.</summary>
+    Task<ActivityDto?> ProposeNegotiationAsync(int activityId, NegotiationProposalRequest request, int actorId, UserRole actorRole);
+
 }

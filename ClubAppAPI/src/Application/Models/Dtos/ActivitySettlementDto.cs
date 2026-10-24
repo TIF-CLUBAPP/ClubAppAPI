@@ -9,5 +9,7 @@ public class ActivitySettlementDto
     public int NonMemberEnrollments { get; set; }
     public decimal MemberFee { get; set; }
     public decimal NonMemberFee { get; set; }
+    public decimal FacilityCanon { get; set; }
     public decimal TotalSettlement { get; set; }
+    public decimal DiscountApplied { get; set; }
 }
