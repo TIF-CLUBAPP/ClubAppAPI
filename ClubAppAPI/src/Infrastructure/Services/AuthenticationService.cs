@@ -238,7 +238,7 @@ namespace ClubApp.Infrastructure.Services
             // Reutilizamos los campos de recuperación de contraseña para almacenar el código.
             // El código vence a los 10 minutos.
             user.PasswordResetToken = code;
-            user.PasswordResetTokenExpiration = DateTime.UtcNow.AddMinutes(10);
+            user.PasswordResetTokenExpiration = DateTime.UtcNow.AddMinutes(2);
 
             await _userRepository.UpdateAsync(user);
 

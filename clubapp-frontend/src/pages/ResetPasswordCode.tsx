@@ -7,7 +7,7 @@ import { authService } from '../services/authService';
 import { useToast } from '../context/ToastContext';
 
 const CODE_LENGTH = 6;
-const RESEND_SECONDS = 60;
+const RESEND_SECONDS = 120;
 
 export default function ResetPasswordCode() {
   const navigate = useNavigate();

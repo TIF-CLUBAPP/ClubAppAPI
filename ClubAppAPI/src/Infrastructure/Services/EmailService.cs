@@ -103,11 +103,22 @@ namespace ClubApp.Infrastructure.Services
                 mailMessage.To.Add(toEmail);
 
                 await client.SendMailAsync(mailMessage);
-                _logger.LogInformation("Correo enviado con éxito a {ToEmail}", toEmail);
+                _logger.LogInformation("================================================");
+                _logger.LogInformation("[SMTP SUCCESS] Correo enviado con éxito a {ToEmail} mediante Brevo (250 OK)", toEmail);
+                _logger.LogInformation("================================================");
+            }
+            catch (SmtpException smtpEx)
+            {
+                _logger.LogError(smtpEx, "================================================");
+                _logger.LogError("[SMTP ERROR] Error SMTP al enviar a {ToEmail}. StatusCode: {StatusCode}, Mensaje: {Message}", toEmail, smtpEx.StatusCode, smtpEx.Message);
+                _logger.LogError("================================================");
+                _logger.LogInformation("[FALLBACK EMAIL LOG] Destinatario: {ToEmail} | Asunto: {Subject} | Contenido: {Body}", toEmail, subject, body);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al enviar correo SMTP a {ToEmail}. Registrando contenido en logger como fallback.", toEmail);
+                _logger.LogError(ex, "================================================");
+                _logger.LogError("[GENERAL SMTP ERROR] Error inesperado al enviar correo a {ToEmail}. Mensaje: {Message}", toEmail, ex.Message);
+                _logger.LogError("================================================");
                 _logger.LogInformation("[FALLBACK EMAIL LOG] Destinatario: {ToEmail} | Asunto: {Subject} | Contenido: {Body}", toEmail, subject, body);
             }
         }
