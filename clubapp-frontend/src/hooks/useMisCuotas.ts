@@ -119,6 +119,7 @@ const buildMockCuotas = (s: FeeSettings): MemberCuota[] => {
 
 export function useMisCuotas() {
   const { user } = useAuth();
+  const isSocio = user?.isSocio === true;
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState<FeeSettings>({
     baseFeeAmount: 15000, lateFeePercentage: 10, lateFeeType: 'percentage', dueDayOfMonth: 15,
@@ -126,9 +127,18 @@ export function useMisCuotas() {
   const [exemptionLabel, setExemptionLabel] = useState('');
   const [cuotas, setCuotas] = useState<MemberCuota[]>([]);
 
-  useEffect(() => { loadData(); }, [user]);
+  useEffect(() => { loadData(); }, [user, isSocio]);
 
   const loadData = async () => {
+    // Verificamos la condición del usuario autenticado ANTES de consultar o listar cuotas.
+    // Un usuario registrado en la app no es automáticamente "Socio" del club abonado.
+    if (!isSocio) {
+      setCuotas([]);
+      setExemptionLabel('');
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       const [sData, eData] = await Promise.all([
@@ -185,5 +195,5 @@ export function useMisCuotas() {
   const hasPending = cuotas.some(c => c.status === 'PENDIENTE');
   const globalStatus: 'AL_DIA' | 'PENDIENTE' | 'EN_MORA' = hasOverdue ? 'EN_MORA' : hasPending ? 'PENDIENTE' : 'AL_DIA';
 
-  return { loading, settings, exemptionLabel, cuotas, totalPending, globalStatus, updateCuota, updateCuotas };
+  return { loading, settings, exemptionLabel, cuotas, totalPending, globalStatus, updateCuota, updateCuotas, isSocio };
 }

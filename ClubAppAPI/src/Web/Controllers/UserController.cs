@@ -375,6 +375,7 @@ public class UsersController : ControllerBase
             fullName = user.FullName,
             email = user.Email,
             role = user.Role.ToString(),
+            isSocio = user.IsMember,
             tipoProfesor = user.TipoProfesor.ToString(),
             dni = user.Dni,
             phone = user.Phone,

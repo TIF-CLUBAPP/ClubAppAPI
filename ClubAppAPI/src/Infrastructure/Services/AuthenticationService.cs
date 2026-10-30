@@ -83,7 +83,9 @@ namespace ClubApp.Infrastructure.Services
                 Dni = dto.Dni,
                 Phone = dto.Phone,
                 BirthDate = dto.BirthDate,
-                Role = UserRole.MEMBER
+                Role = UserRole.MEMBER,
+                // Un usuario registrado en la app NO es automáticamente Socio del club abonado.
+                IsMember = false
             };
 
             await _userRepository.AddAsync(newUser);
@@ -144,7 +146,9 @@ namespace ClubApp.Infrastructure.Services
                 LastName = payload.FamilyName ?? string.Empty,
                 GoogleId = payload.Subject,
                 PasswordHash = string.Empty, // No password for Google-only accounts
-                Role = UserRole.MEMBER
+                Role = UserRole.MEMBER,
+                // Un usuario registrado en la app NO es automáticamente Socio del club abonado.
+                IsMember = false
             };
 
             await _userRepository.AddAsync(newUser);
@@ -194,7 +198,8 @@ namespace ClubApp.Infrastructure.Services
                 new Claim("sub", user.Id.ToString()),
                 new Claim(ClaimTypes.Email, user.Email ?? string.Empty),
                 new Claim(ClaimTypes.Name, user.FirstName ?? string.Empty),
-                new Claim(ClaimTypes.Role, user.Role.ToString())
+                new Claim(ClaimTypes.Role, user.Role.ToString()),
+                new Claim("isSocio", user.IsMember ? "true" : "false")
             };
 
             var issuer = _configuration["Authentication:Issuer"] ?? "ClubAppAPI";

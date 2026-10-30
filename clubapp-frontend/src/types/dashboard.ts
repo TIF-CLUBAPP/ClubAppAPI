@@ -34,3 +34,19 @@ export interface SectorStatus {
   /** Indica si el espacio admite reservas particulares de socios. */
   isReservable?: boolean;
 }
+
+export interface DashboardDto {
+  hasClub: boolean;
+  userName: string;
+  clubName?: string;
+  membershipSummary?: {
+    hasActiveMembership: boolean;
+    membershipName?: string;
+    amount: number;
+    nextDueDate?: string;
+    status: string;
+  };
+  recentCuotas: any[];
+  upcomingReservations: any[];
+}
+

@@ -51,7 +51,7 @@ public class User : BaseEntity
 
     // Indica si el usuario es Socio del club (abona cuota / tiene membresía) o No Socio/Seguidor.
     // Los alumnos "No Socios" se registran como usuarios pero no abonan la cuota social.
-    public bool IsMember { get; set; } = true;
+    public bool IsMember { get; set; } = false;
 
     // Tipo de profesor: CLUB (empleado del club) o INDEPENDIENTE (paga canon/convenio al club).
     public TipoProfesor TipoProfesor { get; set; } = TipoProfesor.CLUB;

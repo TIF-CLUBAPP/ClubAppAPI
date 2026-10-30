@@ -6,7 +6,7 @@ import { PaymentSuccessView } from './PaymentSuccessView';
 import { PaymentSummaryBox } from './PaymentSummaryBox';
 import { paymentsService } from '../../services/paymentsService';
 import { getMercadoPagoInstance } from '../../config/mercadopago';
-import { computeDigitalServiceFee } from '../../config/fees';
+import { computeDigitalServiceFee, DIGITAL_SERVICE_FEE_PERCENTAGE } from '../../config/fees';
 import { GroupPaymentPanel } from './GroupPaymentPanel';
 import { groupPaymentService } from '../../services/groupPaymentService';
 import { useAuth } from '../../context/AuthContext';
@@ -34,7 +34,7 @@ interface CheckoutModalProps {
   prepareBookingForTotal?: () => Promise<{ paymentId: number }>;
 }
 
-/** Resuelve el ID numÃ©rico primario de la cuota (Payment.Id) a partir del objeto cuota. */
+/** Resuelve el ID numérico primario de la cuota (Payment.Id) a partir del objeto cuota. */
 const resolveCuotaId = (cuota: MemberCuota): number | null => {
   const cuotaObj = cuota as any;
   const raw = cuotaObj.idReal ?? cuotaObj.cuotaId ?? cuotaObj.id;
@@ -135,7 +135,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   }, [payMode, group.token, groupFullyPaid]);
 
   // Campos de tarjeta: NO se guardan en el state de React. Se leen desde el DOM
-  // (refs) Ãºnicamente al confirmar, para tokenizarlos en el cliente vÃ­a Mercado Pago.
+  // (refs) únicamente al confirmar, para tokenizarlos en el cliente vía Mercado Pago.
   const cardNumberRef = useRef<HTMLInputElement>(null);
   const cardNameRef = useRef<HTMLInputElement>(null);
   const cardExpiryRef = useRef<HTMLInputElement>(null);
@@ -143,8 +143,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   if (cuotasList.length === 0) return null;
 
-  // Todos los mÃ©todos (Mercado Pago, Tarjeta y Transferencia) suman el costo
-  // del servicio digital ATRIO al total (3.5% - mÃ¡x $1.500).
+  // Todos los métodos (Mercado Pago, Tarjeta y Transferencia) suman el costo
+  // del servicio digital ATRIO al total (3.5% - máx $1.500).
   // En modo dividido, el organizador abona únicamente su cuota (total / participantes).
   const totalBaseAmount = cuotasList.reduce((s, c) => s + (c.totalAmount || 0), 0);
 
@@ -361,17 +361,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         setIsProcessing(false);
       }
       if (cuotaIds.length === 0) {
-        console.error('[pago] cuotaId invÃ¡lido. No se enviarÃ¡ la peticiÃ³n.', {
+        console.error('[pago] cuotaId inválido. No se enviará la petición.', {
           cuotasList,
         });
         toast.error('No se pudo iniciar el pago: no se pudo identificar la cuota.');
         return;
       }
 
-      // ========== Tarjeta: TokenizaciÃ³n Branded ==========
+      // ========== Tarjeta: Tokenización Branded ==========
       // Los datos de la tarjeta se tokenizan en el navegador con el SDK de
-      // Mercado Pago. El backend (.NET) recibe ÃšNICAMENTE el token devuelto,
-      // nunca los nÃºmeros de tarjeta ni datos sensibles.
+      // Mercado Pago. El backend (.NET) recibe ÚNICAMENTE el token devuelto,
+      // nunca los números de tarjeta ni datos sensibles.
       if (method === 'card') {
         setCardError(null);
         setIsProcessing(true);
@@ -401,7 +401,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         const cardExpirationMonth = String(parseInt(expiryMatch[1], 10));
         const cardExpirationYear = `20${expiryMatch[2]}`;
 
-        // TokenizaciÃ³n en el cliente (createCardToken). Los datos NO salen del
+        // Tokenización en el cliente (createCardToken). Los datos NO salen del
         // navegador: solo viaja el token resultante.
         const cardToken = await getMercadoPagoInstance().createCardToken({
           cardNumber,
@@ -442,7 +442,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         return;
       }
 
-      // ========== Mercado Pago: redirecciÃ³n a Checkout Pro ==========
+      // ========== Mercado Pago: redirección a Checkout Pro ==========
       if (method === 'mercadopago') {
         setIsProcessing(true);
 
@@ -456,12 +456,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         const order = await paymentsService.createOrder(cuotaIds);
 
         // El backend actual devuelve `init_point` (snake_case). Por robustez,
-        // tambiÃ©n se aceptan las variantes camelCase / sandbox por si cambia la
-        // serializaciÃ³n o la versiÃ³n de la API de Mercado Pago.
+        // también se aceptan las variantes camelCase / sandbox por si cambia la
+        // serialización o la versión de la API de Mercado Pago.
         const initPoint = order?.init_point ?? order?.initPoint ?? order?.sandboxInitPoint;
         if (!initPoint) {
           console.error('[create-order] La respuesta no incluye init_point.', { order });
-          throw new Error('No se recibiÃ³ init_point de Mercado Pago');
+          throw new Error('No se recibió init_point de Mercado Pago');
         }
 
         console.info('[create-order] Redirigiendo a init_point de Mercado Pago.', { initPoint });
@@ -470,8 +470,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       }
 
       // ========== Transferencia bancaria ==========
-      // Se registra en el backend como PENDING (pendiente de aprobaciÃ³n del club)
-      // con la comisiÃ³n ATRIO (MarketplaceFee) para auditorÃ­a/facturaciÃ³n.
+      // Se registra en el backend como PENDING (pendiente de aprobación del club)
+      // con la comisión ATRIO (MarketplaceFee) para auditoría/facturación.
       if (method === 'transfer') {
         setIsProcessing(true);
 
@@ -508,7 +508,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         return;
       }
 
-      // No deberÃ­a llegar acÃ¡ (mÃ©todo no soportado).
+      // No debería llegar acá (método no soportado).
       setIsProcessing(false);
       toast.error('Método de pago no soportado.');
     } catch (err: any) {
@@ -607,6 +607,33 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         {groupMessage.text}
                       </div>
                     )}
+                    {/* Desglose transparente de "Tu parte" (alquiler + tasa ATRIO) */}
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-3 space-y-2 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-300">Total de la reserva</span>
+                        <span className="font-bold text-white">{formatCurrency(totalBaseAmount)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-300">Dividido entre {Math.max(1, group.totalParticipants)} (alquiler)</span>
+                        <span className="font-semibold text-slate-200">{formatCurrency(perPersonAmount)} c/u</span>
+                      </div>
+                      <div className="pt-2 border-t border-emerald-500/20 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-300">Tu porción del alquiler</span>
+                          <span className="font-semibold text-white">{formatCurrency(perPersonAmount)}</span>
+                        </div>
+                        {digitalServiceFee > 0 && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-400">Tasa servicio digital ATRIO ({DIGITAL_SERVICE_FEE_PERCENTAGE}%)</span>
+                            <span className="font-semibold text-sky-400">+{formatCurrency(digitalServiceFee)}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between pt-1.5 border-t border-emerald-500/20">
+                          <span className="font-bold text-emerald-300">Tu parte (total a abonar)</span>
+                          <span className="text-lg font-black text-emerald-400">{formatCurrency(totalToPay)}</span>
+                        </div>
+                      </div>
+                    </div>
                     <GroupPaymentPanel
                       formatCurrency={formatCurrency}
                       totalAmount={totalBaseAmount}

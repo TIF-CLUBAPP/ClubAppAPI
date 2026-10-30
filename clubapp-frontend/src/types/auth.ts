@@ -17,6 +17,8 @@ export interface User {
   fullName?: string;
   email?: string;
   role?: UserRole;
+  /** Indica si el usuario es Socio del club (abona cuota social / tiene membresía). */
+  isSocio?: boolean;
   tipoProfesor?: 'CLUB' | 'INDEPENDIENTE';
   dni?: string;
   phone?: string;

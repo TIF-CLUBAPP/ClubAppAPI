@@ -89,6 +89,8 @@ public class UserService : IUserService
             Email = userDto.Email.Trim().ToLowerInvariant(),
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(userDto.Password),
             Role = 0,
+            // Un usuario registrado en la app NO es automáticamente Socio del club abonado.
+            IsMember = false,
             BadgeNum = generatedBadgeNum,
             CreatedAt = DateTime.UtcNow
         };

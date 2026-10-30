@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Calendar, MapPin, RefreshCw, CheckCircle2, AlertCircle, Sparkles, GraduationCap, Layers, ChevronLeft, ChevronRight, ChevronDown, Check, X, ArrowRight } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Calendar, MapPin, RefreshCw, CheckCircle2, AlertCircle, Sparkles, Layers, ChevronLeft, ChevronRight, ChevronDown, Check, ArrowRight, Clock, Plus, X } from 'lucide-react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import { useToast } from '../context/ToastContext';
@@ -12,6 +13,7 @@ import type { Booking } from '../types/booking';
 import type { Space } from '../types/space';
 import type { Activity } from '../types/activity';
 import type { MemberCuota } from '../types/cuotas';
+import { computeDigitalServiceFee, DIGITAL_SERVICE_FEE_PERCENTAGE, DIGITAL_SERVICE_FEE_MAX_AMOUNT } from '../config/fees';
 
 const fmt = (val: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(val);
@@ -30,12 +32,6 @@ const toMinutes = (hhmm: string): number => {
   return h * 60 + m;
 };
 
-const parseTime = (t?: string | null): number => {
-  if (!t) return -1;
-  const mins = toMinutes(t);
-  return Number.isNaN(mins) ? -1 : mins;
-};
-
 interface Slot {
   key: string;
   start: string;
@@ -44,7 +40,11 @@ interface Slot {
   endMin: number;
 }
 
-type SlotStatus = 'available' | 'booked' | 'class' | 'past';
+// Grupo de turnos de una misma fecha (carrito multi-día del Paso 2).
+interface CartItem {
+  date: string;
+  slots: Slot[];
+}
 
 const WEEKDAYS_ES = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do'];
 const MONTHS_ES = [
@@ -58,6 +58,35 @@ const formatDateLabel = (iso: string) =>
     day: 'numeric',
     month: 'short',
   });
+
+const formatLongDateLabel = (iso: string) =>
+  new Date(`${iso}T12:00:00`).toLocaleDateString('es-AR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+
+// Formatea los turnos seleccionados para mostrarlos en resúmenes y confirmación.
+const formatSlotsLabel = (slots: Slot[]): string => {
+  if (slots.length === 0) return '—';
+  const sorted = [...slots].sort((a, b) => a.startMin - b.startMin);
+  if (sorted.length === 1) return `${sorted[0].start} – ${sorted[0].end}`;
+
+  const contiguous = sorted.every((s, i) => i === 0 || s.startMin === sorted[i - 1].endMin);
+  if (contiguous) return `${sorted[0].start} – ${sorted[sorted.length - 1].end}`;
+  return sorted.map((s) => `${s.start}–${s.end}`).join(', ');
+};
+
+// Resumen legible del carrito multi-día: "vie 30/10: 08–09, 10–11 · sáb 31/10: 09–10".
+const formatCartSummary = (items: CartItem[]): string =>
+  items
+    .map((i) => `${formatDateLabel(i.date)}: ${formatSlotsLabel(i.slots)}`)
+    .join(' · ');
+
+// Horario genérico de la grilla del Paso 2 (08:00 a 22:00, turnos de 60 minutos).
+const GENERIC_OPEN_MIN = 8 * 60;
+const GENERIC_CLOSE_MIN = 22 * 60;
+const GENERIC_SLOT_MIN = 60;
 
 interface CalendarPickerProps {
   value: string;
@@ -97,59 +126,56 @@ function CalendarPicker({ value, min, onChange }: CalendarPickerProps) {
       <button
         type="button"
         onClick={openCalendar}
-        className="w-full flex items-center justify-between gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-3 text-sm text-white outline-none focus:border-emerald-500 hover:border-slate-700 transition-colors"
+        className="w-full flex items-center justify-between bg-slate-950 border border-slate-800 rounded-xl px-3 py-3 text-sm text-white outline-none focus:border-emerald-500 transition-colors"
       >
         <span className="flex items-center gap-2">
-          <Calendar size={15} className="text-emerald-400" />
-          <span className="capitalize">{formatDateLabel(value)}</span>
+          <Calendar size={16} className="text-emerald-400" />
+          {formatDateLabel(value)}
         </span>
-        <ChevronDown size={15} className={`text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown size={16} className="text-slate-400" />
       </button>
 
       {open && (
         <>
-          <div
-            className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-sm md:bg-transparent md:backdrop-blur-none"
-            onClick={() => setOpen(false)}
-          />
-          <div className="fixed md:absolute z-50 inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] md:inset-x-auto md:bottom-auto md:left-0 md:mt-2 md:w-70 rounded-t-3xl md:rounded-2xl border border-emerald-500/40 bg-slate-900 p-4 md:p-3 shadow-2xl pb-[calc(1rem+env(safe-area-inset-bottom))] md:pb-3">
-            <div className="md:hidden mx-auto mb-3 h-1.5 w-10 rounded-full bg-slate-700" aria-hidden="true" />
-            <div className="flex items-center justify-between mb-2">
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 mt-2 z-50 w-80 bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-2xl">
+            <div className="flex items-center justify-between mb-3">
               <button
                 type="button"
                 onClick={prevMonth}
-                aria-label="Mes anterior"
-                className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300"
+                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
               >
-                <ChevronLeft size={16} />
+                <ChevronLeft size={18} />
               </button>
-              <span className="text-sm font-bold text-white capitalize">{MONTHS_ES[month]} {year}</span>
+              <span className="text-sm font-bold text-white capitalize">
+                {MONTHS_ES[month]} {year}
+              </span>
               <button
                 type="button"
                 onClick={nextMonth}
-                aria-label="Mes siguiente"
-                className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300"
+                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
               >
-                <ChevronRight size={16} />
+                <ChevronRight size={18} />
               </button>
             </div>
 
-            <div className="grid grid-cols-7 text-center mb-1">
-              {WEEKDAYS_ES.map((wd) => (
-                <span key={wd} className="text-[10px] uppercase font-semibold text-slate-500 py-1">
-                  {wd}
+            <div className="grid grid-cols-7 gap-1 mb-2 text-center">
+              {WEEKDAYS_ES.map((w) => (
+                <span key={w} className="text-[10px] font-semibold text-slate-500 uppercase">
+                  {w}
                 </span>
               ))}
             </div>
 
             <div className="grid grid-cols-7 gap-1">
               {Array.from({ length: leadingBlanks }).map((_, i) => (
-                <span key={`blank-${i}`} />
+                <div key={`blank-${i}`} />
               ))}
               {cells.map(({ day, iso }) => {
-                const isDisabled = iso < min;
                 const isSelected = iso === value;
+                const isDisabled = iso < min;
                 const isToday = iso === todayIso;
+
                 return (
                   <button
                     key={iso}
@@ -181,23 +207,42 @@ function CalendarPicker({ value, min, onChange }: CalendarPickerProps) {
   );
 }
 
+type StepId = 1 | 2 | 3 | 4;
+
+interface StepDef {
+  id: StepId;
+  label: string;
+}
+
+const STEPS: StepDef[] = [
+  { id: 1, label: 'Deporte / Espacio' },
+  { id: 2, label: 'Fecha y Horario' },
+  { id: 3, label: 'Espacios Disponibles' },
+  { id: 4, label: 'Pago' },
+];
+
 export default function ReservaCanchas() {
   const today = useMemo(() => new Date(), []);
   const location = useLocation();
   const appliedPreSelection = useRef(false);
-  const [selectedDate, setSelectedDate] = useState<string>(toDateInput(today));
+  const toast = useToast();
+
+  const [step, setStep] = useState<StepId>(1);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState<string>(toDateInput(today));
   const [selectedSpaceId, setSelectedSpaceId] = useState<number | null>(null);
 
-  const [bookings, setBookings] = useState<Booking[]>([]);
+  // Carrito multi-día: acumula { fecha, turnos } antes de avanzar al Paso 3.
+  const [cart, setCart] = useState<CartItem[]>([]);
+
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [bookingsByDate, setBookingsByDate] = useState<Record<string, Booking[]>>({});
   const [loading, setLoading] = useState(true);
-  const [selectedSlots, setSelectedSlots] = useState<Slot[]>([]);
+
   const [pendingBookings, setPendingBookings] = useState<Booking[]>([]);
-  const [pendingSlots, setPendingSlots] = useState<Slot[]>([]);
+  const [pendingItems, setPendingItems] = useState<CartItem[]>([]);
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
-  const toast = useToast();
   const [checkoutCuota, setCheckoutCuota] = useState<MemberCuota | null>(null);
 
   const loadSpacesAndActivities = async () => {
@@ -213,11 +258,23 @@ export default function ReservaCanchas() {
     }
   };
 
-  const loadBookings = async () => {
+  const loadedDatesRef = useRef<Set<string>>(new Set());
+
+  // Carga (y cachea) las reservas de cada fecha del carrito para evaluar disponibilidad real.
+  const loadBookingsForDates = async (dates: string[]) => {
+    const unique = Array.from(new Set(dates)).filter(Boolean);
+    const toLoad = unique.filter((d) => !loadedDatesRef.current.has(d));
+    if (toLoad.length === 0) return;
+    setLoading(true);
     try {
-      setLoading(true);
-      const bookingsData = await bookingService.getBookingsByDate(selectedDate);
-      setBookings(bookingsData);
+      const entries = await Promise.all(
+        toLoad.map(async (date) => [date, await bookingService.getBookingsByDate(date)] as const),
+      );
+      loadedDatesRef.current = new Set([...loadedDatesRef.current, ...toLoad]);
+      setBookingsByDate((prev) => ({
+        ...prev,
+        ...(Object.fromEntries(entries) as Record<string, Booking[]>),
+      }));
     } catch (err: any) {
       toast.error(err?.response?.data?.detail ?? 'No se pudo consultar la disponibilidad.');
     } finally {
@@ -227,45 +284,21 @@ export default function ReservaCanchas() {
 
   useEffect(() => {
     loadSpacesAndActivities();
-  }, []);
-
-  useEffect(() => {
-    loadBookings();
+    loadBookingsForDates([selectedDate]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate]);
-
-  // Limpia la selección múltiple al cambiar de fecha o de espacio/cancha.
-  useEffect(() => {
-    setSelectedSlots([]);
-  }, [selectedSpaceId, selectedDate]);
+  }, []);
 
   const activeSpaces = useMemo(
     () => spaces.filter((s) => s.isActive && s.allowReservations).sort((a, b) => a.name.localeCompare(b.name)),
     [spaces],
   );
-  const maintenanceSpaces = useMemo(() => spaces.filter((s) => !s.isActive), [spaces]);
 
   const categories = useMemo(
     () => Array.from(new Set(activeSpaces.map((s) => s.sportCategory))).sort((a, b) => a.localeCompare(b)),
     [activeSpaces],
   );
 
-  // Aplica la pre-selección recibida desde el Dashboard (navegación con estado).
-  useEffect(() => {
-    if (appliedPreSelection.current || spaces.length === 0) return;
-    appliedPreSelection.current = true;
-
-    const state = location.state as { spaceId?: number; sportCategory?: string } | null;
-    if (!state) return;
-
-    if (state.sportCategory) setSelectedCategory(state.sportCategory);
-    if (state.spaceId != null && spaces.some((s) => s.id === state.spaceId)) {
-      setSelectedSpaceId(state.spaceId);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spaces, location.state]);
-
-  const filteredSpaces = useMemo(
+  const categorySpaces = useMemo(
     () => (selectedCategory === '' ? [] : activeSpaces.filter((s) => s.sportCategory === selectedCategory)),
     [activeSpaces, selectedCategory],
   );
@@ -275,81 +308,57 @@ export default function ReservaCanchas() {
     [spaces, selectedSpaceId],
   );
 
-  const dayOfWeek = useMemo(() => new Date(`${selectedDate}T12:00:00`).getDay(), [selectedDate]);
-  const selectedDayLabel = useMemo(
-    () => new Date(`${selectedDate}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }),
-    [selectedDate],
+  // Turnos de la fecha actualmente visible en el selector (derivado del carrito).
+  const selectedSlots = useMemo(
+    () => cart.find((c) => c.date === selectedDate)?.slots ?? [],
+    [cart, selectedDate],
   );
 
-  const slots = useMemo<Slot[]>(() => {
-    if (!selectedSpace) return [];
+  // Total de turnos acumulados en todas las fechas del carrito.
+  const totalSlotCount = useMemo(
+    () => cart.reduce((n, c) => n + c.slots.length, 0),
+    [cart],
+  );
 
-    const duration = selectedSpace.slotDurationMinutes > 0 ? selectedSpace.slotDurationMinutes : 60;
+  // Subtotal del alquiler y estimación del costo del servicio digital ATRIO
+  // (3.5% - máx $1.500) para mostrarlo antes de abrir la pasarela de pago.
+  const reservationSubtotal = selectedSpace ? selectedSpace.pricePerHour * totalSlotCount : 0;
+  const estimatedServiceFee = computeDigitalServiceFee(reservationSubtotal);
+  const estimatedTotalWithService = reservationSubtotal + estimatedServiceFee;
 
-    let startMin: number;
-    let endMin: number;
+  // Pre-selección recibida desde el Dashboard (ClubMapWidget).
+  useEffect(() => {
+    if (appliedPreSelection.current || spaces.length === 0) return;
+    appliedPreSelection.current = true;
 
-    if (selectedSpace.is24Hours) {
-      startMin = 0;
-      endMin = 1440;
-    } else {
-      const open = parseTime(selectedSpace.openTime);
-      const close = parseTime(selectedSpace.closeTime);
-      startMin = open >= 0 ? open : 8 * 60;
-      endMin = close >= 0 ? close : 22 * 60;
-      // Si el rango cruza medianoche (o está mal configurado), se limita al final del día.
-      if (endMin <= startMin) endMin = 1440;
+    const state = location.state as { spaceId?: number; sportCategory?: string } | null;
+    if (!state) return;
+
+    if (state.sportCategory) {
+      setSelectedCategory(state.sportCategory);
+      setStep(2);
     }
+    if (state.spaceId != null && spaces.some((s) => s.id === state.spaceId)) {
+      setSelectedSpaceId(state.spaceId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spaces, location.state]);
 
+  // Grilla genérica de turnos del Paso 2.
+  const genericSlots = useMemo<Slot[]>(() => {
     const out: Slot[] = [];
-    for (let m = startMin; m + duration <= endMin; m += duration) {
+    for (let m = GENERIC_OPEN_MIN; m + GENERIC_SLOT_MIN <= GENERIC_CLOSE_MIN; m += GENERIC_SLOT_MIN) {
       out.push({
         key: `${pad(Math.floor(m / 60))}:${pad(m % 60)}`,
         start: `${pad(Math.floor(m / 60))}:${pad(m % 60)}`,
-        end: `${pad(Math.floor((m + duration) / 60))}:${pad((m + duration) % 60)}`,
+        end: `${pad(Math.floor((m + GENERIC_SLOT_MIN) / 60))}:${pad((m + GENERIC_SLOT_MIN) % 60)}`,
         startMin: m,
-        endMin: m + duration,
+        endMin: m + GENERIC_SLOT_MIN,
       });
     }
     return out;
-  }, [selectedSpace]);
+  }, []);
 
-  const slotRange = (slot: Slot) => {
-    const base = new Date(`${selectedDate}T00:00:00`).getTime();
-    const start = new Date(base + slot.startMin * 60000);
-    const end = new Date(base + slot.endMin * 60000);
-    return { start, end };
-  };
-
-  const bookingOccupied = (slot: Slot): boolean => {
-    if (!selectedSpace) return false;
-    const { start, end } = slotRange(slot);
-    return bookings.some((b) => {
-      if (b.status === 'Cancelled') return false;
-      const matchesSpace =
-        b.spaceId === selectedSpace.id || (b.spaceId == null && b.resourceName === selectedSpace.name);
-      if (!matchesSpace) return false;
-      return new Date(b.startTime) < end && start < new Date(b.endTime);
-    });
-  };
-
-  const classSchedules = useMemo(() => {
-    if (!selectedSpace) return [] as { name: string; startMin: number; endMin: number }[];
-    return activities
-      .filter((a) => a.isActive && a.spaceId === selectedSpace.id)
-      .flatMap((a) =>
-        (a.schedules ?? [])
-          .filter((s) => s.dayOfWeek === dayOfWeek)
-          .map((s) => ({ name: a.name, startMin: toMinutes(s.startTime), endMin: toMinutes(s.endTime) })),
-      );
-  }, [activities, selectedSpace, dayOfWeek]);
-
-  const classOccupied = (slot: Slot): boolean => {
-    if (!selectedSpace) return false;
-    return classSchedules.some((s) => s.startMin < slot.endMin && slot.startMin < s.endMin);
-  };
-
-  // Un turno es "pasado" únicamente si corresponde a hoy y su hora de inicio ya transcurrió.
   const isPastSlot = (slot: Slot): boolean => {
     if (selectedDate !== toDateInput(new Date())) return false;
     const now = new Date();
@@ -357,64 +366,166 @@ export default function ReservaCanchas() {
     return slot.startMin <= nowMin;
   };
 
-  const slotStatus = (slot: Slot): SlotStatus => {
-    if (isPastSlot(slot)) return 'past';
-    if (classOccupied(slot)) return 'class';
-    if (bookingOccupied(slot)) return 'booked';
-    return 'available';
+  const slotRange = (slot: Slot, date: string) => {
+    const base = new Date(`${date}T00:00:00`).getTime();
+    const start = new Date(base + slot.startMin * 60000);
+    const end = new Date(base + slot.endMin * 60000);
+    return { start, end };
   };
 
+  // Disponibilidad real por espacio para TODOS los días y turnos del carrito.
+  const isCourtAvailable = (space: Space): boolean => {
+    if (cart.length === 0) return false;
+
+    return cart.every(({ date, slots }) => {
+      const dayOfWeek = new Date(`${date}T12:00:00`).getDay();
+      const dayBookings = bookingsByDate[date] ?? [];
+
+      return slots.every((slot) => {
+        const { start, end } = slotRange(slot, date);
+
+        const hasBooking = dayBookings.some((b) => {
+          if (b.status === 'Cancelled') return false;
+          const matches = b.spaceId === space.id || (b.spaceId == null && b.resourceName === space.name);
+          if (!matches) return false;
+          return new Date(b.startTime) < end && start < new Date(b.endTime);
+        });
+        if (hasBooking) return false;
+
+        const hasClass = activities
+          .filter((a) => a.isActive && a.spaceId === space.id)
+          .flatMap((a) => (a.schedules ?? []).filter((s) => s.dayOfWeek === dayOfWeek))
+          .some((s) => toMinutes(s.startTime) < slot.endMin && slot.startMin < toMinutes(s.endTime));
+        if (hasClass) return false;
+
+        return true;
+      });
+    });
+  };
+
+  const availableCourts = useMemo(
+    () => categorySpaces.filter(isCourtAvailable),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [categorySpaces, bookingsByDate, activities, cart],
+  );
+
+  const stepCompleted = (n: StepId): boolean => {
+    if (n === 1) return selectedCategory !== '';
+    if (n === 2) return totalSlotCount > 0;
+    if (n === 3) return selectedSpaceId !== null;
+    return false;
+  };
+
+  const canGoTo = (n: StepId): boolean => n <= step || stepCompleted(n);
+
+  const goTo = (n: StepId) => {
+    if (!canGoTo(n)) return;
+    setStep(n);
+  };
+
+  const handleSelectCategory = (category: string) => {
+    setSelectedCategory(category);
+    setCart([]);
+    setSelectedSpaceId(null);
+    setStep(2);
+  };
+
+  const handleSelectDate = (date: string) => {
+    setSelectedDate(date);
+    setSelectedSpaceId(null);
+    setStep(2);
+  };
+
+  // Alterna un turno en el carrito, asociado a la fecha actualmente visible.
   const handleToggleSlot = (slot: Slot) => {
-    if (!selectedSpace || isPastSlot(slot)) return;
-    setSelectedSlots((prev) =>
-      prev.some((s) => s.key === slot.key)
-        ? prev.filter((s) => s.key !== slot.key)
-        : [...prev, slot],
-    );
+    setCart((prev) => {
+      const idx = prev.findIndex((c) => c.date === selectedDate);
+      const current = idx >= 0 ? prev[idx].slots : [];
+      const exists = current.some((s) => s.key === slot.key);
+      const nextSlots = exists
+        ? current.filter((s) => s.key !== slot.key)
+        : [...current, slot].sort((a, b) => a.startMin - b.startMin);
+
+      if (idx >= 0) {
+        if (nextSlots.length === 0) return prev.filter((c) => c.date !== selectedDate);
+        const next = [...prev];
+        next[idx] = { ...next[idx], slots: nextSlots };
+        return next;
+      }
+      if (nextSlots.length === 0) return prev;
+      return [...prev, { date: selectedDate, slots: nextSlots }].sort((a, b) => a.date.localeCompare(b.date));
+    });
+    setSelectedSpaceId(null);
+  };
+
+  // Agrega "otro día u horario": avanza el selector al día siguiente para seguir sumando fechas.
+  const handleAddAnotherDay = () => {
+    const next = new Date(`${selectedDate}T12:00:00`);
+    next.setDate(next.getDate() + 1);
+    setSelectedDate(toDateInput(next));
+    setSelectedSpaceId(null);
+  };
+
+  const removeCartItem = (date: string) => {
+    setCart((prev) => prev.filter((c) => c.date !== date));
+    setSelectedSpaceId(null);
+  };
+
+  const clearCart = () => {
+    setCart([]);
+    setSelectedSpaceId(null);
+  };
+
+  const handleContinueToCourts = async () => {
+    if (cart.length === 0) return;
+    setSelectedSpaceId(null);
+    await loadBookingsForDates(cart.map((c) => c.date));
+    setStep(3);
+  };
+
+  const handleSelectSpace = (spaceId: number) => {
+    setSelectedSpaceId(spaceId);
+    setStep(4);
+  };
+
+  const handleGoBack = () => {
+    if (step === 4) setStep(3);
+    else if (step === 3) setStep(2);
+    else if (step === 2) setStep(1);
   };
 
   const handleCheckout = () => {
-    if (!selectedSpace || selectedSlots.length === 0) return;
-
-    // Abre el checkout SIN crear la reserva: la creación se difiere al confirmar
-    // (Pago Total) o al inicializar la reserva grupal (Dividir con Amigos).
-    // Los slots quedan en el estado local para poder crear la reserva al confirmar.
-    setPendingSlots(selectedSlots);
+    if (!selectedSpace || cart.length === 0) return;
+    setPendingItems([...cart]);
     setPendingBookings([]);
-    setCheckoutCuota(buildBatchCheckoutCuota(selectedSlots, selectedSpace, selectedDate));
-    setSelectedSlots([]);
+    setCheckoutCuota(buildCheckoutCuota(cart, selectedSpace));
   };
 
-  // Crea la reserva (y su pago asociado) recién al confirmar el Pago Total.
-  // Devuelve el Payment.Id a cobrar; los bookings creados se guardan en
-  // pendingBookings para confirmarlos en handlePaymentSuccess.
   const prepareBookingForTotal = async (): Promise<{ paymentId: number }> => {
-    if (!selectedSpace || pendingSlots.length === 0) {
+    if (!selectedSpace || pendingItems.length === 0) {
       throw new Error('No hay turnos seleccionados para reservar.');
     }
-
     setIsBatchProcessing(true);
     try {
       const created = await Promise.all(
-        pendingSlots.map((slot) => {
-          const { start, end } = slotRange(slot);
-          return bookingService.createBooking({
-            resourceName: selectedSpace.name,
-            spaceId: selectedSpace.id,
-            startTime: start.toISOString(),
-            endTime: end.toISOString(),
-            amount: selectedSpace.pricePerHour,
-          });
-        }),
+        pendingItems.flatMap(({ date, slots }) =>
+          slots.map((slot) => {
+            const { start, end } = slotRange(slot, date);
+            return bookingService.createBooking({
+              resourceName: selectedSpace.name,
+              spaceId: selectedSpace.id,
+              startTime: start.toISOString(),
+              endTime: end.toISOString(),
+              amount: selectedSpace.pricePerHour,
+            });
+          }),
+        ),
       );
-
       setPendingBookings(created);
-
       const paymentId = created[0]?.paymentId ?? null;
       if (paymentId === null) {
         throw new Error('No se pudo generar el pago de la reserva.');
       }
-
       return { paymentId };
     } finally {
       setIsBatchProcessing(false);
@@ -431,19 +542,23 @@ export default function ReservaCanchas() {
         }
       }
     }
+    const bookedDates = cart.map((c) => c.date);
     toast.success('¡Reservas confirmadas y pagadas!');
     setCheckoutCuota(null);
     setPendingBookings([]);
-    setPendingSlots([]);
-    setSelectedSlots([]);
-    await loadBookings();
+    setPendingItems([]);
+    setSelectedCategory('');
+    setCart([]);
+    setSelectedSpaceId(null);
+    setStep(1);
+    await loadBookingsForDates(bookedDates);
   };
 
   const handleCloseCheckout = async () => {
     setCheckoutCuota(null);
     setPendingBookings([]);
-    setPendingSlots([]);
-    await loadBookings();
+    setPendingItems([]);
+    await loadBookingsForDates(cart.map((c) => c.date));
   };
 
   return (
@@ -451,231 +566,409 @@ export default function ReservaCanchas() {
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-60">
         <Header />
-        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-40 md:pt-6 md:px-6 md:pb-6">
-          <div className="space-y-6 w-full">
+        <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-40 md:pt-6 md:px-6 md:pb-28">
+          <div className="space-y-6 w-full max-w-5xl mx-auto">
             {/* Encabezado */}
             <div>
               <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Sparkles size={14} /> Reserva de Espacios
               </span>
-              <h2 className="text-2xl font-black text-white mt-1">Reservar Cancha</h2>
+              <h2 className="text-2xl font-black text-white mt-1">Reservar un Espacio</h2>
               <p className="text-xs text-slate-400 mt-1">
-                Elegí deporte, espacio y fecha. Los turnos en gris están ocupados y los azules los dicta una clase del club.
+                Completá los 4 pasos para reservar tu espacio. Podés volver atrás en cualquier momento para corregir tu selección.
               </p>
             </div>
 
-            {/* Barra de filtros */}
-            <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold flex items-center gap-1.5">
-                    <Layers size={12} /> Deporte / Categoría
-                  </label>
-                  <select
-                    value={selectedCategory}
-                    onChange={(e) => {
-                      const category = e.target.value;
-                      setSelectedCategory(category);
-                      if (category === '') {
-                        setSelectedSpaceId(null);
-                        return;
-                      }
-                      const matches = activeSpaces.filter((s) => s.sportCategory === category);
-                      setSelectedSpaceId(matches.length === 1 ? matches[0].id : null);
-                    }}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-3 text-sm text-white outline-none focus:border-emerald-500"
-                  >
-                    <option value="">Seleccioná un deporte</option>
-                    {categories.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
+            {/* Stepper visual superior */}
+            <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 shadow-xl">
+              <div className="flex items-center justify-between max-w-3xl mx-auto relative">
+                <div className="absolute top-5 left-8 right-8 h-0.5 bg-slate-800 -translate-y-1/2 z-0 hidden sm:block" />
+                {STEPS.map((s) => {
+                  const isActive = step === s.id;
+                  const isCompleted = stepCompleted(s.id) && !isActive;
+                  const isClickable = canGoTo(s.id);
 
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold flex items-center gap-1.5">
-                    <MapPin size={12} /> Espacio / Cancha
-                  </label>
-                  <select
-                    value={selectedSpaceId ?? ''}
-                    onChange={(e) => setSelectedSpaceId(e.target.value ? Number(e.target.value) : null)}
-                    disabled={selectedCategory === '' || filteredSpaces.length === 0}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-3 text-sm text-white outline-none focus:border-emerald-500 disabled:opacity-50"
-                  >
-                    <option value="">Seleccioná un espacio / cancha</option>
-                    {filteredSpaces.map((s) => (
-                      <option key={s.id} value={s.id}>{s.sportCategory} · {s.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold flex items-center gap-1.5">
-                    <Calendar size={12} /> Fecha
-                  </label>
-                  <CalendarPicker value={selectedDate} min={toDateInput(today)} onChange={setSelectedDate} />
-                </div>
+                  return (
+                    <div
+                      key={s.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => goTo(s.id)}
+                      className={`relative z-10 flex flex-col items-center gap-2 ${isClickable ? 'cursor-pointer group' : 'cursor-default'}`}
+                    >
+                      <div
+                        className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all ${
+                          isActive
+                            ? 'bg-emerald-500 text-slate-950 ring-4 ring-emerald-500/20 scale-105'
+                            : isCompleted
+                              ? 'bg-slate-900 border-2 border-emerald-500 text-emerald-400'
+                              : 'bg-slate-800 text-slate-400 border border-slate-700'
+                        }`}
+                      >
+                        {isCompleted ? <Check size={18} strokeWidth={3} /> : s.id}
+                      </div>
+                      <span
+                        className={`text-xs font-semibold text-center transition-colors ${
+                          isActive ? 'text-emerald-400' : isCompleted ? 'text-slate-200' : 'text-slate-500'
+                        }`}
+                      >
+                        {s.label}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Aviso de espacios en mantenimiento */}
-            {maintenanceSpaces.length > 0 && (
-              <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 px-5 py-4">
-                <p className="text-sm font-bold text-amber-300 flex items-center gap-2">
-                  <AlertCircle size={16} /> Espacios en mantenimiento
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {maintenanceSpaces.map((s) => (
-                    <span
-                      key={s.id}
-                      className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-200"
-                    >
-                      <AlertCircle size={12} /> {s.name} — Desactivado por mantenimiento
-                    </span>
-                  ))}
+            <AnimatePresence mode="wait" initial={false}>
+            {/* PASO 1: Deporte / Espacio */}
+            {step === 1 && (
+              <motion.div key="step1" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.3, ease: 'easeOut' }} className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    <Layers size={18} className="text-emerald-400" /> Elegí un Espacio
+                  </h3>
+                  <span className="text-xs text-slate-400 font-medium">{categories.length} categorías de espacio disponibles</span>
                 </div>
-              </div>
-            )}
 
-            {/* Selector de horarios */}
-            <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6">
-              {loading ? (
-                <div className="flex items-center justify-center h-40 text-slate-400 gap-3">
-                  <RefreshCw className="w-6 h-6 animate-spin text-emerald-400" />
-                  <span className="text-sm font-medium">Consultando disponibilidad...</span>
-                </div>
-              ) : !selectedSpace ? (
-                <div className="flex items-center justify-center h-40 text-slate-400 gap-3">
-                  <Calendar size={20} />
-                  <span className="text-sm font-medium">
-                    {selectedCategory === ''
-                      ? 'Seleccioná un deporte y un espacio para ver los turnos disponibles.'
-                      : 'Seleccioná un espacio para ver los turnos disponibles.'}
-                  </span>
-                </div>
-              ) : (
-                <>
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
-                    <div>
-                      <p className="text-sm font-bold text-white">{selectedSpace.name}</p>
-                      <p className="text-xs text-emerald-400 capitalize">
-                        {selectedSpace.sportCategory} · {selectedDayLabel}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
-                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-400" /> Disponible</span>
-                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-slate-500" /> Ocupado</span>
-                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-sky-400" /> Clase</span>
-                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-slate-600" /> Pasado</span>
-                    </div>
+                {categories.length === 0 ? (
+                  <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-10 text-center">
+                    <AlertCircle className="w-8 h-8 text-slate-500 mx-auto mb-3" />
+                    <p className="text-sm text-slate-400">No hay espacios habilitados para reservas en este momento.</p>
                   </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 pt-4">
-                    {slots.map((slot) => {
-                      const status = slotStatus(slot);
-                      const isSelected = selectedSlots.some((s) => s.key === slot.key);
-
-                      if (status === 'class') {
-                        return (
-                          <div
-                            key={slot.key}
-                            className="rounded-2xl border border-sky-500/20 bg-sky-500/5 p-3 flex flex-col items-center justify-center gap-1.5 text-center"
-                          >
-                            <span className="text-sm font-bold text-white">{slot.start} – {slot.end}</span>
-                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-sky-300 bg-sky-500/10 border border-sky-500/20 rounded-full px-2 py-0.5">
-                              <GraduationCap size={12} /> Clase
-                            </span>
-                          </div>
-                        );
-                      }
-
-                      if (status === 'booked') {
-                        return (
-                          <div
-                            key={slot.key}
-                            className="rounded-2xl border border-slate-700/40 bg-slate-900/60 p-3 flex flex-col items-center justify-center gap-1.5 text-center opacity-60"
-                          >
-                            <span className="text-sm font-bold text-slate-400">{slot.start} – {slot.end}</span>
-                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 bg-slate-800/60 rounded-full px-2 py-0.5">
-                              <MapPin size={12} /> Ocupado
-                            </span>
-                          </div>
-                        );
-                      }
-
-                      if (status === 'past') {
-                        return (
-                          <div
-                            key={slot.key}
-                            className="rounded-2xl border border-slate-800 bg-slate-900/40 p-3 flex flex-col items-center justify-center gap-1.5 text-center opacity-40 cursor-not-allowed"
-                          >
-                            <span className="text-sm font-bold text-slate-500 line-through">{slot.start} – {slot.end}</span>
-                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 bg-slate-800/40 rounded-full px-2 py-0.5">
-                              <X size={12} /> Pasado
-                            </span>
-                          </div>
-                        );
-                      }
-
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {categories.map((cat) => {
+                      const count = activeSpaces.filter((s) => s.sportCategory === cat).length;
                       return (
                         <button
-                          key={slot.key}
+                          key={cat}
                           type="button"
-                          onClick={() => handleToggleSlot(slot)}
-                          className={`rounded-2xl border p-3 flex flex-col items-center justify-center gap-1 text-center transition-all group ${
-                            isSelected
-                              ? 'border-emerald-400 bg-emerald-600/30 ring-2 ring-emerald-400/70 shadow-[0_0_16px_rgba(16,185,129,0.45)]'
-                              : 'border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500 hover:text-slate-950'
-                          }`}
+                          onClick={() => handleSelectCategory(cat)}
+                          className="bg-slate-900 border border-slate-800 hover:border-emerald-400/80 rounded-2xl p-5 text-left transition-all duration-300 group hover:shadow-lg hover:shadow-emerald-500/10 hover:scale-[1.02] active:scale-[0.99] active:border-emerald-400 flex flex-col justify-between"
                         >
-                          <span className={`text-sm font-bold ${isSelected ? 'text-white' : 'text-white group-hover:text-slate-950'}`}>
-                            {slot.start} – {slot.end}
-                          </span>
-                          <span className={`text-xs font-semibold ${isSelected ? 'text-emerald-200' : 'text-emerald-300 group-hover:text-slate-900'}`}>
-                            {fmt(selectedSpace.pricePerHour)}
-                          </span>
-                          <span className={`inline-flex items-center gap-1 text-[11px] font-bold ${isSelected ? 'text-emerald-200' : 'text-emerald-300 group-hover:text-slate-900'}`}>
-                            {isSelected ? <CheckCircle2 size={12} /> : <Check size={12} />}
-                            {isSelected ? 'Seleccionado' : 'Seleccionar'}
-                          </span>
+                          <div className="flex items-start justify-between">
+                            <div className="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 group-hover:border-emerald-500/50 flex items-center justify-center text-emerald-400 font-bold text-lg transition">
+                              {cat.charAt(0)}
+                            </div>
+                            <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2.5 py-1">
+                              {count} {count === 1 ? 'espacio' : 'espacios'}
+                            </span>
+                          </div>
+                          <div className="mt-4">
+                            <h4 className="text-base font-bold text-white group-hover:text-emerald-300 transition">{cat}</h4>
+                            <p className="text-xs text-slate-400 mt-0.5">Seleccioná un espacio para continuar</p>
+                          </div>
                         </button>
                       );
                     })}
                   </div>
-                </>
-              )}
-            </div>
+                )}
+              </motion.div>
+            )}
+
+            {/* PASO 2: Fecha y Horario */}
+            {step === 2 && (
+              <motion.div key="step2" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.3, ease: 'easeOut' }} className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      <Calendar size={18} className="text-emerald-400" /> Fecha y Horario
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Deporte / Espacio elegido: <span className="text-emerald-400 font-semibold">{selectedCategory}</span>
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleGoBack}
+                    className="text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-xl px-3 py-2 transition flex items-center gap-1.5"
+                  >
+                    <ChevronLeft size={14} /> Volver
+                  </button>
+                </div>
+
+                <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 space-y-5">
+                  <div className="max-w-sm">
+                    <label className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold block mb-1.5">
+                      Fecha de Reserva
+                    </label>
+                    <CalendarPicker value={selectedDate} min={toDateInput(today)} onChange={handleSelectDate} />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
+                        Elegí tus horarios (de 08:00 a 22:00)
+                      </p>
+                      {loading && (
+                        <span className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                          <RefreshCw size={12} className="animate-spin text-emerald-400" /> Consultando disponibilidad…
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {genericSlots.map((slot) => {
+                        const past = isPastSlot(slot);
+                        const isSelected = selectedSlots.some((s) => s.key === slot.key);
+                        return (
+                          <button
+                            key={slot.key}
+                            type="button"
+                            disabled={past}
+                            onClick={() => handleToggleSlot(slot)}
+                            className={`rounded-2xl border p-3 flex flex-col items-center justify-center gap-1.5 text-center transition-all duration-300 ${
+                              past
+                                ? 'bg-slate-900/50 text-slate-600 border-slate-800 cursor-not-allowed'
+                                : isSelected
+                                  ? 'border-emerald-400 bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20 scale-[1.03]'
+                                  : 'bg-slate-950 border-slate-800 hover:border-emerald-500/60 hover:scale-[1.03] text-white'
+                            }`}
+                          >
+                            <span className="text-sm font-bold flex items-center gap-1.5">
+                              <Clock size={14} className={past ? 'text-slate-600' : 'text-emerald-400'} />
+                              {slot.start} – {slot.end}
+                            </span>
+                            <span className={`text-[11px] font-semibold ${past ? 'text-slate-600' : isSelected ? 'text-slate-800' : 'text-emerald-400'}`}>
+                              {past ? 'No disponible' : isSelected ? 'Seleccionado' : 'Seleccionar'}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-3 flex items-center gap-1.5">
+                      <Plus size={13} className="text-emerald-400" />
+                      ¿Reservás en más de un día? Agregá otro día u horario desde la barra inferior.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Carrito multi-día: turnos acumulados de distintas fechas */}
+                {cart.length > 0 && (
+                  <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
+                        Turnos en tu reserva ({totalSlotCount})
+                      </p>
+                      <button
+                        type="button"
+                        onClick={clearCart}
+                        className="text-[11px] font-semibold text-slate-400 hover:text-rose-400 transition"
+                      >
+                        Limpiar todo
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      {cart.map((item) => (
+                        <div key={item.date} className="flex items-start justify-between gap-3 bg-slate-950 border border-slate-800 rounded-2xl p-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-white capitalize">{formatLongDateLabel(item.date)}</p>
+                            <p className="text-xs text-slate-400 mt-0.5">{formatSlotsLabel(item.slots)}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeCartItem(item.date)}
+                            className="shrink-0 p-1.5 text-slate-500 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition"
+                            aria-label={`Quitar ${formatLongDateLabel(item.date)}`}
+                          >
+                            <X size={15} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {/* PASO 3: Espacios Disponibles */}
+            {step === 3 && (
+              <motion.div key="step3" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.3, ease: 'easeOut' }} className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      <MapPin size={18} className="text-emerald-400" /> Espacios Disponibles
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-1">
+                      {selectedCategory} · {formatCartSummary(cart)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleGoBack}
+                    className="text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-xl px-3 py-2 transition flex items-center gap-1.5"
+                  >
+                    <ChevronLeft size={14} /> Volver
+                  </button>
+                </div>
+
+                {availableCourts.length === 0 ? (
+                  <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-10 text-center">
+                    <AlertCircle className="w-8 h-8 text-amber-400 mx-auto mb-3" />
+                    <p className="text-sm text-slate-400">
+                      No hay espacios disponibles para esos horarios. Probá con otros turnos o fecha.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {availableCourts.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => handleSelectSpace(s.id)}
+                        className="bg-slate-900 border border-slate-800 hover:border-emerald-400/80 rounded-2xl p-5 text-left transition-all duration-300 group hover:shadow-lg hover:shadow-emerald-500/10 hover:scale-[1.02] active:scale-[0.99] active:border-emerald-400"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 group-hover:border-emerald-500/50 flex items-center justify-center text-emerald-400">
+                            <MapPin size={18} />
+                          </div>
+                          <span className="text-xs font-black text-emerald-400">{fmt(s.pricePerHour)}</span>
+                        </div>
+                        <h4 className="text-base font-bold text-white group-hover:text-emerald-300 transition mt-4">{s.name}</h4>
+                        <p className="text-xs text-slate-400 mt-0.5">{s.location || 'Ubicación principal'}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {/* PASO 4: Pago */}
+            {step === 4 && selectedSpace && cart.length > 0 && (
+              <motion.div key="step4" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.3, ease: 'easeOut' }} className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    <CheckCircle2 size={18} className="text-emerald-400" /> Confirmá tu Reserva
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={handleGoBack}
+                    className="text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-xl px-3 py-2 transition flex items-center gap-1.5"
+                  >
+                    <ChevronLeft size={14} /> Volver
+                  </button>
+                </div>
+
+                <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+                      <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Deporte / Espacio</p>
+                      <p className="text-sm font-bold text-white mt-1">{selectedCategory}</p>
+                    </div>
+                    <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+                      <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Espacio</p>
+                      <p className="text-sm font-bold text-white mt-1">{selectedSpace.name}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{selectedSpace.location || 'Ubicación principal'}</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4">
+                    <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
+                      Turnos reservados ({totalSlotCount} {totalSlotCount === 1 ? 'turno' : 'turnos'})
+                    </p>
+                    <div className="mt-2 space-y-1.5">
+                      {cart.map((item) => (
+                        <div key={item.date} className="flex items-center justify-between gap-3 text-sm">
+                          <span className="text-slate-400 capitalize">{formatLongDateLabel(item.date)}</span>
+                          <span className="font-bold text-white text-right">{formatSlotsLabel(item.slots)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between border-t border-slate-800 pt-4">
+                    <span className="text-sm text-slate-300">Precio por hora</span>
+                    <span className="text-sm font-bold text-white">{fmt(selectedSpace.pricePerHour)}</span>
+                  </div>
+                  <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-2">
+                    <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Desglose estimado de tu pago</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-300">Subtotal alquiler ({totalSlotCount} {totalSlotCount === 1 ? 'turno' : 'turnos'})</span>
+                      <span className="text-sm font-semibold text-white">{fmt(reservationSubtotal)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-400">Costo servicio digital ATRIO ({DIGITAL_SERVICE_FEE_PERCENTAGE}% - máx {fmt(DIGITAL_SERVICE_FEE_MAX_AMOUNT)})</span>
+                      <span className="text-sm font-semibold text-sky-400">+{fmt(estimatedServiceFee)}</span>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-slate-800 pt-2">
+                      <span className="text-sm font-bold text-white">Total estimado a abonar con servicio</span>
+                      <span className="text-xl font-black text-emerald-400">{fmt(estimatedTotalWithService)}</span>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-400 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 leading-relaxed">
+                    ¿Van con amigos? En la pasarela de pago podés <span className="text-emerald-300 font-semibold">Dividir con Amigos</span> y abonar solo tu parte. El total es estimado y puede variar según el método de pago.
+                  </p>
+                </div>
+              </motion.div>
+            )}
+            </AnimatePresence>
           </div>
         </main>
       </div>
 
-      {selectedSlots.length > 0 && (
-        <div className="fixed z-50 md:z-40 bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] md:w-auto flex items-center justify-between md:justify-center gap-2 md:gap-4 bg-slate-900/95 backdrop-blur-md border border-slate-800 rounded-full px-4 py-3 md:px-6 shadow-2xl shadow-emerald-950/40">
-          <span className="min-w-0 text-sm text-slate-300 whitespace-nowrap truncate">
-            <span className="font-bold text-white">{selectedSlots.length}</span>{' '}
-            {selectedSlots.length === 1 ? 'turno' : 'turnos'}
-          </span>
-          <span className="hidden md:inline-block h-6 w-px bg-slate-700/60 shrink-0" />
-          <span className="text-sm font-black text-emerald-400 whitespace-nowrap shrink-0">
-            {fmt(selectedSlots.length * (selectedSpace?.pricePerHour ?? 0))}
-          </span>
-          <button
-            type="button"
-            onClick={handleCheckout}
-            disabled={isBatchProcessing}
-            className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm px-5 py-2.5 rounded-full whitespace-nowrap transition disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-          >
-            {isBatchProcessing ? <RefreshCw size={16} className="animate-spin" /> : <ArrowRight size={16} />}
-            Ir a Pagar
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelectedSlots([])}
-            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition shrink-0"
-            aria-label="Limpiar selección"
-          >
-            <X size={16} />
-          </button>
+      {/* Barra de acción flotante (fija en la parte inferior) */}
+      {(step === 2 || step === 4) && (
+        <div className="fixed bottom-0 left-0 right-0 md:left-60 z-30 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 shadow-2xl shadow-black/40 pb-[env(safe-area-inset-bottom)]">
+          <div className="w-full max-w-5xl mx-auto px-4 md:px-6 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            {step === 2 ? (
+              <>
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Turnos en tu reserva</p>
+                  <p className="text-sm font-bold text-white truncate">
+                    {totalSlotCount === 0
+                      ? 'Todavía no seleccionaste horarios'
+                      : `${totalSlotCount} ${totalSlotCount === 1 ? 'horario' : 'horarios'} · ${cart.length} ${cart.length === 1 ? 'día' : 'días'}`}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleAddAnotherDay}
+                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 text-sm font-semibold text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 rounded-xl px-3 py-2.5 transition"
+                  >
+                    <Plus size={16} /> Agregar otro día u horario
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleContinueToCourts}
+                    disabled={totalSlotCount === 0}
+                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 font-bold text-base px-5 py-2.5 rounded-2xl transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-50 bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/20 active:scale-[0.99]"
+                  >
+                    <ArrowRight size={18} />
+                    Continuar con {totalSlotCount} {totalSlotCount === 1 ? 'horario' : 'horarios'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Total estimado a abonar</p>
+                  <p className="text-sm font-bold text-white truncate">
+                    {totalSlotCount} {totalSlotCount === 1 ? 'turno' : 'turnos'} · {fmt(estimatedTotalWithService)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleGoBack}
+                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700 border border-slate-700 rounded-xl px-3 py-2.5 transition"
+                  >
+                    <ChevronLeft size={16} /> Volver
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCheckout}
+                    disabled={isBatchProcessing}
+                    className="inline-flex items-center justify-center gap-2 font-bold text-base px-5 py-2.5 rounded-2xl transition disabled:opacity-50 disabled:cursor-not-allowed bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/20 active:scale-[0.99]"
+                  >
+                    {isBatchProcessing ? <RefreshCw size={18} className="animate-spin" /> : <ArrowRight size={18} />}
+                    Ir a Pagar
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
 
@@ -692,27 +985,33 @@ export default function ReservaCanchas() {
   );
 }
 
-function buildBatchCheckoutCuota(slots: Slot[], space: Space, selectedDate: string): MemberCuota {
-  const sorted = [...slots].sort((a, b) => a.startMin - b.startMin);
-  const first = sorted[0];
-  const last = sorted[sorted.length - 1];
-  const totalBase = sorted.length * space.pricePerHour;
+function buildCheckoutCuota(items: CartItem[], space: Space): MemberCuota {
+  const flat = items.flatMap(({ date, slots }) =>
+    slots.map((slot) => ({ date, slot })),
+  );
+  flat.sort((a, b) =>
+    a.date === b.date ? a.slot.startMin - b.slot.startMin : a.date.localeCompare(b.date),
+  );
 
-  const base = new Date(`${selectedDate}T00:00:00`).getTime();
-  const startTime = new Date(base + first.startMin * 60000).toISOString();
-  const endTime = new Date(base + last.endMin * 60000).toISOString();
+  const total = space.pricePerHour * flat.length;
+  const first = flat[0];
+  const last = flat[flat.length - 1];
+  const baseFirst = new Date(`${first.date}T00:00:00`).getTime();
+  const baseLast = new Date(`${last.date}T00:00:00`).getTime();
+  const startTime = new Date(baseFirst + first.slot.startMin * 60000).toISOString();
+  const endTime = new Date(baseLast + last.slot.endMin * 60000).toISOString();
+  const dayCount = new Set(items.map((i) => i.date)).size;
 
   return {
-    id: `booking-batch-${selectedDate}-${first.start}`,
-    idReal: undefined,
-    periodo: `Reserva - ${space.name} (${slots.length} turnos)`,
+    id: `booking-${first.date}-${last.date}-${flat.length}`,
+    periodo: `Reserva - ${space.name} (${flat.length} ${flat.length === 1 ? 'turno' : 'turnos'} · ${dayCount} ${dayCount === 1 ? 'día' : 'días'})`,
     mesAno: '',
     fechaVencimiento: new Date(startTime).toLocaleDateString('es-AR'),
-    baseAmount: totalBase,
+    baseAmount: total,
     discountPercentage: 0,
     isOverdue: false,
     lateFeeAmount: 0,
-    totalAmount: totalBase,
+    totalAmount: total,
     status: 'PENDIENTE',
     transferAlias: 'CLUB.ATLETICO.MP',
     payoutCollector: 'Club',

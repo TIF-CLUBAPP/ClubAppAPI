@@ -96,6 +96,7 @@ public class AuthenticationController : ControllerBase
             fullName = user.FullName,
             email = user.Email,
             role = user.Role.ToString(),
+            isSocio = user.IsMember,
             dni = user.Dni,
             phone = user.Phone,
             birthDate = user.BirthDate

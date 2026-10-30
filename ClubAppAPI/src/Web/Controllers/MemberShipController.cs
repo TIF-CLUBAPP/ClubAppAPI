@@ -63,6 +63,43 @@ public class MembershipsController : ControllerBase
         );
     }
 
+    /// <summary>
+    /// Suscripción digital al club para el usuario autenticado. Lo convierte en Socio
+    /// activo (IsMember = true), crea su membresía con la categoría elegida y habilita
+    /// la generación de su cuota social en "Mis Cuotas".
+    /// </summary>
+    [HttpPost("subscribe")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Subscribe([FromBody] SubscribeMembershipDto dto)
+    {
+        if (dto == null || dto.MonthlyPrice <= 0)
+        {
+            return BadRequest(new { message = "Debe seleccionar una categoría de membresía válida." });
+        }
+
+        var userIdRaw = User.FindFirst("sub")?.Value
+                        ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        if (!int.TryParse(userIdRaw, out var userId))
+        {
+            return Unauthorized(new { message = "Token inválido." });
+        }
+
+        var membership = await _membershipService.SubscribeAsync(userId, dto);
+
+        return Ok(new
+        {
+            membershipId = membership.Id,
+            status = membership.Status.ToString(),
+            membershipType = dto.MembershipType,
+            monthlyPrice = membership.MonthlyPrice,
+            isSocio = true
+        });
+    }
+
     [HttpPatch("{id:int}/status")]
     [Authorize(Roles = "ADMIN,SUPERADMIN")]
     public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateStatusDto dto)

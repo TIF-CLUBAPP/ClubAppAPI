@@ -10,6 +10,8 @@ interface AuthContextType {
   isLoading: boolean;
   login: (credentials: AuthenticationRequest, remember?: boolean) => Promise<void>;
   setSession: (token: string, user: User | null, remember?: boolean) => void;
+  /** Actualiza parcialmente los datos del usuario en estado y storage (ej. marcar isSocio tras suscribirse). */
+  updateUser: (updates: Partial<User>) => void;
   logout: () => void;
 }
 
@@ -20,6 +22,13 @@ const getStoredItem = (key: string) => localStorage.getItem(key) ?? sessionStora
 /** Devuelve el storage (local o session) donde está persistido el token actual. */
 const resolveSessionStorage = (): Storage =>
   localStorage.getItem('token') !== null ? localStorage : sessionStorage;
+
+/** Normaliza el claim `isSocio`/`isMember` (string o bool) a un boolean. */
+function parseIsSocio(value: unknown): boolean | undefined {
+  if (value === true || value === 'true' || value === 'True' || value === 1 || value === '1') return true;
+  if (value === false || value === 'false' || value === 'False' || value === 0 || value === '0') return false;
+  return undefined;
+}
 
 /**
  * Decodifica el payload (claims) de un JWT sin librerías externas.
@@ -46,6 +55,7 @@ function decodeJwt(token: string): User | null {
       lastName: payload.family_name,
       email: payload.email,
       role: (payload.role ?? 'MEMBER') as User['role'],
+      isSocio: parseIsSocio(payload.isSocio ?? payload.isMember ?? payload.socio),
     };
   } catch {
     return null;
@@ -198,6 +208,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(data.token, data.user ?? null, remember);
   };
 
+  const updateUser = (updates: Partial<User>) => {
+    if (!user) return;
+    const next = { ...user, ...updates };
+    setUser(next);
+    resolveSessionStorage().setItem('user', JSON.stringify(next));
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -216,6 +233,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         login,
         setSession,
+        updateUser,
         logout,
       }}
     >

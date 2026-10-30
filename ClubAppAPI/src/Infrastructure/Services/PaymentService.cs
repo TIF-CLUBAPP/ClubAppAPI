@@ -1021,7 +1021,7 @@ public class PaymentService : IPaymentService
         var period = $"{now:yyyy-MM}";
 
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
-        if (user == null || user.IsExemptFromFees) return;
+        if (user == null || user.IsExemptFromFees || !user.IsMember) return;
 
         var exists = await _context.Payments
             .AnyAsync(p => p.UserId == userId && p.Period == period);
@@ -1029,6 +1029,18 @@ public class PaymentService : IPaymentService
 
         var settings = await GetFeeSettingsAsync();
         var baseFee = settings.BaseFeeAmount > 0 ? settings.BaseFeeAmount : 15000m;
+
+        // Si el socio tiene una membresía ACTIVA con canon mensual propio (categoría de socio),
+        // ese canon manda sobre la tarifa global para que la cuota coincida con el plan elegido.
+        var activeMembership = await _context.Memberships
+            .Where(m => m.UserId == userId &&
+                        (m.Status == MembershipStatus.ACTIVE || m.Status == MembershipStatus.EXPIRING))
+            .OrderByDescending(m => m.EndDate)
+            .FirstOrDefaultAsync();
+        if (activeMembership != null && activeMembership.MonthlyPrice > 0m)
+        {
+            baseFee = activeMembership.MonthlyPrice;
+        }
 
         // Exención de cuota por rol: consulta el porcentaje VIGENTE para el rol del socio.
         // Los cambios guardados no son retroactivos (se promueven recién el 1° del mes siguiente),

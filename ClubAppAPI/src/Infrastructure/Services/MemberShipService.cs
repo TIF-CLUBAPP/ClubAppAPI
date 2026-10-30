@@ -86,6 +86,61 @@ public class MembershipService : IMembershipService
         return membership;
     }
 
+    public async Task<Membership> SubscribeAsync(int userId, SubscribeMembershipDto dto)
+    {
+        if (dto == null || dto.MonthlyPrice <= 0)
+        {
+            throw new AppValidationException("Debe seleccionar una categoría de membresía válida.");
+        }
+
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (user == null)
+        {
+            throw new NotFoundException("User", userId);
+        }
+
+        // El usuario pasa a ser Socio activo del club. Esto habilita la generación
+        // de su cuota social (Payment) en GET /api/payments/mine.
+        user.IsMember = true;
+
+        var now = DateTime.UtcNow;
+
+        // Si ya posee una membresía activa, la nueva se encadena a partir de su vencimiento.
+        var latestMembership = await _context.Memberships
+            .Where(m => m.UserId == userId && m.Status != MembershipStatus.EXPIRED)
+            .OrderByDescending(m => m.EndDate)
+            .FirstOrDefaultAsync();
+
+        var startTime = latestMembership != null && latestMembership.EndDate > now
+            ? latestMembership.EndDate
+            : now;
+
+        var endTime = startTime.AddMonths(1);
+
+        var membership = new Membership
+        {
+            UserId = userId,
+            StartDate = startTime,
+            EndDate = endTime,
+            MonthlyPrice = dto.MonthlyPrice,
+            Status = MembershipStatus.ACTIVE
+        };
+
+        await _context.Memberships.AddAsync(membership);
+        await _context.SaveChangesAsync();
+
+        var typeLabel = string.IsNullOrWhiteSpace(dto.MembershipType) ? "Socio" : dto.MembershipType;
+
+        await _notificationService.CreateNotificationAsync(new CreateNotificationDto
+        {
+            UserId = userId,
+            Title = "Membresía Registrada",
+            Message = $"Tu membresía {typeLabel} fue procesada con éxito. Fecha de vencimiento: {endTime:dd/MM/yyyy}."
+        });
+
+        return membership;
+    }
+
     public async Task<string> UpdateStatusAsync(int id, MembershipStatus newStatus)
     {
         var membership = await _context.Memberships.FindAsync(id);

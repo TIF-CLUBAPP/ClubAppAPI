@@ -38,7 +38,7 @@ export const MisCuotas: React.FC = () => {
   }, [searchParams, success, error, info]);
 
 
-  const { loading, settings, exemptionLabel, cuotas, totalPending, globalStatus, updateCuota, updateCuotas } = useMisCuotas();
+  const { loading, settings, exemptionLabel, cuotas, totalPending, globalStatus, updateCuota, updateCuotas, isSocio } = useMisCuotas();
   const [selectedCuotaIds, setSelectedCuotaIds] = useState<number[]>([]);
   const [checkoutCuotas, setCheckoutCuotas] = useState<MemberCuota[] | null>(null);
   const [selectedReceipt, setSelectedReceipt] = useState<MemberCuota | null>(null);
@@ -126,6 +126,20 @@ export const MisCuotas: React.FC = () => {
               <div className="flex flex-col items-center justify-center h-64 text-slate-400 gap-3">
                 <RefreshCw className="w-8 h-8 animate-spin text-emerald-400" />
                 <span className="text-sm font-medium">Cargando tu estado de cuenta...</span>
+              </div>
+            ) : !isSocio ? (
+              <div className="text-center py-16 px-4 bg-slate-900/50 rounded-3xl border border-slate-800">
+                <CreditCard className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                <h3 className="text-xl font-bold text-white">No tenés cuotas sociales asociadas</h3>
+                <p className="text-slate-400 mt-2 max-w-md mx-auto">
+                  Registrate como socio en la administración del club para acceder a beneficios.
+                </p>
+              </div>
+            ) : cuotas.length === 0 ? (
+              <div className="text-center py-16 px-4 bg-slate-900/50 rounded-3xl border border-slate-800">
+                <CreditCard className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                <h3 className="text-xl font-bold text-white">Aún no tienes cuotas registradas</h3>
+                <p className="text-slate-400 mt-2">Para comenzar, uníte a un club o seleccioná un plan de membresía.</p>
               </div>
             ) : (
               <>
