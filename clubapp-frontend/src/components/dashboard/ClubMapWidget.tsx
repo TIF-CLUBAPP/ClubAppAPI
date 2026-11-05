@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, Users, Info, Sparkles, Clock, Loader2, AlertCircle } from 'lucide-react';
+import { MapPin, Users, Info, Clock, Loader2, AlertCircle } from 'lucide-react';
 import { dashboardService } from '../../services/dashboardService';
 import type { SectorStatus, SectorStatusType } from '../../types/dashboard';
 
@@ -100,7 +100,7 @@ export default function ClubMapWidget() {
           </div>
           <div>
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              Sectores del Club <Sparkles size={16} className="text-emerald-400 animate-pulse" />
+              Sectores del Club
             </h3>
             <p className="text-xs text-slate-400">Estado de instalaciones en tiempo real</p>
           </div>

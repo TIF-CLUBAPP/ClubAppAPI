@@ -28,6 +28,7 @@ export default function Sidebar() {
     .join('')
     .slice(0, 2) || displayName.slice(0, 2).toUpperCase();
 
+  const isSocio = user?.isSocio === true;
   const roleBadge =
     role === 'SUPERADMIN' || role === 'ADMIN'
       ? {
@@ -38,6 +39,11 @@ export default function Sidebar() {
       ? {
           label: 'PROFESOR',
           badgeClasses: 'text-sky-300 bg-sky-500/10 border-sky-500/20',
+        }
+      : isSocio
+      ? {
+          label: 'SOCIO',
+          badgeClasses: 'text-emerald-300 bg-emerald-500/15 border-emerald-500/30',
         }
       : {
           label: 'MIEMBRO',

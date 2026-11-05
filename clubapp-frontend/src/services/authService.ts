@@ -1,4 +1,4 @@
-import { api } from './api';
+﻿import { api } from './api';
 import type { AuthenticationRequest, AuthenticationResponse, RegisterData, User } from '../types/auth';
 
 export const authService = {
@@ -8,7 +8,10 @@ export const authService = {
   },
 
   register: async (data: RegisterData) => {
-    const response = await api.post('/auth/register', data);
+    // Timeout de 15 segundos para proteger contra conexiones lentas o inestables
+    const response = await api.post('/auth/register', data, {
+      timeout: 15000,
+    });
     return response.data;
   },
 

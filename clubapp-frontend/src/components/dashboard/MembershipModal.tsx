@@ -4,7 +4,6 @@ import {
   X,
   CreditCard,
   ArrowLeft,
-  Sparkles,
   CheckCircle2,
   Loader2,
   Users,
@@ -13,7 +12,6 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { MEMBERSHIP_CATEGORIES, membershipService } from '../../services/membershipService';
 import type { MembershipCategory } from '../../services/membershipService';
@@ -36,7 +34,6 @@ type Step = 'select' | 'confirm' | 'done';
 
 export default function MembershipModal({ open, onClose }: MembershipModalProps) {
   const navigate = useNavigate();
-  const { updateUser } = useAuth();
   const { success, error } = useToast();
 
   const [categories, setCategories] = useState<MembershipCategory[]>(MEMBERSHIP_CATEGORIES);
@@ -78,13 +75,14 @@ export default function MembershipModal({ open, onClose }: MembershipModalProps)
     if (!selected || selected.price === null || selected.price === undefined) return;
     setSubmitting(true);
     try {
+      // 1. Registrar suscripción y emitir cuota pendiente del mes en curso,
+      // pero manteniendo temporalmente el rol en MIEMBRO (no se actualiza isSocio aquí).
       await membershipService.subscribe({
         membershipType: selected.id,
         monthlyPrice: selected.price,
       });
 
-      updateUser({ isSocio: true });
-      success('¡Suscripción exitosa! Ya sos socio del club.');
+      success('¡Suscripción registrada! Se generó tu cuota social en Mis Cuotas.');
       setStep('done');
     } catch (err) {
       const message =
@@ -147,8 +145,8 @@ export default function MembershipModal({ open, onClose }: MembershipModalProps)
                         className="group relative cursor-pointer rounded-2xl border border-slate-800 bg-slate-950 p-5 hover:border-emerald-500/60 hover:bg-slate-900/80 transition-all space-y-4"
                       >
                         {cat.highlight && (
-                          <span className="absolute top-4 right-4 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                            <Sparkles size={11} /> Recomendado
+                          <span className="absolute top-4 right-4 inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                            Recomendado
                           </span>
                         )}
 
@@ -193,68 +191,80 @@ export default function MembershipModal({ open, onClose }: MembershipModalProps)
               )}
 
               {/* ===== Paso 2: Confirmación ===== */}
-              {step === 'confirm' && selected && (
-                <div className="space-y-6">
-                  <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 space-y-4">
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                      <div>
-                        <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Plan Seleccionado</p>
-                        <h4 className="text-lg font-bold text-white mt-0.5">{selected.name}</h4>
+              {step === 'confirm' && selected && (() => {
+                const basePrice = selected.price ?? 150;
+                const serviceFee = Math.min(basePrice * 0.035, 1500);
+                const total = basePrice + serviceFee;
+
+                return (
+                  <div className="space-y-6">
+                    <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 space-y-4">
+                      <div className="border-b border-slate-800 pb-4">
+                        <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Resumen de Pago</p>
+                        <h4 className="text-lg font-bold text-white mt-0.5">Cuota Social - {selected.name}</h4>
                       </div>
-                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                        {fmt(selected.price ?? 150)} / mes
-                      </span>
+
+                      <div className="space-y-3 pt-1">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-slate-300">Precio Base</span>
+                          <span className="font-semibold text-white">{fmt(basePrice)}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-slate-300">Costo Servicio Digital ATRIO (3.5% - máx $ 1.500)</span>
+                          <span className="font-semibold text-white">+{fmt(serviceFee)}</span>
+                        </div>
+
+                        <div className="pt-3 border-t border-slate-800 space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs uppercase tracking-wider font-extrabold text-slate-400">Total a Abonar</span>
+                            <span className="text-2xl font-bold text-emerald-400 tracking-tight">
+                              {fmt(total)}
+                              <span className="text-xs font-normal text-slate-400"> / mes</span>
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                            Monto sujeto a modificaciones por parte de la administración del club. Se notificarán los cambios de tarifa previamente por los canales de avisos de la app.
+                          </p>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <p className="text-xs text-slate-300 font-semibold">Beneficios incluidos:</p>
-                      <ul className="space-y-1.5">
-                        {selected.features.map((feat, idx) => (
-                          <li key={idx} className="flex items-center gap-2 text-xs text-slate-400">
-                            <span className="flex items-center justify-center w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">✓</span>
-                            {feat}
-                          </li>
-                        ))}
-                      </ul>
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 text-xs text-slate-300">
+                      <p className="font-semibold text-emerald-400 mb-1">Información importante</p>
+                      <p className="text-slate-400 leading-relaxed">
+                        Al confirmar tu suscripción, se activará tu condición de Socio y asumes el compromiso del pago mensual de la cuota social. Las facturas se emitirán automáticamente en la sección <strong className="text-slate-200">Mis Cuotas</strong>, donde podrás abonarlas de forma directa.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setStep('select')}
+                        disabled={submitting}
+                        className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl border border-slate-700 bg-slate-950 hover:border-slate-600 text-slate-200 font-semibold text-sm transition-all disabled:opacity-50"
+                      >
+                        <ArrowLeft size={16} /> Volver
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleConfirm}
+                        disabled={submitting}
+                        className="flex-[2] inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {submitting ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" /> Procesando...
+                          </>
+                        ) : (
+                          <>
+                            <ShieldCheck size={16} /> Asociarme al Club
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
-
-                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 text-xs text-slate-300">
-                    <p className="font-semibold text-emerald-400 mb-1">Información importante</p>
-                    <p className="text-slate-400">
-                      Al confirmar tu suscripción, se activará tu condición de Socio y se generará tu cuota social mensual por un valor de <strong className="text-emerald-400">{fmt(selected.price ?? 150)}</strong> en
-                      la sección <strong className="text-slate-200">Mis Cuotas</strong>.
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setStep('select')}
-                      disabled={submitting}
-                      className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl border border-slate-700 bg-slate-950 hover:border-slate-600 text-slate-200 font-semibold text-sm transition-all disabled:opacity-50"
-                    >
-                      <ArrowLeft size={16} /> Volver
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleConfirm}
-                      disabled={submitting}
-                      className="flex-[2] inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {submitting ? (
-                        <>
-                          <Loader2 size={16} className="animate-spin" /> Procesando...
-                        </>
-                      ) : (
-                        <>
-                          <ShieldCheck size={16} /> Asociarme al Club
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* ===== Paso 3: Éxito ===== */}
               {step === 'done' && selected && (

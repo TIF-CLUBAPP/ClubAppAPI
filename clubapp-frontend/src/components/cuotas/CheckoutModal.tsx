@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CreditCard, X, RefreshCw, Copy, Check, ShieldCheck, Building2, Lock, Clock } from 'lucide-react';
+import { CreditCard, X, RefreshCw, ShieldCheck, Lock } from 'lucide-react';
 import type { MemberCuota } from '../../types/cuotas';
 import { PaymentSuccessView } from './PaymentSuccessView';
 import { PaymentSummaryBox } from './PaymentSummaryBox';
@@ -92,18 +92,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const isGrouped = cuotasList.length > 1;
   const cuotaKey = cuotasList.map((c) => c.id).join('|');
 
-  const [method, setMethod] = useState<'mercadopago' | 'card' | 'transfer'>('mercadopago');
+  const [method, setMethod] = useState<'mercadopago' | 'card'>('mercadopago');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [copiedCbu, setCopiedCbu] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
-  const [transferReference, setTransferReference] = useState('');
-  const [transferPending, setTransferPending] = useState(false);
-  const [transferProofFile, setTransferProofFile] = useState<File | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ========== Pago dividido / reserva grupal ==========
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const toast = useToast();
   const [payMode, setPayMode] = useState<'total' | 'split'>('total');
   const [group, setGroup] = useState<GroupPaymentState>(() => createEmptyGroup());
@@ -161,14 +156,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const paidCount = group.participants.filter((p) => p.status === 'PAID').length;
   const allPaid = payMode === 'split' && group.totalParticipants > 0 && paidCount >= group.totalParticipants;
 
-  // Alias del receptor final del cobro (Club o Profesor). Viene resuelto por el backend
-  // desde GET /api/payments/mine; si no está disponible, se usa el alias por defecto.
-  const transferAlias = primary?.transferAlias || 'CLUB.ATLETICO.MP';
-  const payoutCollector = primary?.payoutCollector || 'Club';
 
-  // Los alquileres/reservas de cancha solo admiten pago automático (Mercado Pago
-  // o Tarjeta). La transferencia bancaria queda reservada para cuotas sociales.
-  const isCourtBooking = Boolean(primary?.reservation);
+
+  // Los alquileres/reservas de cancha y cuotas admiten pago automático (Mercado Pago o Tarjeta).
 
   const handleSetPayMode = (mode: 'total' | 'split') => {
     setPayMode(mode);
@@ -434,6 +424,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           } else {
             onPaymentSuccess(paidCuotas[0]);
           }
+
+          // Transición de rol: Al confirmar el pago exitoso de la cuota social, se actualiza el estado global a SOCIO.
+          updateUser({ isSocio: true });
           return;
         }
 
@@ -469,44 +462,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         return;
       }
 
-      // ========== Transferencia bancaria ==========
-      // Se registra en el backend como PENDING (pendiente de aprobación del club)
-      // con la comisión ATRIO (MarketplaceFee) para auditoría/facturación.
-      if (method === 'transfer') {
-        setIsProcessing(true);
 
-        const reference = transferReference.trim();
-        // Permite registrar transferencia con referencia o con comprobante (o ambos).
-        if (!reference && !transferProofFile) {
-          setIsProcessing(false);
-          toast.error('Ingresá el N° de operación O adjuntá una foto/PDF del comprobante para continuar');
-          return;
-        }
-
-        // Opcional: si hay archivo pero no referencia, dejamos referenceNumber null.
-        const referenceNumber = reference || undefined;
-
-        const result = await paymentsService.registerTransfer(
-          {
-            cuotaIds,
-            totalAmount: totalToPay,
-            netAmount: totalBaseAmount,
-            marketplaceFee: digitalServiceFee,
-            referenceNumber,
-          },
-          transferProofFile
-        );
-
-        setIsProcessing(false);
-
-        if (result?.success) {
-          setTransferPending(true);
-          return;
-        }
-
-        toast.error(result?.message ?? 'No se pudo registrar la transferencia. Intentá nuevamente.');
-        return;
-      }
 
       // No debería llegar acá (método no soportado).
       setIsProcessing(false);
@@ -530,11 +486,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   };
 
-  const copy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedCbu(true);
-    setTimeout(() => setCopiedCbu(false), 2000);
-  };
+
 
   return (
     <AnimatePresence>
@@ -554,22 +506,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             {!isProcessing && (<button onClick={onClose} className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800"><X className="w-5 h-5" /></button>)}
           </div>
 
-              {transferPending ? (
-                <div className="py-10 text-center space-y-4">
-                  <div className="mx-auto w-14 h-14 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center"><Clock className="w-7 h-7 text-amber-400" /></div>
-                <div>
-                  <h4 className="text-base font-bold text-white">Transferencia registrada</h4>
-                  <p className="text-xs text-slate-400 mt-1 leading-5">
-                    Tu pago por <span className="text-slate-200 font-semibold">{formatCurrency(totalToPay)}</span> quedó
-                    <span className="text-amber-300 font-semibold"> pendiente de aprobación</span> por el club.
-                  </p>
-                  <p className="text-base text-slate-500 mt-2">Referencia: {transferReference || '—'}</p>
-                </div>
-                <button onClick={onClose} className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm transition">
-                  Entendido
-                </button>
-              </div>
-            ) : isSuccess ? (
+              {isSuccess ? (
               <PaymentSuccessView cuotas={cuotasList} onViewReceipt={onViewReceipt} formatCurrency={formatCurrency} />
             ) : isProcessing ? (
               <div className="py-12 text-center space-y-3"><RefreshCw className="w-9 h-9 animate-spin text-emerald-400 mx-auto" /><p className="text-sm font-bold text-white">Procesando pago seguro...</p></div>
@@ -656,124 +593,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   />
                 )}
 
-                <div className={`grid gap-2 ${isCourtBooking ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                <div className="grid gap-2 grid-cols-2">
                   <button type="button" onClick={() => setMethod('mercadopago')} className={`p-2.5 rounded-xl border text-base font-medium flex flex-col items-center gap-1 ${method === 'mercadopago' ? 'bg-sky-500/10 border-sky-500 text-sky-400' : 'bg-slate-950 border-slate-800 text-slate-400'}`}><span className="font-extrabold text-sm">mp</span><span>Mercado Pago</span></button>
                   <button type="button" onClick={() => setMethod('card')} className={`p-2.5 rounded-xl border text-base font-medium flex flex-col items-center gap-1 ${method === 'card' ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' : 'bg-slate-950 border-slate-800 text-slate-400'}`}><CreditCard className="w-4 h-4" /><span>Tarjeta</span></button>
-                  {!isCourtBooking && (
-                    <button type="button" onClick={() => setMethod('transfer')} className={`p-2.5 rounded-xl border text-base font-medium flex flex-col items-center gap-1 ${method === 'transfer' ? 'bg-purple-500/10 border-purple-500 text-purple-400' : 'bg-slate-950 border-slate-800 text-slate-400'}`}><Building2 className="w-4 h-4" /><span>Transferencia</span></button>
-                  )}
                 </div>
 
-                {method === 'transfer' && (
-                  <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-slate-800/50 p-2.5 rounded-lg flex items-center justify-between gap-2">
-                        <div className="min-w-0">
-                          <span className="text-slate-500 block text-[9px] uppercase">ALIAS CBU · {payoutCollector}</span>
-                          <span className="font-mono text-slate-200 text-base font-bold truncate">{transferAlias}</span>
-                        </div>
-
-                        <button
-                          onClick={() => copy(transferAlias)}
-                          className="text-emerald-400 hover:underline text-[11px] flex items-center gap-1 shrink-0"
-                          aria-label="Copiar alias CBU"
-                        >
-                          {copiedCbu ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                          <span>{copiedCbu ? 'Copiado' : 'Copiar'}</span>
-                        </button>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-base font-semibold text-slate-200">N° de Operación</label>
-                        <input
-                          type="text"
-                          value={transferReference}
-                          onChange={(e) => setTransferReference(e.target.value)}
-                          placeholder="Ej: 000123456789"
-                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-base text-white placeholder:text-slate-600 outline-none focus:border-purple-500"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-xs text-slate-500">
-                      <span className="flex-1 h-px bg-slate-800" />
-                      — o bien —
-                      <span className="flex-1 h-px bg-slate-800" />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-base font-semibold text-slate-200">Comprobante (Foto o PDF)</label>
-
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept=".jpg,.jpeg,.png,.pdf,application/pdf"
-                        className="sr-only"
-                        tabIndex={-1}
-                        aria-hidden="true"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0] ?? null;
-                          if (!file) {
-                            setTransferProofFile(null);
-                            return;
-                          }
-
-                          const allowed = ['image/jpeg','image/png','application/pdf'];
-                          const maxSizeMb = 5;
-                          const maxBytes = maxSizeMb * 1024 * 1024;
-
-                          if (!allowed.includes(file.type)) {
-                            toast.error('Formato no válido. Solo se aceptan JPG, PNG o PDF.');
-                            e.target.value = '';
-                            setTransferProofFile(null);
-                            return;
-                          }
-
-                          if (file.size > maxBytes) {
-                            toast.error(`El archivo es demasiado grande. Máximo ${maxSizeMb}MB.`);
-                            e.target.value = '';
-                            setTransferProofFile(null);
-                            return;
-                          }
-
-                          setTransferProofFile(file);
-                        }}
-                      />
-
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-full flex items-center justify-center gap-2 rounded-lg border border-purple-500/60 bg-purple-500/10 hover:bg-purple-500/15 text-purple-200 py-2 px-3 text-sm font-medium transition"
-                        aria-label="Adjuntar comprobante (foto o PDF)"
-                      >
-                        <span aria-hidden="true">📁</span>
-                        <span>{transferProofFile ? 'Cambiar archivo' : 'Adjuntar Comprobante (Foto o PDF)'}</span>
-                      </button>
-
-                      {transferProofFile && (
-                        <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5">
-                          <span className="text-xs font-semibold text-emerald-200 truncate">{transferProofFile.name}</span>
-                          <button
-                            type="button"
-                            className="inline-flex items-center justify-center rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-200 hover:bg-emerald-500/15 px-2 py-0.5 font-bold text-xs"
-                            aria-label="Quitar archivo"
-                            onClick={() => {
-                              setTransferProofFile(null);
-                              if (fileInputRef.current) fileInputRef.current.value = '';
-                            }}
-                          >
-                            (X)
-                          </button>
-                        </div>
-                      )}
-
-                    </div>
-
-                    <p className="text-sm text-slate-300">
-                      Completa al menos uno de los dos datos para confirmar.
-                    </p>
-                  </div>
-                )}
+                {/* Transferencia eliminada */}
                 
                 {method === 'card' && (
                   <div className="space-y-3">
@@ -811,7 +636,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
               </>
             )}
-            {!transferPending && !isSuccess && !isProcessing && (
+            {!isSuccess && !isProcessing && (
               <div className="border-t border-slate-800 pt-3">
                 {payMode === 'split' && organizerHasPaid && !allPaid ? (
                   <p className="text-center text-sm text-amber-300 font-semibold py-1">
@@ -820,13 +645,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 ) : (
                   <button
                     onClick={allPaid ? handleConfirmAllPaid : handleProcess}
-                    disabled={
-                      isProcessing ||
-                      (payMode === 'total' &&
-                        method === 'transfer' &&
-                        !transferReference.trim() &&
-                        !transferProofFile)
-                    }
+                    disabled={isProcessing}
                     className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 mb-1 rounded-2xl transition text-base disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <ShieldCheck className="w-5 h-5" />

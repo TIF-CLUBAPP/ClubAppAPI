@@ -11,7 +11,7 @@ import {
   ChevronUp,
   CheckCircle2,
   AlertCircle,
-  Sparkles,
+  
   Loader2,
   GraduationCap,
 } from 'lucide-react';
@@ -170,13 +170,25 @@ export default function Reservations() {
               <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <Sparkles size={14} /> Mi Agenda Personal
+                    <MapPin size={14} /> Mi Agenda Personal
                   </span>
                   <h2 className="text-2xl font-black text-white mt-1">🗓️ Mi Cronograma de Actividades</h2>
                   <p className="text-xs text-slate-400 mt-1">
                     Las clases y actividades en las que estás inscripto.
                   </p>
                 </div>
+
+                {activeEnrollments.length > 0 && (
+                  <div className="self-start md:self-auto">
+                    <button
+                      onClick={() => navigate("/actividades")}
+                      className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-extrabold px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+                    >
+                      <Dumbbell size={16} />
+                      Explorar Actividades
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="mt-4">
@@ -251,19 +263,26 @@ export default function Reservations() {
               <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <Sparkles size={14} /> Reservas de Espacios
+                    <MapPin size={14} /> Reservas de Espacios
                   </span>
                   <h2 className="text-2xl font-black text-white mt-1">🎾 Mis Alquileres de Canchas</h2>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Consultá y gestioná tus turnos de cancha.
-                  </p>
                 </div>
 
-                <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-2xl border border-slate-800 self-start md:self-auto">
+                <div className="flex items-center gap-3 self-start md:self-auto flex-wrap">
+                  <button
+                    onClick={() => navigate("/reservar-cancha")}
+                    className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-extrabold px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+                  >
+                    <MapPin size={16} />
+                    Reservar Cancha
+                  </button>
+
+                  <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
                   <FilterButton active={filter === 'active'} onClick={() => handleFilterChange('active')} activeClass="bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20">Activas</FilterButton>
                   <FilterButton active={filter === 'all'} onClick={() => handleFilterChange('all')} activeClass="bg-slate-800 text-white">Todas</FilterButton>
                   <FilterButton active={filter === 'cancelled'} onClick={() => handleFilterChange('cancelled')} activeClass="bg-rose-500 text-white shadow-md shadow-rose-500/20">Canceladas</FilterButton>
-                </div>
+                
+                </div></div>
               </div>
 
               <div className="mt-4">

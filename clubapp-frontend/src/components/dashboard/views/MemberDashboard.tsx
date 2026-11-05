@@ -3,6 +3,7 @@ import WeatherWidget from '../WeatherWidget';
 import { CreditCard, CalendarCheck, ArrowRight, Building, UserPlus, Zap } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { dashboardService } from '../../../services/dashboardService';
+import { membershipService } from '../../../services/membershipService';
 import { useNavigate } from 'react-router-dom';
 import type { DashboardDto } from '../../../types/dashboard';
 import MembershipModal from '../MembershipModal';
@@ -82,6 +83,21 @@ export default function MemberDashboard() {
   }
 
   const { membershipSummary } = dashboardData;
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+
+  const handleCancelSubscription = async () => {
+    try {
+      setCancelling(true);
+      await membershipService.cancelSubscription();
+      setShowCancelModal(false);
+      loadDashboard();
+    } catch {
+      // Manejo de error
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -89,14 +105,14 @@ export default function MemberDashboard() {
         <div className="lg:col-span-8"><ClubMapWidget /></div>
         <div className="lg:col-span-4 space-y-6">
           <WeatherWidget />
-          {membershipSummary?.hasActiveMembership && (
+          {membershipSummary?.hasActiveMembership ? (
             <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 relative overflow-hidden">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <CreditCard size={16} className="text-emerald-400" /> Mi Membresía
+                  <CreditCard size={16} className="text-emerald-400" /> Membresía Activa
                 </span>
                 <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold">
-                  {membershipSummary.status}
+                  Socio Activo
                 </span>
               </div>
               <p className="text-2xl font-black text-white">
@@ -108,16 +124,70 @@ export default function MemberDashboard() {
                   Próximo vencimiento: <strong className="text-white">{new Date(membershipSummary.nextDueDate).toLocaleDateString()}</strong>
                 </p>
               )}
+              <div className="mt-4 space-y-2">
+                <button 
+                  onClick={() => navigate('/mis-cuotas')}
+                  className="w-full py-2.5 px-3 bg-slate-950 hover:bg-slate-800 text-white border border-slate-800 font-semibold rounded-xl text-xs transition-all flex items-center justify-center gap-2"
+                >
+                  Ver Historial de Pagos <ArrowRight size={14} />
+                </button>
+                <button 
+                  onClick={() => setShowCancelModal(true)}
+                  className="w-full py-2 px-3 bg-transparent hover:bg-rose-500/10 text-rose-400 hover:text-rose-300 font-semibold rounded-xl text-xs transition-all flex items-center justify-center gap-2"
+                >
+                  Cancelar Suscripción
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 relative overflow-hidden">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <CreditCard size={16} className="text-slate-400" /> Membresía
+                </span>
+                <span className="px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 text-[10px] font-bold">
+                  Inactivo
+                </span>
+              </div>
+              <p className="text-sm text-slate-300 mb-4">Aún no estás asociado a ningún club.</p>
               <button 
-                onClick={() => navigate('/mis-cuotas')}
-                className="w-full mt-4 py-2.5 px-3 bg-slate-950 hover:bg-slate-800 text-white border border-slate-800 font-semibold rounded-xl text-xs transition-all flex items-center justify-center gap-2"
+                onClick={() => setShowMembership(true)}
+                className="w-full py-2.5 px-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold rounded-xl text-xs transition-all flex items-center justify-center gap-2 shadow-lg"
               >
-                Ver Historial de Pagos <ArrowRight size={14} />
+                Suscribirme al Club <ArrowRight size={14} />
               </button>
             </div>
           )}
         </div>
       </div>
+      <MembershipModal open={showMembership} onClose={() => { setShowMembership(false); loadDashboard(); }} />
+
+      {showCancelModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-white">¿Cancelar suscripción al club?</h3>
+            <p className="text-sm text-slate-300 leading-relaxed">
+              ¿Estás seguro de que deseas cancelar tu suscripción al club? Conservarás tus beneficios hasta el final del período abonado.
+            </p>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => setShowCancelModal(false)}
+                disabled={cancelling}
+                className="px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-950 text-slate-200 font-semibold text-xs hover:border-slate-600 transition"
+              >
+                Volver
+              </button>
+              <button
+                onClick={handleCancelSubscription}
+                disabled={cancelling}
+                className="px-4 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-400 text-white font-bold text-xs transition flex items-center gap-2 disabled:opacity-50"
+              >
+                {cancelling ? 'Cancelando...' : 'Confirmar Baja'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6">
         <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
           <CalendarCheck size={18} className="text-emerald-400" /> Mis Próximos Turnos Reservados

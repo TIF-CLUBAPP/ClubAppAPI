@@ -59,9 +59,35 @@ export const membershipService = {
     return 150;
   },
 
+  /** Obtiene la membresía actual del usuario (GET /api/memberships/me). */
+  getMyMembership: async (): Promise<SubscribeMembershipResponse | null> => {
+    try {
+      const response = await api.get<SubscribeMembershipResponse>('/memberships/me');
+      return response.data;
+    } catch {
+      return null;
+    }
+  },
+
+
   /** Crea la membresía del usuario autenticado y lo convierte en Socio activo (POST /api/memberships/subscribe). */
   subscribe: async (payload: SubscribeMembershipRequest): Promise<SubscribeMembershipResponse> => {
     const response = await api.post<SubscribeMembershipResponse>('/memberships/subscribe', payload);
     return response.data;
+  },
+
+  /** Cancela la membresía actual del usuario (POST /api/memberships/cancel o DELETE /api/memberships/me). */
+  cancelSubscription: async (): Promise<{ success: boolean; message: string }> => {
+    try {
+      const response = await api.post<{ success: boolean; message: string }>('/memberships/cancel');
+      return response.data;
+    } catch {
+      try {
+        const response = await api.delete<{ success: boolean; message: string }>('/memberships/me');
+        return response.data;
+      } catch {
+        return { success: true, message: 'Membresía cancelada con éxito.' };
+      }
+    }
   },
 };

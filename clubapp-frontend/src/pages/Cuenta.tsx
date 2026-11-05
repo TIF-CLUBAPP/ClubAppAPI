@@ -34,7 +34,7 @@ const initialsOf = (name: string, email: string): string => {
   return base.slice(0, 2).toUpperCase();
 };
 
-const roleMeta = (role?: string): { label: string; badgeClasses: string } => {
+const roleMeta = (role?: string, isSocio?: boolean): { label: string; badgeClasses: string } => {
   switch (role) {
     case 'SUPERADMIN':
       return { label: 'Super Administrador', badgeClasses: 'text-violet-400 bg-violet-500/10 border-violet-500/20' };
@@ -43,7 +43,9 @@ const roleMeta = (role?: string): { label: string; badgeClasses: string } => {
     case 'TEACHER':
       return { label: 'Profesor', badgeClasses: 'text-sky-300 bg-sky-500/10 border-sky-500/20' };
     default:
-      return { label: 'Miembro', badgeClasses: 'text-slate-200 bg-slate-500/10 border-slate-500/30' };
+      return isSocio
+        ? { label: 'Socio', badgeClasses: 'text-emerald-300 bg-emerald-500/15 border-emerald-500/30' }
+        : { label: 'Miembro', badgeClasses: 'text-slate-200 bg-slate-500/10 border-slate-500/30' };
   }
 };
 
@@ -93,7 +95,7 @@ export default function Cuenta() {
     ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email || 'Usuario'
     : 'Usuario';
   const email = user?.email ?? '—';
-  const role = roleMeta(user?.role);
+  const role = roleMeta(user?.role, user?.isSocio);
   const showRole = isStaffRole(user?.role);
   const initials = initialsOf(displayName, user?.email ?? '');
 
