@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ClipboardCheck, Users, Check, X, RefreshCw, Sparkles, CalendarDays } from 'lucide-react';
+import { ClipboardCheck, Users, Check, X, RefreshCw, CalendarDays } from 'lucide-react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import { useToast } from '../context/ToastContext';
@@ -99,8 +99,8 @@ export default function PanelAsistencia() {
           <div className="space-y-6 max-w-3xl mx-auto">
             {/* Encabezado */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 md:p-6">
-              <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles size={14} /> Panel del Profesor
+              <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">
+                Panel del Profesor
               </span>
               <h2 className="text-2xl font-black text-white mt-1 flex items-center gap-2">
                 <ClipboardCheck className="text-emerald-400" size={24} /> Asistencia

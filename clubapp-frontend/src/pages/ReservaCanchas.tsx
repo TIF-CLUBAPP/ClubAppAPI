@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Calendar, MapPin, RefreshCw, CheckCircle2, AlertCircle, Sparkles, Layers, ChevronLeft, ChevronRight, ChevronDown, Check, ArrowRight, Clock, Plus, X } from 'lucide-react';
+import { Calendar, MapPin, RefreshCw, CheckCircle2, AlertCircle, Layers, ChevronLeft, ChevronRight, ChevronDown, Check, ArrowRight, Clock, Plus, X } from 'lucide-react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import { useToast } from '../context/ToastContext';
@@ -567,20 +567,24 @@ export default function ReservaCanchas() {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-60">
         <Header />
         <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-40 md:pt-6 md:px-6 md:pb-28">
-          <div className="space-y-6 w-full max-w-5xl mx-auto">
+          <div className="space-y-6 w-full max-w-7xl mx-auto">
             {/* Encabezado */}
-            <div>
-              <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles size={14} /> Reserva de Espacios
-              </span>
-              <h2 className="text-2xl font-black text-white mt-1">Reservar un Espacio</h2>
-              <p className="text-xs text-slate-400 mt-1">
-                Completá los 4 pasos para reservar tu espacio. Podés volver atrás en cualquier momento para corregir tu selección.
-              </p>
+            <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">
+                  Reserva de Espacios
+                </span>
+                <h2 className="text-2xl font-black text-white mt-1 flex items-center gap-2.5">
+                  <MapPin className="w-6 h-6 text-emerald-400" /> Reservar Cancha
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Completá los 4 pasos para reservar tu espacio. Podés volver atrás en cualquier momento para corregir tu selección.
+                </p>
+              </div>
             </div>
 
             {/* Stepper visual superior */}
-            <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 shadow-xl">
+            <div className="py-2">
               <div className="flex items-center justify-between max-w-3xl mx-auto relative">
                 <div className="absolute top-5 left-8 right-8 h-0.5 bg-slate-800 -translate-y-1/2 z-0 hidden sm:block" />
                 {STEPS.map((s) => {
@@ -626,7 +630,7 @@ export default function ReservaCanchas() {
               <motion.div key="step1" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.3, ease: 'easeOut' }} className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                    <Layers size={18} className="text-emerald-400" /> Elegí un Espacio
+                    <Layers size={18} className="text-emerald-400" /> Elegí un Deporte o Espacio
                   </h3>
                   <span className="text-xs text-slate-400 font-medium">{categories.length} categorías de espacio disponibles</span>
                 </div>

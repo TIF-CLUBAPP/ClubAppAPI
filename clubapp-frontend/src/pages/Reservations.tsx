@@ -11,9 +11,9 @@ import {
   ChevronUp,
   CheckCircle2,
   AlertCircle,
-  
   Loader2,
   GraduationCap,
+  Trophy,
 } from 'lucide-react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
@@ -169,10 +169,13 @@ export default function Reservations() {
             <section>
               <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <MapPin size={14} /> Mi Agenda Personal
+                  <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">
+                    Mi Agenda Personal
                   </span>
-                  <h2 className="text-2xl font-black text-white mt-1">🗓️ Mi Cronograma de Actividades</h2>
+                  <h2 className="text-2xl font-black text-white mt-1 flex items-center gap-2.5">
+                    <Calendar className="w-6 h-6 text-emerald-400" />
+                    Mi Cronograma de Actividades
+                  </h2>
                   <p className="text-xs text-slate-400 mt-1">
                     Las clases y actividades en las que estás inscripto.
                   </p>
@@ -262,20 +265,25 @@ export default function Reservations() {
             <section>
               <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <MapPin size={14} /> Reservas de Espacios
+                  <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">
+                    Reservas de Espacios
                   </span>
-                  <h2 className="text-2xl font-black text-white mt-1">🎾 Mis Alquileres de Canchas</h2>
+                  <h2 className="text-2xl font-black text-white mt-1 flex items-center gap-2.5">
+                    <Trophy className="w-6 h-6 text-emerald-400" />
+                    Mis Alquileres de Canchas
+                  </h2>
                 </div>
 
                 <div className="flex items-center gap-3 self-start md:self-auto flex-wrap">
-                  <button
-                    onClick={() => navigate("/reservar-cancha")}
-                    className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-extrabold px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
-                  >
-                    <MapPin size={16} />
-                    Reservar Cancha
-                  </button>
+                  {filteredBookings.length > 0 && !bookingsLoading && !bookingsError && (
+                    <button
+                      onClick={() => navigate("/reservar-cancha")}
+                      className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-extrabold px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+                    >
+                      <MapPin size={16} />
+                      Reservar Cancha
+                    </button>
+                  )}
 
                   <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
                   <FilterButton active={filter === 'active'} onClick={() => handleFilterChange('active')} activeClass="bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20">Activas</FilterButton>
@@ -291,7 +299,20 @@ export default function Reservations() {
                 ) : bookingsError ? (
                   <EmptyState icon={<AlertCircle size={32} className="text-rose-500" />} title="No se pudieron cargar tus reservas" subtitle={bookingsError} onRetry={loadBookings} />
                 ) : filteredBookings.length === 0 ? (
-                  <EmptyState icon={<Calendar size={32} />} title="No se encontraron reservas" subtitle={filter === 'active' ? 'No tenés ningún turno activo en este momento.' : 'No hay registros en esta categoría.'} />
+                  <EmptyState
+                    icon={<Calendar size={32} />}
+                    title="No se encontraron reservas"
+                    subtitle={filter === 'active' ? 'No tenés ningún turno activo en este momento.' : 'No hay registros en esta categoría.'}
+                    action={
+                      <button
+                        onClick={() => navigate('/reservar-cancha')}
+                        className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold px-5 py-2.5 rounded-xl shadow-lg shadow-emerald-500/20 transition-all inline-flex items-center gap-2 mt-4"
+                      >
+                        <Trophy size={18} />
+                        Reservar Cancha
+                      </button>
+                    }
+                  />
                 ) : (
                   <>
                   <motion.div
@@ -467,8 +488,8 @@ function FilterButton({ active, onClick, activeClass, children }: { active: bool
 
 function EmptyState({ icon, title, subtitle, onRetry, action }: { icon: ReactNode; title: string; subtitle?: string; onRetry?: () => void; action?: ReactNode }) {
   return (
-    <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-12 text-center space-y-3">
-      <div className="inline-flex p-4 rounded-full bg-slate-950 text-slate-500 border border-slate-800">{icon}</div>
+    <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-12 text-center space-y-3">
+      <div className="inline-flex p-4 rounded-2xl bg-slate-900/90 text-emerald-400 border border-emerald-500/30 shadow-inner">{icon}</div>
       <h3 className="text-lg font-bold text-white">{title}</h3>
       {subtitle && <p className="text-xs text-slate-400 max-w-xs mx-auto">{subtitle}</p>}
       {onRetry && (

@@ -27,6 +27,8 @@ export default function Header() {
     '/': 'Dashboard',
     '/reservas': 'Reservas & Agenda',
     '/reservar-cancha': 'Reservar Cancha',
+    '/reserva-cancha': 'Reservar Cancha',
+    '/canchas': 'Reservar Cancha',
     '/actividades': 'Actividades',
     '/gestion-actividades': 'Gestión de Actividades',
     '/mis-cuotas': 'Mis Cuotas',
@@ -38,7 +40,7 @@ export default function Header() {
     '/cuenta': 'Mi Cuenta'
   };
   
-  const pageTitle = pageTitles[location.pathname] || '';
+  const pageTitle = pageTitles[location.pathname] || (location.pathname.includes('cancha') || location.pathname.includes('reservar') ? 'Reservar Cancha' : 'ClubApp');
 
   return (
     <header className="hidden md:flex h-16 border-b border-slate-800/80 bg-slate-950/50 backdrop-blur-md px-4 md:px-6 items-center justify-between gap-4 shrink-0 relative z-10">

@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   Check,
-  Sparkles,
   UserCheck,
   Wallet,
   Copy,
@@ -122,10 +121,12 @@ export default function InscripcionActividades() {
             {/* Encabezado */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Sparkles size={14} /> Actividades del Club
+                <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">
+                  Actividades del Club
                 </span>
-                <h2 className="text-2xl font-black text-white mt-1">Inscripción a Actividades</h2>
+                <h2 className="text-2xl font-black text-white mt-1 flex items-center gap-2.5">
+                  <Dumbbell className="w-6 h-6 text-emerald-400" /> Inscripción a Actividades
+                </h2>
                 <p className="text-xs text-slate-400 mt-1">
                   Elegí tu actividad y reservá tu lugar. Los cupos son limitados.
                 </p>
