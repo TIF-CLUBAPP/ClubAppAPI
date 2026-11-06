@@ -5,10 +5,16 @@ import FriendSearch from './FriendSearch';
 import NotificationDropdown from './NotificationDropdown';
 
 const greetings = [
-  '¡Hola de nuevo! 👋',
-  '¡Qué bueno verte por acá! 👋',
-  '¡Excelente día para un partido! 🎾',
-  '¡Listo para otra jornada deportiva! 💪',
+  '¡Hola de nuevo!',
+  '¡Qué bueno verte por acá!',
+  '¡Excelente día para un partido!',
+  '¡Listo para otra jornada deportiva!',
+  '¡A dejar todo en la cancha hoy!',
+  '¡Cada entrenamiento te hace más fuerte!',
+  '¡Es un gran momento para superar tus metas!',
+  '¡La energía del club se siente en cada jugada!',
+  '¡A entrenar con constancia y pasión!',
+  '¡Construí tu mejor versión en cada disciplina!'
 ];
 
 export default function Header() {
