@@ -130,15 +130,6 @@ export function useMisCuotas() {
   useEffect(() => { loadData(); }, [user, isSocio]);
 
   const loadData = async () => {
-    // Verificamos la condición del usuario autenticado ANTES de consultar o listar cuotas.
-    // Un usuario registrado en la app no es automáticamente "Socio" del club abonado.
-    if (!isSocio) {
-      setCuotas([]);
-      setExemptionLabel('');
-      setLoading(false);
-      return;
-    }
-
     try {
       setLoading(true);
       const [sData, eData] = await Promise.all([

@@ -22,14 +22,24 @@ interface NotificationContextType {
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
-const POLLING_INTERVAL_MS = 12000; // Polling en segundo plano cada 12 segundos
-
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, token } = useAuth();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [actingId, setActingId] = useState<number | null>(null);
   const isFetchingRef = useRef<boolean>(false);
+
+  const [dismissedIds, setDismissedIds] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('dismissed_notifications');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const dismissedIdsRef = useRef(dismissedIds);
+  dismissedIdsRef.current = dismissedIds;
 
   const fetchNotifications = useCallback(async (showLoading = false) => {
     if (!isAuthenticated) return;
@@ -40,16 +50,31 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     try {
       const data = await notificationService.fetchAll();
-      setNotifications(data);
+      const filtered = data.filter(n => {
+        const strId = String(n.id);
+        if (dismissedIdsRef.current.includes(strId)) return false;
+        const textToCheck = `${n.title} ${n.description}`.toLowerCase();
+        if (textToCheck.includes('membresía registrada') || textToCheck.includes('membresia registrada')) {
+          return false;
+        }
+        return true;
+      });
+      setNotifications(filtered);
     } catch {
-      // Ignorar errores transitorios de conexión durante polling
+      // Ignorar errores transitorios de conexión
     } finally {
       isFetchingRef.current = false;
       if (showLoading) setLoading(false);
     }
   }, [isAuthenticated]);
 
-  // Carga inicial y polling continuo
+  const tokenRef = useRef(token);
+  tokenRef.current = token;
+
+  const fetchNotificationsRef = useRef(fetchNotifications);
+  fetchNotificationsRef.current = fetchNotifications;
+
+  // Carga inicial al autenticar y conexión en tiempo real vía SignalR (SIN POLLING / SIN INTERVALOS)
   useEffect(() => {
     if (!isAuthenticated) {
       setNotifications([]);
@@ -58,26 +83,20 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
 
     // Consulta inicial al montar / autenticar
-    void fetchNotifications(true);
-
-    // Polling recurrente cada 12 segundos
-    const intervalId = setInterval(() => {
-      void fetchNotifications(false);
-    }, POLLING_INTERVAL_MS);
+    void fetchNotificationsRef.current(true);
 
     // Conexión WebSockets / SignalR para notificaciones en tiempo real
-    if (token) {
-      startSignalRNotificationConnection(token, () => {
+    if (tokenRef.current) {
+      startSignalRNotificationConnection(tokenRef.current, () => {
         // Al recibir un evento SignalR, sincronizamos la lista inmediatamente
-        void fetchNotifications(false);
+        void fetchNotificationsRef.current(false);
       });
     }
 
     return () => {
-      clearInterval(intervalId);
       void stopSignalRNotificationConnection();
     };
-  }, [isAuthenticated, token, fetchNotifications]);
+  }, [isAuthenticated]);
 
   const markAllRead = useCallback(async () => {
     try {
@@ -89,11 +108,23 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, []);
 
   const remove = useCallback(async (id: string) => {
+    const strId = String(id);
+    // 1. Borra la notificación del estado local inmediatamente de forma infalible
+    setNotifications(prev => prev.filter(n => String(n.id) !== strId));
+    // 2. Registrar en dismissedIds y persistir en localStorage para ocultamiento forzoso permanente
+    setDismissedIds(prev => {
+      if (prev.includes(strId)) return prev;
+      const next = [...prev, strId];
+      try {
+        localStorage.setItem('dismissed_notifications', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
     try {
+      // 3. Haz el await notificationService.remove(id) sin re-fetch
       await notificationService.remove(id);
-      setNotifications((prev) => prev.filter((n) => n.id !== id));
-    } catch {
-      // Sin conexión con el backend
+    } catch (err) {
+      console.warn("No se pudo sincronizar el borrado en servidor:", err);
     }
   }, []);
 

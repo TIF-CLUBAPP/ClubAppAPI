@@ -4,6 +4,7 @@ import { CreditCard, RefreshCw, UserPlus } from 'lucide-react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import type { MemberCuota } from '../types/cuotas';
+import { useAuth } from '../context/AuthContext';
 import { useMisCuotas } from '../hooks/useMisCuotas';
 import { useToast } from '../context/ToastContext';
 import { AccountStatusCard } from '../components/cuotas/AccountStatusCard';
@@ -11,6 +12,7 @@ import { CuotasList } from '../components/cuotas/CuotasList';
 import { CheckoutModal } from '../components/cuotas/CheckoutModal';
 import { ReceiptModal } from '../components/cuotas/ReceiptModal';
 import MembershipModal from '../components/dashboard/MembershipModal';
+import { membershipService } from '../services/membershipService';
 import { cuotaNumericId } from '../utils/cuotaIds';
 
 const fmt = (val: number) =>
@@ -39,11 +41,29 @@ export const MisCuotas: React.FC = () => {
   }, [searchParams, success, error, info]);
 
 
+  const { updateUser } = useAuth();
   const { loading, settings, exemptionLabel, cuotas, totalPending, globalStatus, updateCuota, updateCuotas, isSocio } = useMisCuotas();
   const [selectedCuotaIds, setSelectedCuotaIds] = useState<number[]>([]);
   const [checkoutCuotas, setCheckoutCuotas] = useState<MemberCuota[] | null>(null);
   const [selectedReceipt, setSelectedReceipt] = useState<MemberCuota | null>(null);
   const [showMembershipModal, setShowMembershipModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+
+  const handleCancelSubscription = async () => {
+    try {
+      setCancelling(true);
+      await membershipService.cancelSubscription();
+      setShowCancelModal(false);
+      updateUser({ isSocio: false, role: 'MEMBER' });
+      success('Membresía cancelada con éxito.');
+      window.location.reload();
+    } catch (err: any) {
+      error(err?.response?.data?.message || 'No se pudo cancelar la membresía.');
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   // Cuotas abonables (Pendiente / En Mora) y sus IDs para la selección múltiple.
   const selectableCuotas = useMemo(() => cuotas.filter((c) => c.status !== 'PAGADA'), [cuotas]);
@@ -124,6 +144,24 @@ export const MisCuotas: React.FC = () => {
                   </div>
                 </div>
               )}
+              {isSocio || cuotas.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setShowCancelModal(true)}
+                  className="px-4 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 hover:text-rose-300 font-semibold text-xs transition-all flex items-center gap-2 self-start md:self-auto"
+                >
+                  Cancelar Membresía
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowMembershipModal(true)}
+                  className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-all flex items-center gap-2 self-start md:self-auto shadow-lg shadow-emerald-500/20"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  Suscribirme al Club
+                </button>
+              )}
             </div>
 
             {loading ? (
@@ -131,32 +169,21 @@ export const MisCuotas: React.FC = () => {
                 <RefreshCw className="w-8 h-8 animate-spin text-emerald-400" />
                 <span className="text-sm font-medium">Cargando tu estado de cuenta...</span>
               </div>
-            ) : !isSocio ? (
-              <div className="flex flex-col items-center justify-center text-center py-16 sm:py-24 px-6 sm:px-12 bg-slate-900/60 rounded-3xl border border-slate-800/80 shadow-2xl w-full">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center mb-5 text-emerald-400 shadow-inner">
-                  <CreditCard className="w-8 h-8 sm:w-10 sm:h-10" />
-                </div>
-                <h3 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">No tenés cuotas sociales asociadas</h3>
-                <p className="text-slate-300 text-xs sm:text-sm mt-2 mb-8 max-w-md leading-relaxed">
-                  Asociate al club para acceder a todos los beneficios, reservas de canchas y descuentos exclusivos con tu membresía activa.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setShowMembershipModal(true)}
-                  className="w-auto inline-flex items-center justify-center gap-2.5 rounded-xl bg-emerald-500 px-6 sm:px-8 py-3 text-sm sm:text-base font-bold text-slate-950 transition-all hover:bg-emerald-400 hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-emerald-500/25"
-                >
-                  <UserPlus className="w-5 h-5" />
-                  Suscribirme al Club
-                </button>
-              </div>
-            ) : cuotas.length === 0 ? (
-              <div className="text-center py-16 px-4 bg-slate-900/50 rounded-3xl border border-slate-800">
-                <CreditCard className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-                <h3 className="text-xl font-bold text-white">Aún no tienes cuotas registradas</h3>
-                <p className="text-slate-400 mt-2">Para comenzar, uníte a un club o seleccioná un plan de membresía.</p>
-              </div>
-            ) : (
+            ) : cuotas.length > 0 ? (
               <>
+                {!isSocio && (
+                  <div className="bg-slate-900/90 border border-emerald-500/30 rounded-2xl p-4 md:p-5 flex items-center gap-3.5 shadow-xl">
+                    <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex-shrink-0">
+                      <CreditCard className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-white">Activación de Membresía Pendiente</h4>
+                      <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
+                        Tu membresía se activará automáticamente una vez acreditado el pago de tu primera cuota social.
+                      </p>
+                    </div>
+                  </div>
+                )}
                 <AccountStatusCard
                   globalStatus={globalStatus}
                   totalPendingAmount={totalPending}
@@ -177,6 +204,30 @@ export const MisCuotas: React.FC = () => {
                   formatCurrency={fmt}
                 />
               </>
+            ) : !isSocio ? (
+              <div className="flex flex-col items-center justify-center text-center py-16 sm:py-24 px-6 sm:px-12 bg-slate-900/60 rounded-3xl border border-slate-800/80 shadow-2xl w-full">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center mb-5 text-emerald-400 shadow-inner">
+                  <CreditCard className="w-8 h-8 sm:w-10 sm:h-10" />
+                </div>
+                <h3 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">No tenés cuotas sociales asociadas</h3>
+                <p className="text-slate-300 text-xs sm:text-sm mt-2 mb-8 max-w-md leading-relaxed">
+                  Asociate al club para acceder a todos los beneficios, reservas de canchas y descuentos exclusivos con tu membresía activa.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowMembershipModal(true)}
+                  className="w-auto inline-flex items-center justify-center gap-2.5 rounded-xl bg-emerald-500 px-6 sm:px-8 py-3 text-sm sm:text-base font-bold text-slate-950 transition-all hover:bg-emerald-400 hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-emerald-500/25"
+                >
+                  <UserPlus className="w-5 h-5" />
+                  Suscribirme al Club
+                </button>
+              </div>
+            ) : (
+              <div className="text-center py-16 px-4 bg-slate-900/50 rounded-3xl border border-slate-800">
+                <CreditCard className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                <h3 className="text-xl font-bold text-white">Aún no tienes cuotas registradas</h3>
+                <p className="text-slate-400 mt-2">Para comenzar, uníte a un club o seleccioná un plan de membresía.</p>
+              </div>
             )}
           </div>
         </main>
@@ -205,6 +256,35 @@ export const MisCuotas: React.FC = () => {
           window.location.reload();
         }}
       />
+
+      {showCancelModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-white">¿Querés cancelar tu membresía al club?</h3>
+            <p className="text-sm text-slate-300 leading-relaxed">
+              Al cancelar, perderás los beneficios de Socio y se anularán tus cuotas pendientes no abonadas.
+            </p>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowCancelModal(false)}
+                disabled={cancelling}
+                className="px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-950 text-slate-200 font-semibold text-xs hover:border-slate-600 transition"
+              >
+                Volver
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelSubscription}
+                disabled={cancelling}
+                className="px-4 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-400 text-white font-bold text-xs transition flex items-center gap-2 disabled:opacity-50 shadow-lg shadow-rose-500/20"
+              >
+                {cancelling ? 'Cancelando...' : 'Confirmar Cancelación'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -30,8 +30,8 @@ const CATEGORY_STYLES: Record<
   },
   payment: {
     label: 'Pagos & Cuotas',
-    iconClass: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
-    labelClass: 'text-amber-400',
+    iconClass: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+    labelClass: 'text-emerald-400',
   },
   announcement: {
     label: 'Avisos & Actividades',
@@ -79,17 +79,12 @@ export default function NotificationDropdown() {
     hasActionableUnread,
     loading,
     actingId,
-    refresh,
     markAllRead,
     remove,
     resolveRequest,
   } = useNotifications();
 
-  useEffect(() => {
-    if (open) {
-      void refresh();
-    }
-  }, [open, refresh]);
+
 
   useEffect(() => {
     const onPointerDown = (e: MouseEvent) => {

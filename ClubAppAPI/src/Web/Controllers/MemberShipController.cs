@@ -116,4 +116,34 @@ public class MembershipsController : ControllerBase
 
         return Ok(new { message = "Estado actualizado correctamente." });
     }
+
+    [HttpPost("cancel")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> CancelSubscription()
+    {
+        var userIdRaw = User.FindFirst("sub")?.Value
+                        ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        if (!int.TryParse(userIdRaw, out var userId))
+        {
+            return Unauthorized(new { message = "Token inválido." });
+        }
+
+        var result = await _membershipService.CancelSubscriptionAsync(userId);
+        if (!result)
+        {
+            return BadRequest(new { message = "No se pudo cancelar la membresía." });
+        }
+
+        return Ok(new { success = true, message = "Membresía cancelada con éxito." });
+    }
+
+    [HttpDelete("me")]
+    [Authorize]
+    public async Task<IActionResult> CancelMyMembership()
+    {
+        return await CancelSubscription();
+    }
 }

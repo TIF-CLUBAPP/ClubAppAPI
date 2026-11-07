@@ -75,14 +75,14 @@ export default function MembershipModal({ open, onClose }: MembershipModalProps)
     if (!selected || selected.price === null || selected.price === undefined) return;
     setSubmitting(true);
     try {
-      // 1. Registrar suscripción y emitir cuota pendiente del mes en curso,
-      // pero manteniendo temporalmente el rol en MIEMBRO (no se actualiza isSocio aquí).
+      // 1. Registrar suscripción y emitir cuota pendiente del mes en curso.
+      // El rol de socio se activará automáticamente al acreditarse el pago de la cuota.
       await membershipService.subscribe({
         membershipType: selected.id,
         monthlyPrice: selected.price,
       });
 
-      success('¡Suscripción registrada! Se generó tu cuota social en Mis Cuotas.');
+      success('¡Suscripción registrada! Se generó tu primera cuota social.');
       setStep('done');
     } catch (err) {
       const message =
@@ -274,8 +274,7 @@ export default function MembershipModal({ open, onClose }: MembershipModalProps)
                   </div>
                   <h4 className="text-xl font-black text-white">¡Suscripción completada!</h4>
                   <p className="text-sm text-slate-400 mt-2 max-w-sm mx-auto">
-                    Ya sos <strong className="text-emerald-400">{selected.name}</strong>. Podés ver tu
-                    cuota social y abonarla desde la sección Mis Cuotas.
+                    Generamos tu primera cuota. Abonala para activar tu condición de Socio Activo.
                   </p>
 
                   <div className="mt-6 flex flex-col sm:flex-row gap-3">

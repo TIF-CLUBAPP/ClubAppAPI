@@ -129,13 +129,12 @@ public class MembershipService : IMembershipService
         await _context.Memberships.AddAsync(membership);
         await _context.SaveChangesAsync();
 
-        var typeLabel = string.IsNullOrWhiteSpace(dto.MembershipType) ? "Socio" : dto.MembershipType;
-
         await _notificationService.CreateNotificationAsync(new CreateNotificationDto
         {
             UserId = userId,
-            Title = "Membresía Registrada",
-            Message = $"Tu membresía {typeLabel} fue procesada con éxito. Fecha de vencimiento: {endTime:dd/MM/yyyy}."
+            Title = "Cuota Social Generada",
+            Message = "Se generó tu primera cuota social. Abonala desde la sección Mis Cuotas para activar tu condición de Socio Activo.",
+            Category = NotificationCategory.Payment
         });
 
         return membership;
@@ -149,6 +148,41 @@ public class MembershipService : IMembershipService
         membership.Status = newStatus;
         await _context.SaveChangesAsync();
         return "OK";
+    }
+
+    public async Task<bool> CancelSubscriptionAsync(int userId)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (user == null) return false;
+
+        user.IsMember = false;
+        user.Role = UserRole.MEMBER;
+
+        var memberships = await _context.Memberships
+            .Where(m => m.UserId == userId && (m.Status == MembershipStatus.ACTIVE || m.Status == MembershipStatus.EXPIRING))
+            .ToListAsync();
+
+        foreach (var m in memberships)
+        {
+            m.Status = MembershipStatus.EXPIRED;
+        }
+
+        var pendingPayments = await _context.Payments
+            .Where(p => p.UserId == userId && (p.Status == PaymentStatus.Pending || p.Status == PaymentStatus.Overdue))
+            .ToListAsync();
+
+        _context.Payments.RemoveRange(pendingPayments);
+
+        await _context.SaveChangesAsync();
+
+        await _notificationService.CreateNotificationAsync(new CreateNotificationDto
+        {
+            UserId = userId,
+            Title = "Membresía Cancelada",
+            Message = "Tu membresía al club ha sido cancelada y las cuotas pendientes fueron anuladas."
+        });
+
+        return true;
     }
 
     public async Task CheckAndProcessExpirationsAsync()

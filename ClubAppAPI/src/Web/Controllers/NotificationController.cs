@@ -75,13 +75,14 @@ public class NotificationsController : ControllerBase
     public async Task<IActionResult> Delete(int id)
     {
         var notification = await _notificationService.GetByIdAsync(id);
-        if (notification == null) return NotFound("No se encontró el registro para eliminar.");
+        if (notification == null) 
+            return NoContent();
 
-        if (!IsAdmin() && notification.UserId != GetUserId())
+        if (!IsAdmin() && notification.UserId != null && notification.UserId != GetUserId())
             return StatusCode(403, "No te pertenece esta notificación.");
 
         await _notificationService.DeleteNotificationAsync(id);
-        return Ok(new { message = "Notificación eliminada." });
+        return NoContent();
     }
 
     [HttpGet("user/{userId:int}")]
