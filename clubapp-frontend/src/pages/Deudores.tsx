@@ -810,7 +810,9 @@ export default function Deudores() {
                   </div>
                 ) : !sorted.length ? (
                   <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-10 text-center">
-                    <Inbox className="mx-auto text-slate-600" size={38} />
+                    <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto text-emerald-400 shadow-lg shadow-emerald-500/5">
+                      <Inbox size={32} />
+                    </div>
                     <h3 className="mt-3 text-base font-bold text-white">
                       {search ? 'Sin resultados' : 'No hay deudores'}
                     </h3>

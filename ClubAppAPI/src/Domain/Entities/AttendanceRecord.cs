@@ -13,6 +13,6 @@ public class AttendanceRecord : BaseEntity
     /// <summary>Fecha de la clase (solo fecha, sin hora).</summary>
     public DateTime Date { get; set; }
 
-    /// <summary>true = Presente, false = Ausente.</summary>
-    public bool Present { get; set; }
+    /// <summary>Estado de asistencia (Presente / Ausente / Justificado).</summary>
+    public AttendanceStatus Status { get; set; } = AttendanceStatus.PRESENT;
 }

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Edit2, Trash2, X, Save, Clock, MapPin,
   CheckCircle2, AlertCircle, AlertTriangle, Dumbbell, RefreshCw, Users,
-  GraduationCap, UserPlus, ChevronDown, Receipt, Banknote,
+  GraduationCap, UserPlus, ChevronDown, Receipt, Banknote, Search,
 } from 'lucide-react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
@@ -26,6 +26,7 @@ import {
   blocksToSchedules,
   maskTimeInput,
 } from '../components/activities/WeeklyScheduleSelector';
+import Combobox from '../components/ui/Combobox';
 
 const DAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
@@ -69,7 +70,7 @@ const emptyForm = (): SaveActivityRequest => ({
 
 const Toggle = ({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) => (
   <div className="flex items-center justify-between py-2">
-    <span className="text-sm text-slate-400">{label}</span>
+    <span className="text-sm font-medium text-slate-200">{label}</span>
     <button
       type="button"
       onClick={() => onChange(!checked)}
@@ -80,6 +81,41 @@ const Toggle = ({ checked, onChange, label }: { checked: boolean; onChange: (v: 
   </div>
 );
 
+// Mensajes de error por campo en el formulario de actividad.
+type FieldErrors = {
+  name?: string;
+  category?: string;
+  spaceId?: string;
+  maxCapacity?: string;
+  schedules?: string;
+};
+
+const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+// Devuelve los errores de validación previa de los campos obligatorios.
+const validateForm = (form: SaveActivityRequest): FieldErrors => {
+  const errors: FieldErrors = {};
+
+  if (!form.name.trim()) errors.name = 'Este campo es obligatorio';
+
+  if (!form.category || !form.category.trim()) errors.category = 'Selecciona un deporte';
+
+  if (form.spaceId == null) errors.spaceId = 'Selecciona un espacio físico';
+
+  if (!form.maxCapacity || form.maxCapacity <= 0) {
+    errors.maxCapacity = 'Ingresa un cupo mayor a 0';
+  }
+
+  const validSchedules = (form.schedules ?? []).filter(
+    (s) => TIME_RE.test(s.startTime) && TIME_RE.test(s.endTime) && timeToMin(s.startTime) < timeToMin(s.endTime),
+  );
+  if (validSchedules.length === 0) {
+    errors.schedules = 'Agrega al menos un horario válido (inicio antes del fin)';
+  }
+
+  return errors;
+};
+
 export default function GestionActividades() {
   const { user: currentUser } = useAuth();
   const isStaff = currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPERADMIN';
@@ -88,11 +124,15 @@ export default function GestionActividades() {
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [professors, setProfessors] = useState<UserListItem[]>([]);
   const [instructorsOpen, setInstructorsOpen] = useState(false);
+  const [instructorSearch, setInstructorSearch] = useState('');
+  const [scopeFilter, setScopeFilter] = useState<'mine' | 'all'>('mine');
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Activity | null>(null);
   const [form, setForm] = useState<SaveActivityRequest>(emptyForm());
   const [saving, setSaving] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [serverError, setServerError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Activity | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [settlementTarget, setSettlementTarget] = useState<Activity | null>(null);
@@ -152,6 +192,55 @@ export default function GestionActividades() {
     () => spaces.find((s) => s.id === form.spaceId) ?? null,
     [spaces, form.spaceId],
   );
+
+  // Opciones del Combobox de deportes (SPORT_CATEGORIES es un array de strings).
+  const sportOptions = useMemo(
+    () => SPORT_CATEGORIES.map((cat) => ({ value: cat, label: cat })),
+    [],
+  );
+
+  // Opciones del Combobox de espacios físicos (id como value, nombre + categoría).
+  const spaceOptions = useMemo(
+    () => spaces.map((s) => ({ value: String(s.id), label: s.name, secondary: s.sportCategory })),
+    [spaces],
+  );
+
+  // Determina si el usuario logueado puede editar/eliminar una actividad.
+  // Los administradores pueden gestionar todo; un profesor solo las que tiene a cargo.
+  const canManageActivity = (a: Activity): boolean => {
+    if (isStaff) return true;
+    if (currentUser?.role === 'TEACHER') {
+      const myId = currentUser.id ? Number(currentUser.id) : null;
+      if (myId == null) return false;
+      const inInstructors = (a.instructors ?? []).some((i) => i.id === myId);
+      const isTeacher = a.teacherId === myId;
+      return inInstructors || isTeacher;
+    }
+    return false;
+  };
+
+  // Lista filtrada según el alcance seleccionado (Mis Actividades vs Todas).
+  const visibleActivities = useMemo(() => {
+    if (scopeFilter === 'all' || isStaff) return activities;
+    const myId = currentUser?.id ? Number(currentUser.id) : null;
+    if (myId == null) return [];
+    return activities.filter((a) => {
+      const inInstructors = (a.instructors ?? []).some((i) => i.id === myId);
+      return inInstructors || a.teacherId === myId;
+    });
+  }, [activities, scopeFilter, isStaff, currentUser]);
+
+  // Profesores filtrados por el texto de búsqueda en el selector.
+  const filteredProfessors = useMemo(() => {
+    const q = instructorSearch.trim().toLowerCase();
+    if (!q) return professors;
+    return professors.filter(
+      (p) =>
+        p.fullName.toLowerCase().includes(q) ||
+        p.email.toLowerCase().includes(q),
+    );
+  }, [professors, instructorSearch]);
+
 
   // Determina si el profesor a cargo es INDEPENDIENTE (paga canon/convenio).
   const isIndependentTeacher = useMemo(() => {
@@ -230,6 +319,8 @@ export default function GestionActividades() {
   const openCreate = () => {
     setEditing(null);
     setForm(emptyForm());
+    setFieldErrors({});
+    setServerError(null);
     setScheduleMode('detailed');
     setMassiveBlocks([{ id: '1', days: [1, 2, 3, 4, 5], startTime: '08:00', endTime: '20:00' }]);
     setModalOpen(true);
@@ -237,6 +328,8 @@ export default function GestionActividades() {
 
   const openEdit = (a: Activity) => {
     setEditing(a);
+    setFieldErrors({});
+    setServerError(null);
     const initialSchedules =
       a.schedules.length > 0
         ? a.schedules.map((s) => ({ dayOfWeek: s.dayOfWeek, startTime: s.startTime, endTime: s.endTime }))
@@ -292,21 +385,39 @@ export default function GestionActividades() {
     }));
   };
 
-  const toggleInstructor = (id: number) => {
-    setForm((f) => {
-      const current = f.instructorIds ?? [];
-      const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
-      return { ...f, instructorIds: next };
-    });
-  };
-
   const removeInstructor = (id: number) => {
     setForm((f) => ({ ...f, instructorIds: (f.instructorIds ?? []).filter((x) => x !== id) }));
+  };
+
+  const addInstructor = (id: number) => {
+    setForm((f) => ({
+      ...f,
+      instructorIds: (f.instructorIds ?? []).includes(id)
+        ? f.instructorIds
+        : [...(f.instructorIds ?? []), id],
+    }));
+  };
+
+  const handleEditClick = (a: Activity) => {
+    if (!canManageActivity(a)) {
+      toast.error('No tenés permisos para gestionar esta actividad');
+      return;
+    }
+    openEdit(a);
+  };
+
+  const handleDeleteClick = (a: Activity) => {
+    if (!canManageActivity(a)) {
+      toast.error('No tenés permisos para gestionar esta actividad');
+      return;
+    }
+    setDeleteTarget(a);
   };
 
   const handleMassiveBlocksChange = (newBlocks: WeeklyScheduleBlock[]) => {
     setMassiveBlocks(newBlocks);
     setForm((f) => ({ ...f, schedules: blocksToSchedules(newBlocks) }));
+    if (fieldErrors.schedules) setFieldErrors({ ...fieldErrors, schedules: undefined });
   };
 
   const handleTabSwitch = (mode: 'detailed' | 'massive') => {
@@ -323,10 +434,12 @@ export default function GestionActividades() {
       ...f,
       schedules: [...f.schedules, { dayOfWeek: 1, startTime: '08:00', endTime: '20:00' }],
     }));
+    if (fieldErrors.schedules) setFieldErrors({ ...fieldErrors, schedules: undefined });
   };
 
   const removeScheduleRow = (index: number) => {
     setForm((f) => ({ ...f, schedules: f.schedules.filter((_, i) => i !== index) }));
+    if (fieldErrors.schedules) setFieldErrors({ ...fieldErrors, schedules: undefined });
   };
 
   const updateScheduleRow = (index: number, patch: Partial<ActivityScheduleInput>) => {
@@ -334,6 +447,7 @@ export default function GestionActividades() {
       ...f,
       schedules: f.schedules.map((s, i) => (i === index ? { ...s, ...patch } : s)),
     }));
+    if (fieldErrors.schedules) setFieldErrors({ ...fieldErrors, schedules: undefined });
   };
 
   const confirmDelete = async () => {
@@ -368,10 +482,28 @@ export default function GestionActividades() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setServerError(null);
+
     if (hasBlocked) {
       toast.error('Hay horarios bloqueados. Revisá los conflictos en rojo.');
       return;
     }
+
+    const errors = validateForm(form);
+    const errorCount = Object.keys(errors).length;
+    if (errorCount > 0) {
+      setFieldErrors(errors);
+      // Enfocar el primer campo con error para que el usuario lo corrija de inmediato.
+      const firstKey = Object.keys(errors)[0];
+      requestAnimationFrame(() => {
+        const el = document.querySelector<HTMLElement>(`[data-field="${firstKey}"]`);
+        el?.focus();
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+      return;
+    }
+    setFieldErrors({});
+
     try {
       setSaving(true);
       if (editing) {
@@ -384,7 +516,9 @@ export default function GestionActividades() {
       setModalOpen(false);
       await load();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'No se pudo guardar la actividad.');
+      const message = err?.response?.data?.message ?? err?.response?.data?.detail ?? null;
+      setServerError(message ?? 'No se pudo guardar la actividad.');
+      toast.error(message ?? 'No se pudo guardar la actividad.');
     } finally {
       setSaving(false);
     }
@@ -442,71 +576,106 @@ export default function GestionActividades() {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden md:pl-60">
         <Header />
         <main className="flex-1 w-full min-w-0 overflow-y-auto pt-16 px-4 pb-32 md:pt-6 md:px-6 md:pb-6">
-          <div className="space-y-6 max-w-6xl mx-auto">
+          <div className="space-y-8 max-w-7xl mx-auto">
             <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Dumbbell size={14} /> Administración
+                <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">
+                  Administración
                 </span>
-                <h2 className="text-2xl font-black text-white mt-1">Gestión de Actividades</h2>
-                <p className="text-xs text-slate-400 mt-1">
+                <h2 className="text-xl md:text-2xl font-black tracking-tight text-white flex items-center gap-2.5 mt-1">
+                  <Dumbbell className="w-6 h-6 text-emerald-400" /> Administración de Clases y Actividades
+                </h2>
+                <p className="text-xs md:text-sm text-slate-400 mt-1">
                   Creá y editá actividades, asigná espacios y validá la disponibilidad de horarios.
                 </p>
               </div>
               <button
                 onClick={openCreate}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-all self-start md:self-auto"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-all self-start md:self-auto shadow-lg shadow-emerald-500/20"
               >
                 <Plus size={14} /> Nueva Actividad
               </button>
             </div>
 
+            <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 w-fit">
+              <button
+                onClick={() => setScopeFilter('mine')}
+                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+                  scopeFilter === 'mine'
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Mis Actividades
+              </button>
+              <button
+                onClick={() => setScopeFilter('all')}
+                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+                  scopeFilter === 'all'
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Todas las Actividades
+              </button>
+            </div>
+
             {loading ? (
               <p className="text-slate-300">Cargando...</p>
-            ) : activities.length === 0 ? (
+            ) : visibleActivities.length === 0 ? (
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center text-slate-400">
-                No hay actividades cargadas todavía.
+                {scopeFilter === 'mine' && !isStaff
+                  ? 'No tenés actividades a cargo todavía.'
+                  : 'No hay actividades cargadas todavía.'}
               </div>
             ) : (
               <div className="grid gap-4 md:grid-cols-2">
-                {activities.map((a) => (
-                  <div key={a.id} className="bg-slate-900 p-4 rounded-xl border border-slate-800 flex flex-col gap-3">
+                {visibleActivities.map((a) => (
+                  <div key={a.id} className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 flex flex-col gap-3 transition-all hover:border-slate-700">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-bold text-white truncate">{a.name}</h3>
+                          <h3 className="text-lg font-bold text-white truncate">{a.name}</h3>
                           {!a.isActive && (
-                            <span className="text-[10px] font-black px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300">
+                            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300">
                               Inactiva
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          <Dumbbell size={11} className="inline mr-1 text-emerald-400" />
+                        <p className="text-sm font-medium text-slate-300 mt-1">
+                          <Dumbbell size={14} className="inline mr-1 text-emerald-400" />
                           {a.category}
                           {a.spaceName && (
                             <>
-                              <MapPin size={11} className="inline ml-2 mr-1 text-sky-400" />
+                              <MapPin size={14} className="inline ml-2 mr-1 text-sky-400" />
                               {a.spaceName}
                             </>
                           )}
                         </p>
                       </div>
                       <div className="flex gap-2 shrink-0">
-                        <button
-                          onClick={() => openEdit(a)}
-                          className="p-2 bg-slate-800 rounded-md hover:bg-slate-700 border border-slate-700"
-                          title="Editar"
-                        >
-                          <Edit2 size={15} />
-                        </button>
-                        <button
-                          onClick={() => setDeleteTarget(a)}
-                          className="p-2 bg-red-900/20 text-red-400 rounded-md hover:bg-red-900/40 border border-red-900/20"
-                          title="Eliminar"
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                        {canManageActivity(a) ? (
+                          <>
+                            <button
+                              onClick={() => handleEditClick(a)}
+                              className="p-2 bg-slate-900 rounded-lg hover:bg-slate-800 border border-slate-700 text-slate-300 transition"
+                              title="Editar"
+                            >
+                              <Edit2 size={15} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteClick(a)}
+                              className="p-2 bg-red-900/20 text-red-400 rounded-lg hover:bg-red-900/40 border border-red-900/20 transition"
+                              title="Eliminar"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-[10px] text-slate-600 font-semibold px-2 py-1 bg-slate-900/40 border border-slate-800 rounded-lg self-center">
+                            Sin permisos
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -515,41 +684,34 @@ export default function GestionActividades() {
                         a.schedules.map((s) => (
                           <span
                             key={s.id}
-                            className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-300 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1"
+                            className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-300 bg-slate-900/60 border border-slate-800 rounded-lg px-2.5 py-1"
                           >
-                            <Clock size={11} className="text-emerald-400" />
+                            <Clock size={14} className="text-emerald-400" />
                             {s.dayName} {s.startTime}-{s.endTime}
                           </span>
                         ))
                       ) : (
-                        <span className="text-[10px] font-semibold text-slate-400 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1">
-                          <Clock size={11} className="inline mr-1" /> {a.schedule || 'Sin horario'}
+                        <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-400 bg-slate-900/60 border border-slate-800 rounded-lg px-2.5 py-1">
+                          <Clock size={14} className="inline text-emerald-400" /> {a.schedule || 'Sin horario'}
                         </span>
                       )}
                     </div>
 
-                    {(a.instructors ?? []).length > 0 && (
-                      <div className="flex flex-wrap gap-1.5">
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                          <GraduationCap size={11} /> Profesores:
+                    <div className="flex items-center justify-between text-sm text-slate-300 mt-auto">
+                      <span className="flex items-center gap-1.5 min-w-0">
+                        <Users size={14} className="text-violet-400 shrink-0" />
+                        <span className="truncate">
+                          Cupo: {a.maxCapacity}
+                          {(a.instructors ?? []).length > 0 && (
+                            <span className="text-slate-400">
+                              {' · '}
+                              <GraduationCap size={14} className="inline mr-0.5 text-sky-400" />
+                              {(a.instructors ?? []).map((i) => i.fullName).join(', ')}
+                            </span>
+                          )}
                         </span>
-                        {(a.instructors ?? []).map((i) => (
-                          <span
-                            key={i.id}
-                            className="inline-flex items-center gap-1 text-[10px] font-semibold text-sky-300 bg-sky-500/10 border border-sky-500/20 rounded-lg px-2 py-0.5"
-                          >
-                            <GraduationCap size={11} />
-                            {i.fullName}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between text-xs text-slate-400">
-                      <span className="flex items-center gap-1">
-                        <Users size={12} className="text-violet-400" /> Cupo: {a.maxCapacity}
                       </span>
-                      <span>{Math.max(a.availableSpots, 0)} disponibles</span>
+                      <span className="font-semibold text-emerald-400 shrink-0">{Math.max(a.availableSpots, 0)} disponibles</span>
                     </div>
 
                     {a.paymentCollector === 'PROFESSOR_DIRECT' && (
@@ -622,18 +784,30 @@ export default function GestionActividades() {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 mb-1">Nombre</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Nombre</label>
                   <input
                     type="text"
-                    required
+                    data-field="name"
                     value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                    onChange={(e) => {
+                      setForm({ ...form, name: e.target.value });
+                      if (fieldErrors.name) setFieldErrors({ ...fieldErrors, name: undefined });
+                    }}
+                    className={`w-full bg-[#0f172a] border text-slate-100 rounded-lg p-2.5 text-sm outline-none ${
+                      fieldErrors.name
+                        ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500'
+                        : 'border-slate-700 focus:border-emerald-500'
+                    }`}
                   />
+                  {fieldErrors.name && (
+                    <p className="mt-1 text-xs text-rose-400 flex items-center gap-1">
+                      <AlertCircle size={12} /> {fieldErrors.name}
+                    </p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 mb-1">Descripción</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Descripción</label>
                   <textarea
                     value={form.description}
                     onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -643,36 +817,45 @@ export default function GestionActividades() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Deporte / Categoría</label>
-                    <select
+                  <div data-field="category">
+                    <label className="block text-sm font-medium text-slate-300 mb-1">Deporte / Categoría</label>
+                    <Combobox
                       value={form.category}
-                      onChange={(e) => setForm({ ...form, category: e.target.value })}
-                      className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
-                    >
-                      {SPORT_CATEGORIES.map((cat) => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                    </select>
+                      options={sportOptions}
+                      placeholder="Seleccionar deporte…"
+                      noResultsText="No hay deportes que coincidan"
+                      error={!!fieldErrors.category}
+                      onChange={(v) => {
+                        setForm({ ...form, category: v ?? SPORT_CATEGORIES[0] });
+                        if (fieldErrors.category) setFieldErrors({ ...fieldErrors, category: undefined });
+                      }}
+                    />
+                    {fieldErrors.category && (
+                      <p className="mt-1 text-xs text-rose-400 flex items-center gap-1">
+                        <AlertCircle size={12} /> {fieldErrors.category}
+                      </p>
+                    )}
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Espacio físico</label>
-                    <select
-                      value={form.spaceId ?? ''}
-                      onChange={(e) =>
-                        setForm({ ...form, spaceId: e.target.value ? Number(e.target.value) : null })
-                      }
-                      className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
-                    >
-                      <option value="">— Sin espacio —</option>
-                      {spaces.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name} ({s.sportCategory})
-                        </option>
-                      ))}
-                    </select>
-                    {selectedSpace && (
+                  <div data-field="spaceId">
+                    <label className="block text-sm font-medium text-slate-300 mb-1">Espacio físico</label>
+                    <Combobox
+                      value={form.spaceId != null ? String(form.spaceId) : null}
+                      options={spaceOptions}
+                      placeholder="— Sin espacio —"
+                      noResultsText="No hay espacios que coincidan"
+                      error={!!fieldErrors.spaceId}
+                      onChange={(v) => {
+                        setForm({ ...form, spaceId: v ? Number(v) : null });
+                        if (fieldErrors.spaceId) setFieldErrors({ ...fieldErrors, spaceId: undefined });
+                      }}
+                    />
+                    {fieldErrors.spaceId && (
+                      <p className="mt-1 text-xs text-rose-400 flex items-center gap-1">
+                        <AlertCircle size={12} /> {fieldErrors.spaceId}
+                      </p>
+                    )}
+                    {selectedSpace && !fieldErrors.spaceId && (
                       <p className="text-[11px] text-slate-500 mt-1">
                         Superposición: {selectedSpace.permitir_superposicion ? 'permitida (mismo deporte)' : 'bloqueada'}.
                       </p>
@@ -680,18 +863,31 @@ export default function GestionActividades() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Cupo máximo</label>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">Cupo máximo</label>
                     <input
                       type="number"
                       min={0}
+                      data-field="maxCapacity"
                       value={form.maxCapacity === 0 ? '' : form.maxCapacity}
-                      onChange={(e) => setForm({ ...form, maxCapacity: parseNumericInput(e.target.value) })}
-                      className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                      onChange={(e) => {
+                        setForm({ ...form, maxCapacity: parseNumericInput(e.target.value) });
+                        if (fieldErrors.maxCapacity) setFieldErrors({ ...fieldErrors, maxCapacity: undefined });
+                      }}
+                      className={`w-full bg-[#0f172a] border text-slate-100 rounded-lg p-2.5 text-sm outline-none ${
+                        fieldErrors.maxCapacity
+                          ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500'
+                          : 'border-slate-700 focus:border-emerald-500'
+                      }`}
                     />
+                    {fieldErrors.maxCapacity && (
+                      <p className="mt-1 text-xs text-rose-400 flex items-center gap-1">
+                        <AlertCircle size={12} /> {fieldErrors.maxCapacity}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 mb-1">Tipo de Cobro</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Tipo de Cobro</label>
                   <select
                     value={form.paymentCollector}
                     onChange={(e) =>
@@ -706,7 +902,7 @@ export default function GestionActividades() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Precio Socio ($)</label>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">Precio Socio ($)</label>
                     <input
                       type="number"
                       min={0}
@@ -716,7 +912,7 @@ export default function GestionActividades() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Precio No Socio ($)</label>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">Precio No Socio ($)</label>
                     <input
                       type="number"
                       min={0}
@@ -737,7 +933,7 @@ export default function GestionActividades() {
                       </p>
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-400 mb-1">Canon de Instalaciones ($)</label>
+                      <label className="block text-sm font-medium text-slate-300 mb-1">Canon de Instalaciones ($)</label>
                       <input
                         type="number"
                         min={0}
@@ -757,7 +953,7 @@ export default function GestionActividades() {
                       {form.aplicaDescuentoSocios && (
                         <div className="space-y-3 pl-2 border-l-2 border-emerald-500/30">
                           <div>
-                            <label className="block text-xs font-bold text-slate-400 mb-1">Tipo de Descuento</label>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">Tipo de Descuento</label>
                             <select
                               value={form.tipoDescuentoCanon}
                               onChange={(e) => setForm({ ...form, tipoDescuentoCanon: e.target.value as 'MONTO_FIJO' | 'PORCENTAJE' })}
@@ -769,7 +965,7 @@ export default function GestionActividades() {
                           </div>
 
                           <div>
-                            <label className="block text-xs font-bold text-slate-400 mb-1">
+                            <label className="block text-sm font-medium text-slate-300 mb-1">
                               {form.tipoDescuentoCanon === 'PORCENTAJE' ? 'Porcentaje de Descuento por Socio (%)' : 'Monto de Descuento por Socio ($)'}
                             </label>
                             <input
@@ -783,7 +979,7 @@ export default function GestionActividades() {
                           </div>
 
                           <div>
-                            <label className="block text-xs font-bold text-slate-400 mb-1">Descuento Máximo Total ($ o vacío)</label>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">Descuento Máximo Total ($ o vacío)</label>
                             <input
                               type="number"
                               min="0"
@@ -801,26 +997,26 @@ export default function GestionActividades() {
 
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-bold text-slate-400">Profesores a cargo</label>
+                    <label className="block text-sm font-medium text-slate-300">Profesores a cargo</label>
                     <button
                       type="button"
                       onClick={handleAssignMe}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-300 text-[11px] font-semibold hover:bg-sky-500/20 transition"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-300 text-sm font-medium hover:bg-sky-500/20 transition"
                     >
-                      <UserPlus size={12} /> Asignarme a mí
+                      <UserPlus size={14} /> Asignarme a mí
                     </button>
                   </div>
 
-                  <div className="flex flex-wrap gap-1.5 mb-2">
+                  <div className="flex flex-wrap gap-2 mb-2">
                     {(form.instructorIds ?? []).length === 0 ? (
-                      <span className="text-[11px] text-slate-500">Sin profesores asignados.</span>
+                      <span className="text-sm text-slate-500">Sin profesores asignados.</span>
                     ) : (
                       (form.instructorIds ?? []).map((id) => (
                         <span
                           key={id}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-200 text-[11px] font-semibold"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-200 text-sm font-medium"
                         >
-                          <GraduationCap size={12} />
+                          <GraduationCap size={15} />
                           {instructorLabel(id)}
                           <button
                             type="button"
@@ -828,7 +1024,7 @@ export default function GestionActividades() {
                             className="text-sky-400 hover:text-white ml-0.5"
                             title="Quitar"
                           >
-                            <X size={12} />
+                            <X size={14} />
                           </button>
                         </span>
                       ))
@@ -839,36 +1035,57 @@ export default function GestionActividades() {
                     <div className="relative">
                       <button
                         type="button"
-                        onClick={() => setInstructorsOpen((v) => !v)}
+                        onClick={() => {
+                          setInstructorsOpen((v) => !v);
+                          setInstructorSearch('');
+                        }}
                         className="w-full flex items-center justify-between gap-2 bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
                       >
-                        <span className="text-slate-400">Seleccionar profesores…</span>
+                        <span className="text-slate-400">Buscar y asignar profesores…</span>
                         <ChevronDown size={16} className={`transition-transform ${instructorsOpen ? 'rotate-180' : ''}`} />
                       </button>
                       {instructorsOpen && (
-                        <div className="absolute z-10 mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg shadow-2xl max-h-48 overflow-y-auto scrollbar-thin">
-                          {professors.length === 0 ? (
-                            <p className="px-3 py-2 text-xs text-slate-500">No hay profesores disponibles.</p>
-                          ) : (
-                            professors.map((p) => {
-                              const checked = (form.instructorIds ?? []).includes(p.id);
-                              return (
-                                <label
-                                  key={p.id}
-                                  className="flex items-center gap-2 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700/60 cursor-pointer"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={checked}
-                                    onChange={() => toggleInstructor(p.id)}
-                                    className="accent-emerald-500"
-                                  />
-                                  <span className="flex-1 truncate">{p.fullName}</span>
-                                  <span className="text-[10px] text-slate-500">{p.email}</span>
-                                </label>
-                              );
-                            })
-                          )}
+                        <div className="absolute z-10 mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg shadow-2xl overflow-hidden">
+                          <div className="p-2 border-b border-slate-700">
+                            <div className="relative flex items-center">
+                              <Search size={14} className="absolute left-2.5 text-slate-500 pointer-events-none" />
+                              <input
+                                autoFocus
+                                type="text"
+                                value={instructorSearch}
+                                onChange={(e) => setInstructorSearch(e.target.value)}
+                                placeholder="Buscar profesor…"
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-8 pr-2.5 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none focus:border-emerald-500"
+                              />
+                            </div>
+                          </div>
+                          <div className="max-h-48 overflow-y-auto scrollbar-thin">
+                            {filteredProfessors.length === 0 ? (
+                              <p className="px-3 py-3 text-center text-xs text-slate-500">No hay profesores que coincidan.</p>
+                            ) : (
+                              filteredProfessors.map((p) => {
+                                const assigned = (form.instructorIds ?? []).includes(p.id);
+                                return (
+                                  <button
+                                    type="button"
+                                    key={p.id}
+                                    onClick={() => (assigned ? removeInstructor(p.id) : addInstructor(p.id))}
+                                    className="w-full flex items-center justify-between gap-2 px-3 py-2 text-sm text-left transition-colors hover:bg-slate-700/60"
+                                  >
+                                    <span className="flex-1 min-w-0">
+                                      <span className="block truncate text-slate-200">{p.fullName}</span>
+                                      <span className="block text-[10px] text-slate-500 truncate">{p.email}</span>
+                                    </span>
+                                    {assigned ? (
+                                      <CheckCircle2 size={16} className="shrink-0 text-emerald-400" />
+                                    ) : (
+                                      <Plus size={16} className="shrink-0 text-slate-500" />
+                                    )}
+                                  </button>
+                                );
+                              })
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -877,7 +1094,7 @@ export default function GestionActividades() {
 
                 <div>
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-2 border-b border-slate-800">
-                    <label className="block text-xs font-bold text-slate-300">Días y horarios</label>
+                    <label className="block text-base font-bold text-white">Días y horarios</label>
                     <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 self-start sm:self-auto">
                       <button
                         type="button"
@@ -904,6 +1121,12 @@ export default function GestionActividades() {
                     </div>
                   </div>
 
+                  {fieldErrors.schedules && (
+                    <p className="mb-2 text-xs text-rose-400 flex items-center gap-1">
+                      <AlertCircle size={12} /> {fieldErrors.schedules}
+                    </p>
+                  )}
+
                   {scheduleMode === 'massive' ? (
                     <WeeklyScheduleSelector
                       blocks={massiveBlocks}
@@ -916,9 +1139,9 @@ export default function GestionActividades() {
                         <button
                           type="button"
                           onClick={addScheduleRow}
-                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-semibold border border-slate-700 transition"
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 text-sm font-semibold border border-slate-700 transition"
                         >
-                          <Plus size={13} /> Agregar horario
+                          <Plus size={15} /> Agregar horario
                         </button>
                       </div>
 
@@ -929,11 +1152,11 @@ export default function GestionActividades() {
                             <div key={index} className={`rounded-xl border p-3 ${rowStyle(row.status)}`}>
                               <div className="flex flex-wrap items-end gap-2">
                                 <div className="flex-1 min-w-30">
-                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Día</label>
+                                  <label className="block text-sm font-medium text-slate-400 mb-1">Día</label>
                                   <select
                                     value={row.dayOfWeek}
                                     onChange={(e) => updateScheduleRow(index, { dayOfWeek: Number(e.target.value) })}
-                                    className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2 text-xs focus:border-emerald-500 outline-none"
+                                    className="w-full h-10 bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg px-3 text-sm font-medium focus:border-emerald-500 outline-none"
                                   >
                                     {DAYS.map((d, i) => (
                                       <option key={d} value={i}>{d}</option>
@@ -942,7 +1165,7 @@ export default function GestionActividades() {
                                 </div>
 
                                 <div>
-                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Inicio</label>
+                                  <label className="block text-sm font-medium text-slate-400 mb-1">Inicio</label>
                                   <div className="relative">
                                     <input
                                       type="text"
@@ -952,14 +1175,14 @@ export default function GestionActividades() {
                                       maxLength={5}
                                       inputMode="numeric"
                                       autoComplete="off"
-                                      className="w-28 pl-3 pr-8 py-2 bg-slate-900/80 border border-slate-700 text-slate-100 rounded-lg text-sm text-center focus:border-emerald-500 focus:outline-none"
+                                      className="w-28 h-10 pl-3 pr-8 bg-slate-900/80 border border-slate-700 text-slate-100 rounded-lg text-sm font-medium text-center focus:border-emerald-500 focus:outline-none"
                                     />
                                     <Clock className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                                   </div>
                                 </div>
 
                                 <div>
-                                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Fin</label>
+                                  <label className="block text-sm font-medium text-slate-400 mb-1">Fin</label>
                                   <div className="relative">
                                     <input
                                       type="text"
@@ -969,14 +1192,14 @@ export default function GestionActividades() {
                                       maxLength={5}
                                       inputMode="numeric"
                                       autoComplete="off"
-                                      className="w-28 pl-3 pr-8 py-2 bg-slate-900/80 border border-slate-700 text-slate-100 rounded-lg text-sm text-center focus:border-emerald-500 focus:outline-none"
+                                      className="w-28 h-10 pl-3 pr-8 bg-slate-900/80 border border-slate-700 text-slate-100 rounded-lg text-sm font-medium text-center focus:border-emerald-500 focus:outline-none"
                                     />
                                     <Clock className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                                   </div>
                                 </div>
 
-                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold border ${badge.cls}`}>
-                                  {row.status === 'blocked' ? <AlertCircle size={11} /> : row.status === 'shared' ? <AlertTriangle size={11} /> : <CheckCircle2 size={11} />}
+                                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold border ${badge.cls}`}>
+                                  {row.status === 'blocked' ? <AlertCircle size={14} /> : row.status === 'shared' ? <AlertTriangle size={14} /> : <CheckCircle2 size={14} />}
                                   {badge.label}
                                 </span>
 
@@ -1036,6 +1259,13 @@ export default function GestionActividades() {
                   checked={form.isActive}
                   onChange={(v) => setForm({ ...form, isActive: v })}
                 />
+
+                {serverError && (
+                  <div className="mt-4 flex items-start gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-sm">
+                    <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                    <span>{serverError}</span>
+                  </div>
+                )}
 
                 <button
                   type="submit"

@@ -57,12 +57,16 @@ public class AttendanceService : IAttendanceService
                 ActivityScheduleId = schedule.Id,
                 StartTime = schedule.StartTime.ToString(@"hh\:mm"),
                 EndTime = schedule.EndTime.ToString(@"hh\:mm"),
-                Students = students.Select(u => new ClassStudentDto
+                Students = students.Select(u =>
                 {
-                    UserId = u.Id,
-                    FullName = u.FullName,
-                    Email = u.Email,
-                    Present = records.Any(r => r.UserId == u.Id && r.Present)
+                    var record = records.FirstOrDefault(r => r.UserId == u.Id);
+                    return new ClassStudentDto
+                    {
+                        UserId = u.Id,
+                        FullName = u.FullName,
+                        Email = u.Email,
+                        Status = record?.Status ?? AttendanceStatus.ABSENT
+                    };
                 }).ToList()
             });
         }
@@ -100,13 +104,13 @@ public class AttendanceService : IAttendanceService
                     ActivityScheduleId = schedule.Id,
                     UserId = item.UserId,
                     Date = date,
-                    Present = item.Present,
+                    Status = item.Status,
                     CreatedAt = DateTime.UtcNow
                 });
             }
             else
             {
-                existing.Present = item.Present;
+                existing.Status = item.Status;
             }
         }
 

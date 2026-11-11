@@ -351,8 +351,8 @@ export const MisCuotas: React.FC = () => {
               </>
             ) : !isSocio ? (
               <div className="flex flex-col items-center justify-center text-center py-16 sm:py-24 px-6 sm:px-12 bg-slate-900/60 rounded-3xl border border-slate-800/80 shadow-2xl w-full">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center mb-5 text-emerald-400 shadow-inner">
-                  <CreditCard className="w-8 h-8 sm:w-10 sm:h-10" />
+                <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-5 text-emerald-400 shadow-lg shadow-emerald-500/5">
+                  <CreditCard className="w-8 h-8" />
                 </div>
                 <h3 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">No tenés cuotas sociales asociadas</h3>
                 <p className="text-slate-300 text-xs sm:text-sm mt-2 mb-8 max-w-md leading-relaxed">
@@ -369,7 +369,9 @@ export const MisCuotas: React.FC = () => {
               </div>
             ) : (
               <div className="text-center py-16 px-4 bg-slate-900/50 rounded-3xl border border-slate-800">
-                <CreditCard className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-4 text-emerald-400 shadow-lg shadow-emerald-500/5">
+                  <CreditCard className="w-8 h-8" />
+                </div>
                 <h3 className="text-xl font-bold text-white">Aún no tienes cuotas registradas</h3>
                 <p className="text-slate-400 mt-2">Para comenzar, uníte a un club o seleccioná un plan de membresía.</p>
               </div>

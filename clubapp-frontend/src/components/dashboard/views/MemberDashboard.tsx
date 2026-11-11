@@ -1,6 +1,6 @@
 import ClubMapWidget from '../ClubMapWidget';
 import WeatherWidget from '../WeatherWidget';
-import { CreditCard, CalendarCheck, ArrowRight, Building, UserPlus, Zap, AlertTriangle, Wallet } from 'lucide-react';
+import { CreditCard, CalendarCheck, ArrowRight, Building, UserPlus, Zap, AlertTriangle, Wallet, IdCard } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { dashboardService } from '../../../services/dashboardService';
@@ -179,8 +179,8 @@ export default function MemberDashboard() {
     return (
       <div className="space-y-6">
         <div className="rounded-3xl border border-emerald-500/30 bg-linear-to-br from-slate-900 to-emerald-950/40 p-8 md:p-10 text-center relative overflow-hidden shadow-2xl">
-          <div className="inline-flex p-4 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 mb-6 shadow-inner">
-            <Building size={36} />
+          <div className="inline-flex w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 mb-6 items-center justify-center shadow-lg shadow-emerald-500/5">
+            <Building size={32} />
           </div>
           <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight">
             {isPendingPayment ? 'Tu solicitud de asociación fue registrada' : 'Aún no estás asociado a ningún Club'}
@@ -398,6 +398,12 @@ export default function MemberDashboard() {
                 <span className="px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 text-[10px] font-bold">
                   Inactivo
                 </span>
+              </div>
+              <div className="flex flex-col items-center text-center pt-2 pb-4">
+                <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shadow-lg shadow-emerald-500/5 mb-4">
+                  <IdCard size={32} />
+                </div>
+                <p className="text-sm font-bold text-white">Aún no tenés una membresía activa</p>
               </div>
               <p className="text-sm text-slate-300 mb-4">
                 {hasPendingSubscription

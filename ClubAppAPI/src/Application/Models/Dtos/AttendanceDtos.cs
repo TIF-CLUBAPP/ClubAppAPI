@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
+using ClubApp.Domain.Entities;
 
 namespace ClubApp.Application.Dtos;
 
@@ -7,7 +9,10 @@ namespace ClubApp.Application.Dtos;
 public class AttendanceItemDto
 {
     public int UserId { get; set; }
-    public bool Present { get; set; }
+
+    /// <summary>PRESENT / ABSENT / JUSTIFIED.</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public AttendanceStatus Status { get; set; }
 }
 
 /// <summary>Entrada para registrar asistencia (POST /api/attendance/mark).</summary>
@@ -24,7 +29,10 @@ public class ClassStudentDto
     public int UserId { get; set; }
     public string FullName { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
-    public bool Present { get; set; }
+
+    /// <summary>PRESENT / ABSENT / JUSTIFIED.</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public AttendanceStatus Status { get; set; }
 }
 
 /// <summary>Clase del día de un profesor con sus alumnos (GET /api/attendance/classes).</summary>

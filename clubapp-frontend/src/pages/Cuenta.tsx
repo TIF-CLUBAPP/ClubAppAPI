@@ -585,7 +585,9 @@ export default function Cuenta() {
 
                 {!loading && !error && friends.length === 0 && (
                   <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-10 text-center">
-                    <Users size={32} className="mx-auto text-slate-600" />
+                    <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto text-emerald-400 shadow-lg shadow-emerald-500/5">
+                      <Users size={32} />
+                    </div>
                     <p className="mt-3 text-sm font-semibold text-white">Todavía no tenés amigos</p>
                     <p className="mt-1 text-xs text-slate-400">
                       Agregalos desde el buscador superior de la barra de navegación.

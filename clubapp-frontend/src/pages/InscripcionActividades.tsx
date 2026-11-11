@@ -168,20 +168,17 @@ export default function InscripcionActividades() {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3">
-                          <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
-                            <Dumbbell size={20} />
-                          </div>
                           <div>
-                            <h3 className="text-lg font-black text-white leading-tight">{a.name}</h3>
+                            <h3 className="text-xl font-bold text-white leading-tight">{a.name}</h3>
                             {a.category && (
-                              <span className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
+                              <span className="text-sm font-medium text-slate-300">
                                 {a.category}
                               </span>
                             )}
                           </div>
                         </div>
                         <span
-                          className={`shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-full border ${
+                          className={`shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full border ${
                             inactive
                               ? 'bg-slate-800 text-slate-400 border-slate-700'
                               : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
@@ -191,14 +188,14 @@ export default function InscripcionActividades() {
                         </span>
                       </div>
 
-                      {a.description && <p className="text-xs text-slate-400 leading-relaxed">{a.description}</p>}
+                      {a.description && <p className="text-sm text-slate-400 leading-relaxed">{a.description}</p>}
 
                       <div className="space-y-1.5">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-slate-400 flex items-center gap-1.5">
-                            <Users size={13} className="text-slate-500" /> Cupos
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-slate-300 flex items-center gap-1.5">
+                            <Users size={15} className="text-slate-400" /> Cupos
                           </span>
-                          <span className={`font-bold ${full ? 'text-rose-400' : 'text-emerald-400'}`}>
+                          <span className={`font-semibold ${full ? 'text-rose-400' : 'text-emerald-400'}`}>
                             Disponibles: {Math.max(a.availableSpots, 0)} / {a.maxCapacity}
                           </span>
                         </div>
@@ -217,15 +214,15 @@ export default function InscripcionActividades() {
                           a.schedules.map((s) => (
                             <span
                               key={s.id}
-                              className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-300 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1"
+                              className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-300 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1"
                             >
-                              <Clock size={11} className="text-emerald-400" />
+                              <Clock size={14} className="text-emerald-400" />
                               {s.dayName} {s.startTime}-{s.endTime}
                             </span>
                           ))
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-400 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1">
-                            <Clock size={11} /> {a.schedule || 'Horario a confirmar'}
+                          <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-400 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1">
+                            <Clock size={14} /> {a.schedule || 'Horario a confirmar'}
                           </span>
                         )}
                       </div>
@@ -233,20 +230,20 @@ export default function InscripcionActividades() {
                       <div className="mt-auto flex items-center justify-between gap-3 pt-1">
                         <div className="flex flex-col">
                           {a.teacherName && (
-                            <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                              <UserCheck size={12} className="text-sky-400" /> {a.teacherName}
+                            <span className="text-sm font-semibold text-slate-300 flex items-center gap-1.5">
+                              <UserCheck size={14} className="text-sky-400" /> {a.teacherName}
                             </span>
                           )}
                           <div className="flex flex-col gap-0.5">
-                            <span className="text-xs text-slate-400">
+                            <span className="text-sm text-slate-400">
                               Socio:{' '}
-                              <span className="font-bold text-white">
+                              <span className="font-semibold text-white">
                                 {a.priceMember > 0 ? fmtCurrency(a.priceMember) : 'Gratuita'}
                               </span>
                             </span>
-                            <span className="text-xs text-slate-400">
+                            <span className="text-sm text-slate-400">
                               No Socio:{' '}
-                              <span className="font-bold text-white">
+                              <span className="font-semibold text-white">
                                 {a.priceNonMember > 0 ? fmtCurrency(a.priceNonMember) : 'Gratuita'}
                               </span>
                             </span>
@@ -255,22 +252,22 @@ export default function InscripcionActividades() {
 
                         {isEnrolled ? (
                           <div className="flex flex-col items-end gap-2 shrink-0">
-                            <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600/30 text-blue-400 border border-blue-500/30 text-xs font-bold">
-                              <Check size={14} /> Inscripto
+                            <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600/30 text-blue-400 border border-blue-500/30 text-sm font-semibold">
+                              <Check size={15} /> Inscripto
                             </span>
                             <button
                               type="button"
                               onClick={() => setCancelTarget({ activity: a, enrollmentId: enrollment!.id })}
-                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-rose-400 hover:bg-rose-500/20 border border-rose-500/30 transition-all"
+                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-rose-400 hover:bg-rose-500/20 border border-rose-500/30 transition-all"
                             >
-                              <AlertTriangle size={14} /> Anular inscripción
+                              <AlertTriangle size={15} /> Anular inscripción
                             </button>
                           </div>
                         ) : (
                           <button
                             onClick={() => handleEnroll(a)}
                             disabled={full || inactive || busyId === a.id}
-                            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                            className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center gap-1.5 ${
                               full
                                 ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30 cursor-not-allowed'
                                 : inactive
@@ -279,7 +276,7 @@ export default function InscripcionActividades() {
                             } disabled:opacity-70 disabled:cursor-not-allowed`}
                           >
                             {busyId === a.id ? (
-                              <RefreshCw size={14} className="animate-spin" />
+                              <RefreshCw size={15} className="animate-spin" />
                             ) : full ? (
                               'Sin Cupo'
                             ) : (

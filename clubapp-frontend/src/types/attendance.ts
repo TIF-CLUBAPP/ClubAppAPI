@@ -1,9 +1,12 @@
+// Estado de asistencia de un alumno en una clase.
+export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'JUSTIFIED';
+
 // Alumno inscripto en una clase (GET /api/attendance/classes)
 export interface ClassStudent {
   userId: number;
   fullName: string;
   email: string;
-  present: boolean;
+  status: AttendanceStatus;
 }
 
 // Clase del día de un profesor con sus alumnos
@@ -20,5 +23,5 @@ export interface TeacherClass {
 export interface MarkAttendanceRequest {
   activityScheduleId: number;
   date: string;
-  attendances: { userId: number; present: boolean }[];
+  attendances: { userId: number; status: AttendanceStatus }[];
 }

@@ -637,7 +637,9 @@ export default function ReservaCanchas() {
 
                 {categories.length === 0 ? (
                   <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-10 text-center">
-                    <AlertCircle className="w-8 h-8 text-slate-500 mx-auto mb-3" />
+                    <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-4 text-emerald-400 shadow-lg shadow-emerald-500/5">
+                      <AlertCircle size={32} />
+                    </div>
                     <p className="text-sm text-slate-400">No hay espacios habilitados para reservas en este momento.</p>
                   </div>
                 ) : (
