@@ -16,6 +16,8 @@ export interface UserListItem {
   role: UserRole;
   tipoProfesor: TipoProfesor;
   isActive: boolean;
+  /** true => es Socio del club (abona cuota social); false => Miembro / No Socio. */
+  isMember?: boolean;
   createdAt: string;
 }
 

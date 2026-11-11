@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, type ReactNode } from '
 import type { AuthenticationRequest, AuthenticationResponse, User } from '../types/auth';
 import { authService } from '../services/authService';
 import { api } from '../services/api';
+import { membershipService } from '../services/membershipService';
 
 interface AuthContextType {
   user: User | null;
@@ -12,6 +13,8 @@ interface AuthContextType {
   setSession: (token: string, user: User | null, remember?: boolean) => void;
   /** Actualiza parcialmente los datos del usuario en estado y storage (ej. marcar isSocio tras suscribirse). */
   updateUser: (updates: Partial<User>) => void;
+  /** Re-obtiene el estado de membresía del backend y sincroniza `user.isSocio`/`role`. */
+  refreshMembershipState: () => Promise<void>;
   logout: () => void;
 }
 
@@ -215,6 +218,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     resolveSessionStorage().setItem('user', JSON.stringify(next));
   };
 
+  /**
+   * Re-obtiene el estado de membresía del usuario desde el backend y lo aplica al
+   * estado global. Se usa tras `cancelMembership` / `subscribeToClub` para que
+   * Dashboard y "Mis Cuotas" queden sincronizados sin recargar la página.
+   *
+   * Falla silenciosamente: si el backend no expone la membresía (ej. usuario que
+   * nunca se suscribió), se mantiene el estado actual en lugar de romper la UI.
+   */
+  const refreshMembershipState = async () => {
+    try {
+      const membership = await membershipService.getMyMembership();
+      if (membership) {
+        const isActive = membership.status?.toUpperCase() === 'ACTIVE';
+        // `isSocio` solo debe ser true cuando la membresía está ACTIVA (cuota pagada);
+        // una solicitud pendiente (INACTIVE/PENDING) NO habilita los beneficios de socio.
+        // Preferimos el flag autoritativo `isSocio` del backend cuando está presente.
+        const isSocio = typeof membership.isSocio === 'boolean'
+          ? membership.isSocio
+          : isActive;
+        updateUser({ isSocio, role: 'MEMBER' });
+      } else {
+        // Sin membresía en el backend => no es socio.
+        updateUser({ isSocio: false, role: 'MEMBER' });
+      }
+    } catch {
+      // Silencioso: no hay membresía o el endpoint no está disponible.
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -234,6 +266,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         setSession,
         updateUser,
+        refreshMembershipState,
         logout,
       }}
     >

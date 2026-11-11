@@ -24,5 +24,12 @@ public class UserDto
 
     public bool IsActive { get; set; } = true;
     public bool IsBlocked { get; set; }
+
+    /// <summary>
+    /// Indica si el usuario es Socio del club (abona cuota social / tiene membresía).
+    /// Un "No Socio" es un usuario con rol MEMBER y este flag en false.
+    /// </summary>
+    public bool IsMember { get; set; }
+
     public DateTime CreatedAt { get; set; }
 }

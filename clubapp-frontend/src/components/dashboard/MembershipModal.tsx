@@ -10,10 +10,13 @@ import {
   Heart,
   ShieldCheck,
   ChevronRight,
+  AlertTriangle,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 import { MEMBERSHIP_CATEGORIES, membershipService } from '../../services/membershipService';
+import { paymentsService } from '../../services/paymentsService';
 import type { MembershipCategory } from '../../services/membershipService';
 
 const fmt = (val: number) =>
@@ -35,11 +38,13 @@ type Step = 'select' | 'confirm' | 'done';
 export default function MembershipModal({ open, onClose }: MembershipModalProps) {
   const navigate = useNavigate();
   const { success, error } = useToast();
+  const { refreshMembershipState } = useAuth();
 
   const [categories, setCategories] = useState<MembershipCategory[]>(MEMBERSHIP_CATEGORIES);
   const [step, setStep] = useState<Step>('select');
   const [selected, setSelected] = useState<MembershipCategory | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [hasPendingCuota, setHasPendingCuota] = useState(false);
 
   // Obtención silenciosa de la tarifa oficial desde el backend al abrir el modal con fallback transparente
   useEffect(() => {
@@ -55,6 +60,23 @@ export default function MembershipModal({ open, onClose }: MembershipModalProps)
         .catch(() => {
           // Fallback silencioso sin alertar al usuario
         });
+
+      // Si el usuario ya tiene una solicitud de suscripción en curso con cuota pendiente,
+      // se deshabilita el botón de alta para evitar duplicar membresías.
+      paymentsService
+        .getMyCuotas()
+        .then((cuotas) => {
+          setHasPendingCuota(
+            cuotas.some((c) =>
+              ['PENDING', 'PENDIENTE', 'EN_MORA', 'OVERDUE'].includes(
+                String(c?.status ?? '').toUpperCase(),
+              ),
+            ),
+          );
+        })
+        .catch(() => setHasPendingCuota(false));
+    } else {
+      setHasPendingCuota(false);
     }
   }, [open]);
 
@@ -73,6 +95,8 @@ export default function MembershipModal({ open, onClose }: MembershipModalProps)
 
   const handleConfirm = async () => {
     if (!selected || selected.price === null || selected.price === undefined) return;
+    // Bloqueo estricto contra doble clic: si ya hay una solicitud en curso, se ignora.
+    if (submitting) return;
     setSubmitting(true);
     try {
       // 1. Registrar suscripción y emitir cuota pendiente del mes en curso.
@@ -82,13 +106,23 @@ export default function MembershipModal({ open, onClose }: MembershipModalProps)
         monthlyPrice: selected.price,
       });
 
+      // Sincroniza el estado de membresía global tras la suscripción: el usuario
+      // queda en estado "pendiente de pago" (no socio activo todavía) y la UI del
+      // Dashboard / Mis Cuotas debe reflejarlo de inmediato.
+      setHasPendingCuota(true);
+      await refreshMembershipState();
+
       success('¡Suscripción registrada! Se generó tu primera cuota social.');
       setStep('done');
     } catch (err) {
+      const data = (err as { response?: { data?: { message?: string; detail?: string } } })?.response?.data;
       const message =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        data?.message ?? data?.detail ??
         'No se pudo completar la suscripción. Intentalo nuevamente.';
       error(message);
+      // Si el backend rechazó por una membresía/cuota pendiente previa, se refleja
+      // en la UI deshabilitando el botón de alta.
+      setHasPendingCuota(true);
     } finally {
       setSubmitting(false);
     }
@@ -236,6 +270,15 @@ export default function MembershipModal({ open, onClose }: MembershipModalProps)
                       </p>
                     </div>
 
+                    {hasPendingCuota && (
+                      <div className="flex items-start gap-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 p-3">
+                        <AlertTriangle size={16} className="text-amber-400 shrink-0 mt-0.5" />
+                        <p className="text-xs text-amber-200 leading-relaxed">
+                          Ya tenés una solicitud de suscripción activa en proceso de pago. Completá el abono de tu cuota pendiente desde <strong className="text-amber-100">Mis Cuotas</strong>.
+                        </p>
+                      </div>
+                    )}
+
                     <div className="flex flex-col sm:flex-row gap-3">
                       <button
                         type="button"
@@ -248,12 +291,16 @@ export default function MembershipModal({ open, onClose }: MembershipModalProps)
                       <button
                         type="button"
                         onClick={handleConfirm}
-                        disabled={submitting}
+                        disabled={submitting || hasPendingCuota}
                         className="flex-[2] inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {submitting ? (
                           <>
                             <Loader2 size={16} className="animate-spin" /> Procesando...
+                          </>
+                        ) : hasPendingCuota ? (
+                          <>
+                            <ShieldCheck size={16} /> Solicitud en Proceso
                           </>
                         ) : (
                           <>

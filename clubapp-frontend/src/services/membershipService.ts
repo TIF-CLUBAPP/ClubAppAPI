@@ -43,6 +43,8 @@ export interface SubscribeMembershipResponse {
   membershipType: string;
   monthlyPrice: number;
   isSocio: boolean;
+  /** Fecha de vencimiento del período vigente (null si no aplica). */
+  nextDueDate?: string;
 }
 
 export const membershipService = {
@@ -77,17 +79,40 @@ export const membershipService = {
   },
 
   /** Cancela la membresía actual del usuario (POST /api/memberships/cancel o DELETE /api/memberships/me). */
-  cancelSubscription: async (): Promise<{ success: boolean; message: string }> => {
-    try {
-      const response = await api.post<{ success: boolean; message: string }>('/memberships/cancel');
-      return response.data;
-    } catch {
-      try {
-        const response = await api.delete<{ success: boolean; message: string }>('/memberships/me');
-        return response.data;
-      } catch {
-        return { success: true, message: 'Membresía cancelada con éxito.' };
-      }
-    }
+  cancelSubscription: async (): Promise<CancelSubscriptionResponse> => {
+    const response = await api.post<CancelSubscriptionResponse>('/memberships/cancel');
+    return response.data;
+  },
+
+  /** Reactiva una membresía cancelada con beneficios vigentes (POST /api/memberships/reactivate). */
+  reactivateSubscription: async (): Promise<ReactivationResponse> => {
+    const response = await api.post<ReactivationResponse>('/memberships/reactivate');
+    return response.data;
   },
 };
+
+/** Respuesta del endpoint de cancelación: estado actualizado del usuario para reflejarlo sin recargar. */
+export interface CancelSubscriptionResponse {
+  success: boolean;
+  message: string;
+  /** Estado final del usuario: rol y condición de socio ya actualizados en la base de datos. */
+  user?: {
+    role?: string;
+    isSocio?: boolean;
+  };
+  membershipStatus?: string;
+}
+
+/** Respuesta del endpoint de reactivación: membresía devuelta a ACTIVE sin cuota nueva. */
+export interface ReactivationResponse {
+  success: boolean;
+  message: string;
+  /** Estado final del usuario: rol y condición de socio ya actualizados en la base de datos. */
+  user?: {
+    role?: string;
+    isSocio?: boolean;
+  };
+  membershipStatus?: string;
+  /** Fecha de vencimiento del período vigente (ya abonado). */
+  nextDueDate?: string;
+}

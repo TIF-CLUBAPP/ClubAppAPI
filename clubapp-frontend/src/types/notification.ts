@@ -4,6 +4,7 @@ export type NotificationCategory =
   | 'friend_request' // Solicitudes de amistad
   | 'rental' // Alquiler de canchas / reservas
   | 'payment' // Pagos grupales / cuotas pendientes
+  | 'membership' // Membresías / alta como socio
   | 'announcement'; // Actividades / avisos del club
 
 export interface AppNotification {

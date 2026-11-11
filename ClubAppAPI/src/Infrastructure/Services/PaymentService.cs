@@ -24,10 +24,13 @@ public class PaymentService : IPaymentService
 {
     private readonly ApplicationContext _context;
     private readonly IConfiguration _configuration;
-    public PaymentService(ApplicationContext context, IConfiguration configuration)
+    private readonly INotificationService _notificationService;
+
+    public PaymentService(ApplicationContext context, IConfiguration configuration, INotificationService notificationService)
     {
         _context = context;
         _configuration = configuration;
+        _notificationService = notificationService;
     }
 
     public async Task<string> ProcessMercadoPagoWebhookAsync(string payloadJson)
@@ -208,6 +211,12 @@ public class PaymentService : IPaymentService
 
         payment.Status = newStatus;
         await _context.SaveChangesAsync();
+
+        if (newStatus == PaymentStatus.Paid)
+        {
+            await CheckAndSendWelcomeNotificationAsync(payment.UserId);
+        }
+
         return "OK";
     }
 
@@ -1545,6 +1554,9 @@ public class PaymentService : IPaymentService
         }
 
         await _context.SaveChangesAsync();
+
+        await CheckAndSendWelcomeNotificationAsync(payment.UserId);
+
         return "OK";
     }
 
@@ -1602,9 +1614,44 @@ public class PaymentService : IPaymentService
             }
 
             await _context.SaveChangesAsync();
+
+            foreach (var affectedUserId in userIdsAfectados)
+            {
+                await CheckAndSendWelcomeNotificationAsync(affectedUserId);
+            }
         }
 
         return resultado;
+    }
+
+    /// <summary>
+    /// Envía la notificación de bienvenida cuando se acredita la cuota inicial
+    /// (primer pago exitoso que oficializa al usuario como Socio activo del club).
+    /// Es idempotente: solo se dispara una única vez por usuario.
+    /// </summary>
+    private async Task CheckAndSendWelcomeNotificationAsync(int userId)
+    {
+        // Solo interesa si se trata de la cuota inicial: exactamente un único pago acreditado.
+        var paidCount = await _context.Payments
+            .CountAsync(p => p.UserId == userId && p.Status == PaymentStatus.Paid);
+
+        if (paidCount != 1)
+            return;
+
+        // Evita duplicados ante reintentos o re-procesamiento del mismo pago.
+        var alreadySent = await _context.Notifications
+            .AnyAsync(n => n.UserId == userId && n.Category == NotificationCategory.Membership);
+
+        if (alreadySent)
+            return;
+
+        await _notificationService.CreateNotificationAsync(new CreateNotificationDto
+        {
+            UserId = userId,
+            Title = "¡Bienvenido oficialmente al club!",
+            Message = "Tu primer pago ha sido acreditado con éxito. Ya sos socio oficial del club, disfrutá de todas las instalaciones y beneficios exclusivos.",
+            Category = NotificationCategory.Membership
+        });
     }
 
     // Ej: "Julio 2026"

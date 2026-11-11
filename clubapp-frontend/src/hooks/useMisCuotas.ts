@@ -13,6 +13,7 @@ const STATUS_MAP: Record<string, MemberCuota['status']> = {
   OVERDUE: 'EN_MORA',
   PENDING: 'PENDIENTE',
   EXEMPT: 'PENDIENTE',
+  CANCELLED: 'CANCELADA',
 };
 
 /** Convierte "yyyy-MM" a "Mes Año" (ej: "2026-09" -> "Septiembre 2026"). */
@@ -67,56 +68,6 @@ const mapCuota = (p: UserCuota, s: FeeSettings): MemberCuota => {
   };
 };
 
-/** Fallback demo: cuotas generadas al vuelo (solo si el backend no responde). */
-const buildMockCuotas = (s: FeeSettings): MemberCuota[] => {
-  const base = s.baseFeeAmount ?? 15000;
-  const due = s.dueDayOfMonth ?? 15;
-  const lfType = s.lateFeeType ?? 'percentage';
-  const lfVal = s.lateFeePercentage ?? 10;
-  const today = new Date();
-  const curDay = today.getDate();
-  const curMonth = today.getMonth();
-  const curYear = today.getFullYear();
-
-  const gen: MemberCuota[] = [];
-  for (let i = 0; i < 4; i++) {
-    let m = curMonth - i;
-    let y = curYear;
-    if (m < 0) { m += 12; y -= 1; }
-    const isPaid = i > 0;
-    const dd = String(due).padStart(2, '0');
-    const mm = String(m + 1).padStart(2, '0');
-    const fecha = `${dd}/${mm}/${y}`;
-    const isOverdue = !isPaid && (y < curYear || (y === curYear && m < curMonth) || (y === curYear && m === curMonth && curDay > due));
-    let lf = 0; let ll = '';
-    if (isOverdue) {
-      if (lfType === 'percentage') { lf = (base * lfVal) / 100; ll = `+${lfVal}% Mora`; }
-      else { lf = lfVal; ll = `+$${lfVal.toLocaleString('es-AR')} Mora`; }
-    }
-    const status: MemberCuota['status'] = isPaid ? 'PAGADA' : isOverdue ? 'EN_MORA' : 'PENDIENTE';
-    const methods = ['Mercado Pago', 'Tarjeta Débito Visa', 'Transferencia Bancaria'];
-    gen.push({
-      id: `cuota-${y}-${mm}`,
-      periodo: `${MONTH_NAMES[m]} ${y}`,
-      mesAno: `${y}-${mm}`,
-      fechaVencimiento: fecha,
-      baseAmount: base,
-      discountPercentage: 0,
-      isOverdue,
-      lateFeeAmount: lf,
-      lateFeeLabel: ll,
-      totalAmount: base + lf,
-      status,
-      paidAt: isPaid ? `${String(Math.floor(Math.random() * 15) + 1).padStart(2, '0')}/${mm}/${y} 14:30` : undefined,
-      paymentMethod: isPaid ? methods[i - 1] || 'Mercado Pago' : undefined,
-      receiptNumber: isPaid ? `REC-${y}-${mm}${Math.floor(100 + Math.random() * 900)}` : undefined,
-      transferAlias: 'CLUB.ATLETICO.MP',
-      payoutCollector: 'Club',
-    });
-  }
-  return gen;
-};
-
 export function useMisCuotas() {
   const { user } = useAuth();
   const isSocio = user?.isSocio === true;
@@ -161,8 +112,9 @@ export function useMisCuotas() {
       setCuotas(raw.map((p) => mapCuota(p, sData)));
     } catch (err) {
       console.error('Error al cargar datos de cuotas:', err);
-      // Fallback demo solo si el backend no está disponible.
-      setCuotas(buildMockCuotas(settings));
+      // Sin cuotas en el backend (o error): no fabricamos deudas fantasma.
+      // La UI debe reflejar que el usuario no tiene membresía activa.
+      setCuotas([]);
     } finally {
       setLoading(false);
     }
@@ -181,10 +133,10 @@ export function useMisCuotas() {
     );
   };
 
-  const totalPending = cuotas.filter(c => c.status !== 'PAGADA').reduce((s, c) => s + c.totalAmount, 0);
+  const totalPending = cuotas.filter(c => c.status !== 'PAGADA' && c.status !== 'CANCELADA').reduce((s, c) => s + c.totalAmount, 0);
   const hasOverdue = cuotas.some(c => c.status === 'EN_MORA');
   const hasPending = cuotas.some(c => c.status === 'PENDIENTE');
   const globalStatus: 'AL_DIA' | 'PENDIENTE' | 'EN_MORA' = hasOverdue ? 'EN_MORA' : hasPending ? 'PENDIENTE' : 'AL_DIA';
 
-  return { loading, settings, exemptionLabel, cuotas, totalPending, globalStatus, updateCuota, updateCuotas, isSocio };
+  return { loading, settings, exemptionLabel, cuotas, totalPending, globalStatus, updateCuota, updateCuotas, isSocio, reload: loadData };
 }

@@ -68,13 +68,19 @@ function SummaryCard({
   );
 }
 
-function RoleBadge({ role }: { role: UserRole }) {
+function RoleBadge({ role, isMember }: { role: UserRole; isMember?: boolean }) {
   const config = getRoleConfig(role);
+  // Un usuario con rol MEMBER puede ser "Socio" (IsMember=true) o "No Socio/Miembro"
+  // (IsMember=false). La membresía cancelada no debe seguir figurando como "Socio".
+  const label =
+    role === 'MEMBER'
+      ? (isMember === false ? 'No Socio' : config.label)
+      : config.label;
   return (
     <span
       className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[10px] font-bold whitespace-nowrap ${config.badgeClasses}`}
     >
-      {config.label}
+      {label}
     </span>
   );
 }
@@ -218,7 +224,7 @@ function UserCard({
 
       {/* Rol + acciones */}
       <div className="mt-3 pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
-        <RoleBadge role={item.role} />
+        <RoleBadge role={item.role} isMember={item.isMember} />
         <ActionButtons
           item={item}
           isSelf={isSelf}
@@ -1191,7 +1197,7 @@ export default function Socios() {
                                 </div>
                               </td>
                               <td className="px-3 py-2">
-                                <RoleBadge role={u.role} />
+                                <RoleBadge role={u.role} isMember={u.isMember} />
                               </td>
                               <td className="px-3 py-2">
                                 <StatusBadge active={u.isActive} />

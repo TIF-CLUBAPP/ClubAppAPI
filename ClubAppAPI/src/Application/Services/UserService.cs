@@ -36,6 +36,7 @@ public class UserService : IUserService
             TipoProfesor = u.TipoProfesor,
             IsActive = u.IsActive,
             IsBlocked = !u.IsActive,
+            IsMember = u.IsMember,
             BadgeNum = u.BadgeNum,
             CreatedAt = u.CreatedAt,
         }).ToList();
@@ -63,6 +64,7 @@ public class UserService : IUserService
             TipoProfesor = user.TipoProfesor,
             IsActive = user.IsActive,
             IsBlocked = !user.IsActive,
+            IsMember = user.IsMember,
             BadgeNum = user.BadgeNum,
             CreatedAt = user.CreatedAt
         };

@@ -8,7 +8,8 @@ namespace ClubApp.Domain.Entities
         Pending, 
         Paid, 
         Overdue, 
-        Exempt 
+        Exempt,
+        Cancelled
     }
 
     public class Payment : BaseEntity

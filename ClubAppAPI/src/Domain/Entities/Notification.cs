@@ -7,7 +7,8 @@ public enum NotificationCategory
     FriendRequest,
     Booking,
     Payment,
-    System
+    System,
+    Membership
 }
 
 public class Notification : BaseEntity

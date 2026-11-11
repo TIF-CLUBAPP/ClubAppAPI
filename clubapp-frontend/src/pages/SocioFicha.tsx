@@ -97,7 +97,7 @@ export default function SocioFicha() {
                       <div className="mt-1 flex flex-wrap items-center gap-2">
                         {role && (
                           <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${role.badgeClasses}`}>
-                            {role.label}
+                            {member.role === 'MEMBER' && member.isMember === false ? 'No Socio' : role.label}
                           </span>
                         )}
                         <span

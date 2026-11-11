@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Bell,
+  BadgeCheck,
   Check,
   CheckCheck,
   CreditCard,
@@ -33,12 +34,31 @@ const CATEGORY_STYLES: Record<
     iconClass: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
     labelClass: 'text-emerald-400',
   },
+  membership: {
+    label: 'Membresías',
+    iconClass: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+    labelClass: 'text-emerald-400',
+  },
   announcement: {
     label: 'Avisos & Actividades',
     iconClass: 'text-violet-400 bg-violet-500/10 border-violet-500/20',
     labelClass: 'text-violet-400',
   },
 };
+
+// Respaldo para cualquier categoría inesperada que llegue del backend,
+// evitando un TypeError por `meta` indefinido que rompería el Header completo.
+const CATEGORY_FALLBACK = {
+  label: 'Notificación',
+  iconClass: 'text-slate-400 bg-slate-500/10 border-slate-500/20',
+  labelClass: 'text-slate-400',
+};
+
+/** Resuelve los estilos de una categoría de forma segura (nunca lanza). */
+const getCategoryStyle = (
+  category: NotificationCategory,
+): { label: string; iconClass: string; labelClass: string } =>
+  CATEGORY_STYLES[category] ?? CATEGORY_FALLBACK;
 
 function CategoryIcon({ category }: { category: NotificationCategory }) {
   const size = 16;
@@ -49,6 +69,8 @@ function CategoryIcon({ category }: { category: NotificationCategory }) {
       return <MapPin size={size} />;
     case 'payment':
       return <CreditCard size={size} />;
+    case 'membership':
+      return <BadgeCheck size={size} />;
     default:
       return <Megaphone size={size} />;
   }
@@ -100,6 +122,13 @@ export default function NotificationDropdown() {
       document.removeEventListener('keydown', onKey);
     };
   }, []);
+  useEffect(() => {
+    if (open && unreadCount > 0) {
+      markAllRead();
+    }
+  }, [open, unreadCount, markAllRead]);
+
+
 
   return (
     <div ref={rootRef} className="relative">
@@ -152,12 +181,12 @@ export default function NotificationDropdown() {
 
             {!loading && items.length === 0 && (
               <p className="px-4 py-8 text-center text-xs text-slate-500">
-                No tenés notificaciones 🎉
+                No tenés notificaciones
               </p>
             )}
 
             {items.map((n) => {
-              const meta = CATEGORY_STYLES[n.category];
+              const meta = getCategoryStyle(n.category);
               const isUnread = !n.read;
               return (
                 <div

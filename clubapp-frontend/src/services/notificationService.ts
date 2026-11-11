@@ -23,6 +23,8 @@ const mapCategory = (category: string): NotificationCategory => {
       return 'rental';
     case 'Payment':
       return 'payment';
+    case 'Membership':
+      return 'membership';
     default:
       return 'announcement';
   }

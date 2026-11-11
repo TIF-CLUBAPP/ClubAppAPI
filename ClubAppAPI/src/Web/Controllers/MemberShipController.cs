@@ -90,13 +90,18 @@ public class MembershipsController : ControllerBase
 
         var membership = await _membershipService.SubscribeAsync(userId, dto);
 
+        // La activación del carnet es posterior al pago de la primera cuota; mientras tanto
+        // la membresía queda PENDING_PAYMENT y el usuario aún no es "Socio activo".
+        var isSocioActive = membership.Status == MembershipStatus.ACTIVE;
+
         return Ok(new
         {
             membershipId = membership.Id,
             status = membership.Status.ToString(),
             membershipType = dto.MembershipType,
             monthlyPrice = membership.MonthlyPrice,
-            isSocio = true
+            isSocio = isSocioActive,
+            pendingInitialCuota = !isSocioActive
         });
     }
 
@@ -117,9 +122,88 @@ public class MembershipsController : ControllerBase
         return Ok(new { message = "Estado actualizado correctamente." });
     }
 
+    /// <summary>
+    /// Devuelve la membresía vigente del usuario autenticado (GET /api/memberships/me).
+    /// Es la fuente de verdad para que el frontend sincronice "Socio activo / pendiente / no socio".
+    /// </summary>
+    [HttpGet("me")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetMyMembership()
+    {
+        var userIdRaw = User.FindFirst("sub")?.Value
+                        ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        if (!int.TryParse(userIdRaw, out var userId))
+        {
+            return Unauthorized(new { message = "Token inválido." });
+        }
+
+        var membership = await _membershipService.GetMyMembershipAsync(userId);
+        if (membership == null)
+        {
+            // Usuario sin membresía: no es socio (estado vacío, válido para el frontend).
+            return Ok(new MyMembershipDto
+            {
+                MembershipId = 0,
+                Status = "NONE",
+                MembershipType = string.Empty,
+                MonthlyPrice = 0m,
+                IsSocio = false
+            });
+        }
+
+        return Ok(membership);
+    }
+
+    /// <summary>
+    /// Reactivación directa de una membresía que fue cancelada con beneficios vigentes
+    /// (CANCELED_PENDING_END -> ACTIVE) sin generar cuota nueva ni cobro extra, porque
+    /// el período actual ya fue abonado.
+    /// </summary>
+    [HttpPost("reactivate")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> ReactivateSubscription()
+    {
+        var userIdRaw = User.FindFirst("sub")?.Value
+                        ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        if (!int.TryParse(userIdRaw, out var userId))
+        {
+            return Unauthorized(new { message = "Token inválido." });
+        }
+
+        var result = await _membershipService.ReactivateSubscriptionAsync(userId);
+        if (result == null || !result.Success)
+        {
+            return BadRequest(new
+            {
+                message = result?.Message ?? "No se pudo reactivar la membresía."
+            });
+        }
+
+        return Ok(new
+        {
+            success = true,
+            message = result.Message,
+            user = new
+            {
+                role = result.Role,
+                isSocio = result.IsSocio
+            },
+            membershipStatus = result.MembershipStatus,
+            nextDueDate = result.EndDate
+        });
+    }
+
     [HttpPost("cancel")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> CancelSubscription()
     {
@@ -132,12 +216,27 @@ public class MembershipsController : ControllerBase
         }
 
         var result = await _membershipService.CancelSubscriptionAsync(userId);
-        if (!result)
+        if (result == null || !result.Success)
         {
-            return BadRequest(new { message = "No se pudo cancelar la membresía." });
+            return BadRequest(new
+            {
+                message = result?.Message ?? "No tenés una membresía activa para cancelar, o la operación no pudo completarse."
+            });
         }
 
-        return Ok(new { success = true, message = "Membresía cancelada con éxito." });
+        // Devuelve el estado actualizado del usuario para que el frontend lo refleje
+        // de inmediato sin recargar la página.
+        return Ok(new
+        {
+            success = true,
+            message = result.Message,
+            user = new
+            {
+                role = result.Role,
+                isSocio = result.IsSocio
+            },
+            membershipStatus = result.MembershipStatus
+        });
     }
 
     [HttpDelete("me")]

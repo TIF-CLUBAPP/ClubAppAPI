@@ -182,7 +182,7 @@ export interface MemberCuota {
   lateFeeAmount: number;
   lateFeeLabel?: string;
   totalAmount: number;
-  status: 'PAGADA' | 'PENDIENTE' | 'EN_MORA';
+  status: 'PAGADA' | 'PENDIENTE' | 'EN_MORA' | 'CANCELADA';
   paidAt?: string;
   paymentMethod?: string;
   receiptNumber?: string;
@@ -205,7 +205,7 @@ export interface UserCuota {
   period: string;         // "yyyy-MM"
   amount: number;         // monto base
   lateFeeApplied: number; // recargo por mora
-  status: string;         // "PENDING" | "PAID" | "OVERDUE" | "EXEMPT"
+  status: string;         // "PENDING" | "PAID" | "OVERDUE" | "EXEMPT" | "CANCELLED"
   paymentDate?: string | null;
   paymentMethod?: string;
   createdAt: string;

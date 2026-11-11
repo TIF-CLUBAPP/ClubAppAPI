@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Users, Info, Clock, Loader2, AlertCircle } from 'lucide-react';
@@ -29,6 +29,18 @@ const STATUS_CONFIG: Record<SectorStatusType, StatusConfig> = {
   },
 };
 
+// Configuración de respaldo para estados desconocidos/nulos devueltos por el backend,
+// evitando un TypeError en `STATUS_CONFIG[status]` que rompería todo el árbol de React.
+const FALLBACK_STATUS: StatusConfig = {
+  label: 'Desconocido',
+  bg: 'bg-slate-500/10 border-slate-500/30 text-slate-400',
+  dot: 'bg-slate-400',
+};
+
+/** Resuelve la configuración visual de un estado de forma segura (nunca lanza). */
+const getStatusConfig = (status: SectorStatusType | undefined | null): StatusConfig =>
+  (status && STATUS_CONFIG[status]) || FALLBACK_STATUS;
+
 // Etiqueta de ocupación/capacidad mostrada en la tarjeta y el detalle.
 const formatCapacity = (sector: SectorStatus): string => {
   if (sector.status === 'maintenance') return 'Cerrado';
@@ -55,6 +67,21 @@ export default function ClubMapWidget() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>('Todos');
+  const [isAtBottom, setIsAtBottom] = useState(false);
+  const listRef = useRef<HTMLDivElement | null>(null);
+
+  // Detecta si el listado ya está al final del scroll para ocultar el difuminado inferior
+  // y que el último recuadro (ej. "Tenis 2 Peñarol") se vea completamente nítido.
+  const handleScroll = () => {
+    const el = listRef.current;
+    if (!el) return;
+    setIsAtBottom(el.scrollTop + el.clientHeight >= el.scrollHeight - 4);
+  };
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (el) handleScroll();
+  }, [sectors, filterCategory]);
 
   const loadSectors = async () => {
     try {
@@ -163,10 +190,11 @@ export default function ClubMapWidget() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 flex-1 min-h-0">
-          <div className="md:col-span-2 max-h-[380px] overflow-y-auto custom-scrollbar pr-2">
-            <div className="grid grid-cols-2 gap-3">
+          <div className="md:col-span-2 relative max-h-[380px]">
+            <div ref={listRef} onScroll={handleScroll} className="h-full overflow-y-auto custom-scrollbar pr-2 pb-8">
+              <div className="grid grid-cols-2 gap-3">
               {filteredSectors.map((sector) => {
-                const config = STATUS_CONFIG[sector.status];
+                const config = getStatusConfig(sector.status);
                 const isSelected = selected?.id === sector.id;
 
                 return (
@@ -195,6 +223,8 @@ export default function ClubMapWidget() {
                 );
               })}
             </div>
+            <div className={`pointer-events-none absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-[#0b1329] to-transparent transition-opacity duration-200 ${isAtBottom ? 'opacity-0' : 'opacity-100'}`} />
+            </div>
           </div>
           <div className="sticky top-4 self-start h-fit">
           <AnimatePresence mode="wait">
@@ -219,8 +249,8 @@ export default function ClubMapWidget() {
                   <div className="space-y-3 text-xs">
                     <div className="flex justify-between items-center p-2.5 rounded-xl bg-slate-900 border border-slate-800/60">
                       <span className="text-slate-400">Estado</span>
-                      <span className={`px-2 py-0.5 rounded border ${STATUS_CONFIG[selected.status].bg} font-medium`}>
-                        {STATUS_CONFIG[selected.status].label}
+                      <span className={`px-2 py-0.5 rounded border ${getStatusConfig(selected.status).bg} font-medium`}>
+                        {getStatusConfig(selected.status).label}
                       </span>
                     </div>
 

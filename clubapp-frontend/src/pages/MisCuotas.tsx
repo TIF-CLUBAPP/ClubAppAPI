@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
-import { CreditCard, RefreshCw, UserPlus } from 'lucide-react';
+import { CreditCard, RefreshCw, UserPlus, AlertTriangle } from 'lucide-react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import type { MemberCuota } from '../types/cuotas';
+import type { User } from '../types/auth';
 import { useAuth } from '../context/AuthContext';
 import { useMisCuotas } from '../hooks/useMisCuotas';
 import { useToast } from '../context/ToastContext';
@@ -12,6 +14,7 @@ import { CuotasList } from '../components/cuotas/CuotasList';
 import { CheckoutModal } from '../components/cuotas/CheckoutModal';
 import { ReceiptModal } from '../components/cuotas/ReceiptModal';
 import MembershipModal from '../components/dashboard/MembershipModal';
+import CancelMembershipModal from '../components/dashboard/CancelMembershipModal';
 import { membershipService } from '../services/membershipService';
 import { cuotaNumericId } from '../utils/cuotaIds';
 
@@ -41,36 +44,116 @@ export const MisCuotas: React.FC = () => {
   }, [searchParams, success, error, info]);
 
 
-  const { updateUser } = useAuth();
-  const { loading, settings, exemptionLabel, cuotas, totalPending, globalStatus, updateCuota, updateCuotas, isSocio } = useMisCuotas();
+  const { updateUser, refreshMembershipState } = useAuth();
+  const { loading, settings, exemptionLabel, cuotas, totalPending, globalStatus, updateCuota, updateCuotas, isSocio, reload } = useMisCuotas();
   const [selectedCuotaIds, setSelectedCuotaIds] = useState<number[]>([]);
   const [checkoutCuotas, setCheckoutCuotas] = useState<MemberCuota[] | null>(null);
   const [selectedReceipt, setSelectedReceipt] = useState<MemberCuota | null>(null);
   const [showMembershipModal, setShowMembershipModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [reactivating, setReactivating] = useState(false);
+  const [membershipStatus, setMembershipStatus] = useState<string>('');
+  const [nextDueDate, setNextDueDate] = useState<string | undefined>(undefined);
+
+  // Obtiene el estado canónico de la membresía (GET /api/memberships/me) para detectar
+  // la baja programada (CANCELED_PENDING_END) y su fecha de vencimiento.
+  useEffect(() => {
+    membershipService.getMyMembership()
+      .then((m) => {
+        setMembershipStatus(m?.status ?? '');
+        setNextDueDate(m?.nextDueDate);
+      })
+      .catch(() => {
+        setMembershipStatus('');
+        setNextDueDate(undefined);
+      });
+  }, []);
+
+  const isCanceledPendingEnd =
+    membershipStatus.toUpperCase() === 'CANCELED_PENDING_END' ||
+    membershipStatus.toUpperCase() === 'CANCELLED_PENDING_END';
+
+  // Hay cuota/solicitud pendiente de pago (membresía aún no activa). Se usa para
+  // decidir si mostrar el botón "Cancelar Membresía": solo cuando el usuario es
+  // socio activo o tiene una suscripción en curso por pagar.
+  const hasPendingCuota = cuotas.some((c) => c.status !== 'PAGADA' && c.status !== 'CANCELADA');
+  const showCancelButton = isSocio || hasPendingCuota;
 
   const handleCancelSubscription = async () => {
+    // Bloqueo estricto contra doble clic.
+    if (cancelling) return;
+    setCancelling(true);
     try {
-      setCancelling(true);
-      await membershipService.cancelSubscription();
+      const result = await membershipService.cancelSubscription();
+      if (result && !result.success) {
+        error(result.message || 'No se pudo cancelar la membresía.');
+        return;
+      }
       setShowCancelModal(false);
-      updateUser({ isSocio: false, role: 'MEMBER' });
+      // Refleja la baja de forma inmediata en el estado global del usuario usando la
+      // respuesta autoritativa del backend (rol + condición de socio ya cambiados).
+      updateUser({
+        isSocio: result?.user?.isSocio ?? false,
+        role: (result?.user?.role as User['role']) ?? 'MEMBER',
+      });
+      // Sincroniza el estado de membresía con el backend (fuente de verdad) para
+      // que Dashboard y Mis Cuotas queden alineados sin recarga completa de página.
+      await refreshMembershipState();
+      // CRÍTICO (post-mutation sync instantáneo): re-obtiene la membresía del backend
+      // y actualiza `membershipStatus`/`nextDueDate` locales de forma síncrona, para
+      // que el banner "Baja Solicitada" y el botón "Reactivar Membresía" aparezcan al
+      // instante (sin esperar cambio de ruta ni recarga manual).
+      const membership = await membershipService.getMyMembership();
+      setMembershipStatus(membership?.status ?? result?.membershipStatus ?? 'CANCELED_PENDING_END');
+      setNextDueDate(membership?.nextDueDate);
+      // Re-obtiene perfil + cuotas del backend SIN recarga completa de página,
+      // para que la vista refleje al instante que ya no hay membresía activa
+      // (desaparecen "Activación de Membresía Pendiente" y el botón "Cancelar").
+      await reload();
       success('Membresía cancelada con éxito.');
-      window.location.reload();
     } catch (err: any) {
-      error(err?.response?.data?.message || 'No se pudo cancelar la membresía.');
+      const data = err?.response?.data;
+      error(data?.message ?? data?.detail ?? 'No se pudo cancelar la membresía.');
     } finally {
       setCancelling(false);
     }
   };
 
+  // Reactivación directa de una membresía con baja programada (CANCELED_PENDING_END):
+  // el backend la devuelve a ACTIVE sin cuota nueva ni cobro. Se refresca el estado
+  // global y las cuotas para mostrar "Socio Activo" de inmediato.
+  const handleReactivate = async () => {
+    if (reactivating) return;
+    setReactivating(true);
+    try {
+      const result = await membershipService.reactivateSubscription();
+      if (result && !result.success) {
+        throw new Error(result.message || 'No se pudo reactivar la membresía.');
+      }
+      updateUser({
+        isSocio: result?.user?.isSocio ?? true,
+        role: (result?.user?.role as User['role']) ?? 'MEMBER',
+      });
+      await refreshMembershipState();
+      setMembershipStatus(result?.membershipStatus ?? 'ACTIVE');
+      setNextDueDate(result?.nextDueDate);
+      await reload();
+      success(result?.message || 'Membresía reactivada con éxito.');
+    } catch (err: any) {
+      const data = err?.response?.data;
+      error(data?.message ?? data?.detail ?? 'No se pudo reactivar la membresía.');
+    } finally {
+      setReactivating(false);
+    }
+  };
+
   // Cuotas abonables (Pendiente / En Mora) y sus IDs para la selección múltiple.
-  const selectableCuotas = useMemo(() => cuotas.filter((c) => c.status !== 'PAGADA'), [cuotas]);
+  const selectableCuotas = useMemo(() => cuotas.filter((c) => c.status !== 'PAGADA' && c.status !== 'CANCELADA'), [cuotas]);
   const selectableIds = useMemo(() => selectableCuotas.map((c) => cuotaNumericId(c)), [selectableCuotas]);
 
   const selectedCuotas = useMemo(
-    () => cuotas.filter((c) => c.status !== 'PAGADA' && selectedCuotaIds.includes(cuotaNumericId(c))),
+    () => cuotas.filter((c) => c.status !== 'PAGADA' && c.status !== 'CANCELADA' && selectedCuotaIds.includes(cuotaNumericId(c))),
     [cuotas, selectedCuotaIds],
   );
   const selectedTotal = selectedCuotas.reduce((s, c) => s + c.totalAmount, 0);
@@ -80,7 +163,7 @@ export const MisCuotas: React.FC = () => {
   const currentMonthCuota = useMemo(() => {
     const now = new Date();
     const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    return cuotas.find((c) => c.mesAno === period && c.status !== 'PAGADA' && c.totalAmount > 0);
+    return cuotas.find((c) => c.mesAno === period && c.status !== 'PAGADA' && c.status !== 'CANCELADA' && c.totalAmount > 0);
   }, [cuotas]);
 
   // Si el usuario tildó cuotas, el botón paga la selección; si no (o solo tildó la vigente),
@@ -144,25 +227,87 @@ export const MisCuotas: React.FC = () => {
                   </div>
                 </div>
               )}
-              {isSocio || cuotas.length > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => setShowCancelModal(true)}
-                  className="px-4 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 hover:text-rose-300 font-semibold text-xs transition-all flex items-center gap-2 self-start md:self-auto"
-                >
-                  Cancelar Membresía
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setShowMembershipModal(true)}
-                  className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-all flex items-center gap-2 self-start md:self-auto shadow-lg shadow-emerald-500/20"
-                >
-                  <UserPlus className="w-4 h-4" />
-                  Suscribirme al Club
-                </button>
-              )}
+              <AnimatePresence mode="wait" initial={false}>
+                {isCanceledPendingEnd ? (
+                  <motion.div
+                    key="reactivate"
+                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                    transition={{ duration: 0.3, ease: 'easeOut' }}
+                    className="self-start md:self-auto"
+                  >
+                    <button
+                      type="button"
+                      onClick={handleReactivate}
+                      disabled={reactivating}
+                      className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-all duration-300 ease-in-out flex items-center gap-2 shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      {reactivating ? 'Reactivando...' : 'Reactivar Membresía'}
+                    </button>
+                  </motion.div>
+                ) : showCancelButton ? (
+                  <motion.div
+                    key="cancel"
+                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                    transition={{ duration: 0.3, ease: 'easeOut' }}
+                    className="self-start md:self-auto"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setShowCancelModal(true)}
+                      className="px-4 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 hover:text-rose-300 font-semibold text-xs transition-all duration-300 ease-in-out flex items-center gap-2"
+                    >
+                      Cancelar Membresía
+                    </button>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="subscribe"
+                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                    transition={{ duration: 0.3, ease: 'easeOut' }}
+                    className="self-start md:self-auto"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setShowMembershipModal(true)}
+                      className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-all duration-300 ease-in-out flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      Suscribirme al Club
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
+
+            <AnimatePresence>
+              {isCanceledPendingEnd && (
+                <motion.div
+                  key="baja-banner"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -12 }}
+                  transition={{ duration: 0.35, ease: 'easeOut' }}
+                  className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex items-start gap-3"
+                >
+                  <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-amber-300">
+                      Baja Solicitada - Activo hasta {nextDueDate ? new Date(nextDueDate).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'el vencimiento'}
+                    </p>
+                    <p className="text-xs text-amber-200/80 mt-1 leading-relaxed">
+                      Solicitaste la baja de tu membresía, pero tenés acceso total a las instalaciones hasta el vencimiento de tu cuota por haberla abonado. Podés reactivarla en cualquier momento sin cargo adicional.
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {loading ? (
               <div className="flex flex-col items-center justify-center h-64 text-slate-400 gap-3">
@@ -258,32 +403,13 @@ export const MisCuotas: React.FC = () => {
       />
 
       {showCancelModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl">
-            <h3 className="text-lg font-bold text-white">¿Querés cancelar tu membresía al club?</h3>
-            <p className="text-sm text-slate-300 leading-relaxed">
-              Al cancelar, perderás los beneficios de Socio y se anularán tus cuotas pendientes no abonadas.
-            </p>
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowCancelModal(false)}
-                disabled={cancelling}
-                className="px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-950 text-slate-200 font-semibold text-xs hover:border-slate-600 transition"
-              >
-                Volver
-              </button>
-              <button
-                type="button"
-                onClick={handleCancelSubscription}
-                disabled={cancelling}
-                className="px-4 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-400 text-white font-bold text-xs transition flex items-center gap-2 disabled:opacity-50 shadow-lg shadow-rose-500/20"
-              >
-                {cancelling ? 'Cancelando...' : 'Confirmar Cancelación'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <CancelMembershipModal
+          open={showCancelModal}
+          onClose={() => setShowCancelModal(false)}
+          onConfirm={handleCancelSubscription}
+          confirming={cancelling}
+          nextDueDate={nextDueDate}
+        />
       )}
     </div>
   );

@@ -67,7 +67,7 @@ export default function Register() {
       
       // Detectar 400, 409 o mensaje de correo ya registrado / existente
       if (status === 400 || status === 409 || message.includes('already') || message.includes('exist') || message.includes('registrad') || message.includes('correo') || message.includes('email')) {
-        toast.error('Tu cuenta ya fue creada. Te redirigimos al inicio de sesión.');
+        toast.info('Tu cuenta ya está registrada. Te redirigimos al inicio de sesión.');
         setTimeout(() => {
           navigate('/login');
         }, 1500);
