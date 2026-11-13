@@ -23,4 +23,7 @@ public interface IActivityService
     /// <summary>Permite que un instructor invitado acepte o rechace su asignación a una actividad.</summary>
     Task<ActivityDto?> SetInstructorStatusAsync(int activityId, int teacherId, AssignmentStatus status, int actorId);
 
+    /// <summary>Vence automáticamente las invitaciones pendientes que superen los 3 días sin respuesta.</summary>
+    Task ExpireOverdueInvitationsAsync();
+
 }

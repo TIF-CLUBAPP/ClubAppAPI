@@ -168,6 +168,9 @@ builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 
 builder.Services.AddHttpClient<IWeatherService, WeatherService>();
 
+// Fin: vencimiento automático de invitaciones a actividades (cada 30 min).
+builder.Services.AddHostedService<InvitationExpirationService>();
+
 // ==========================================
 // 6. PIPELINE DE EJECUCIÓN (MIDDLEWARES)
 // ==========================================

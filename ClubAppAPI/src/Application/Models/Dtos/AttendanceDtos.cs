@@ -30,9 +30,21 @@ public class ClassStudentDto
     public string FullName { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
 
-    /// <summary>PRESENT / ABSENT / JUSTIFIED.</summary>
+    /// <summary>PRESENT / ABSENT / JUSTIFIED (asistencia del día seleccionado).</summary>
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public AttendanceStatus Status { get; set; }
+
+    /// <summary>Fecha en la que el alumno se inscribió a la actividad (UTC).</summary>
+    public DateTime? EnrollmentDate { get; set; }
+
+    /// <summary>Estado actual de la inscripción: "ACTIVE" / "CANCELED".</summary>
+    public string EnrollmentStatus { get; set; } = string.Empty;
+
+    /// <summary>Resumen histórico de asistencia del alumno en esta clase/schedule.</summary>
+    public int TotalClasses { get; set; }
+    public int Presents { get; set; }
+    public int Absents { get; set; }
+    public int Justified { get; set; }
 }
 
 /// <summary>Clase del día de un profesor con sus alumnos (GET /api/attendance/classes).</summary>

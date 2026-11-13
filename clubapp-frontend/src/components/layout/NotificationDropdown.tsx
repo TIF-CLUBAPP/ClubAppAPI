@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Bell,
   BadgeCheck,
@@ -102,6 +103,7 @@ const formatTime = (iso: string): string => {
 export default function NotificationDropdown() {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const navigate = useNavigate();
 
   const {
     notifications: items,
@@ -110,9 +112,9 @@ export default function NotificationDropdown() {
     loading,
     actingId,
     markAllRead,
+    markRead,
     remove,
     resolveRequest,
-    resolveInvitation,
   } = useNotifications();
 
 
@@ -136,6 +138,16 @@ export default function NotificationDropdown() {
       markAllRead();
     }
   }, [open, unreadCount, markAllRead]);
+
+  // Al hacer clic en una invitación a actividad, la marcamos como leída y
+  // llevamos al usuario a "Gestión de Actividades", donde está la tarjeta de
+  // Invitaciones Pendientes (única fuente de verdad para aceptar/rechazar).
+  const handleOpenInvitation = (n: { id: string; category: string }) => {
+    if (n.category !== 'activity_invitation') return;
+    void markRead(n.id);
+    setOpen(false);
+    navigate('/gestion-actividades');
+  };
 
 
 
@@ -200,9 +212,18 @@ export default function NotificationDropdown() {
               return (
                 <div
                   key={n.id}
+                  onClick={() => handleOpenInvitation(n)}
+                  role={n.category === 'activity_invitation' ? 'button' : undefined}
+                  tabIndex={n.category === 'activity_invitation' ? 0 : undefined}
+                  onKeyDown={(e) => {
+                    if (n.category === 'activity_invitation' && (e.key === 'Enter' || e.key === ' ')) {
+                      e.preventDefault();
+                      handleOpenInvitation(n);
+                    }
+                  }}
                   className={`group flex items-start gap-3 px-4 py-3 border-b border-slate-800/60 transition hover:bg-slate-800/40 ${
                     isUnread ? 'bg-slate-800/20' : ''
-                  }`}
+                  } ${n.category === 'activity_invitation' ? 'cursor-pointer' : ''}`}
                 >
                   <div className={`mt-0.5 p-2 rounded-xl border shrink-0 ${meta.iconClass}`}>
                     <CategoryIcon category={n.category} />
@@ -237,30 +258,7 @@ export default function NotificationDropdown() {
                           <X size={13} />
                           Rechazar
                         </button>
-                      </div>
-                    )}
-
-                    {n.category === 'activity_invitation' && n.activityId && (
-                      <div className="flex items-center gap-2 mt-2">
-                        <button
-                          type="button"
-                          onClick={() => resolveInvitation(n, true)}
-                          disabled={actingId === n.activityId}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-semibold hover:bg-emerald-500/20 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Check size={13} />
-                          Aceptar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => resolveInvitation(n, false)}
-                          disabled={actingId === n.activityId}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-slate-400 border border-slate-700 text-[11px] font-semibold hover:text-rose-400 hover:border-rose-500/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <X size={13} />
-                          Rechazar
-                        </button>
-                      </div>
+                    </div>
                     )}
 
                     <p className="text-[10px] text-slate-500 mt-1.5">

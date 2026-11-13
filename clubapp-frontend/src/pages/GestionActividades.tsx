@@ -30,6 +30,37 @@ import Combobox from '../components/ui/Combobox';
 
 const DAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
+// Vencimiento de invitaciones: 3 días (72 horas).
+const INVITATION_TTL_HOURS = 72;
+
+/**
+ * Texto legible que indica cuánto tiempo le queda a una invitación pendiente
+ * antes de vencer (a partir del campo `invitedAt` del instructor).
+ */
+const invitationDeadlineLabel = (activity: Activity, userId: number): string => {
+  const pending = (activity.instructors ?? []).find(
+    (i) => i.id === userId && i.status === 'Pending',
+  );
+  if (!pending?.invitedAt) return '';
+
+  const invitedAt = new Date(pending.invitedAt).getTime();
+  if (Number.isNaN(invitedAt)) return '';
+
+  const deadline = invitedAt + INVITATION_TTL_HOURS * 60 * 60 * 1000;
+  const remainingMs = deadline - Date.now();
+
+  if (remainingMs <= 0) return 'Vencida';
+
+  const remainingHours = Math.floor(remainingMs / (60 * 60 * 1000));
+  const remainingDays = Math.floor(remainingHours / 24);
+
+  if (remainingDays <= 0) {
+    return remainingHours <= 1 ? 'Vence en 1 hora' : `Vence en ${remainingHours} horas`;
+  }
+  return remainingDays === 1 ? 'Vence en 1 día' : `Vence en ${remainingDays} días`;
+};
+
+
 const parseNumericInput = (raw: string): number => {
   const cleaned = raw.replace(/^0+(?=\d)/, '');
   return cleaned === '' ? 0 : Number(cleaned);
@@ -713,6 +744,18 @@ export default function GestionActividades() {
                             </>
                           )}
                         </p>
+                        {(() => {
+                          const deadline = invitationDeadlineLabel(
+                            a,
+                            Number(currentUser?.id ?? 0),
+                          );
+                          if (!deadline) return null;
+                          return (
+                            <p className="text-[11px] font-semibold text-amber-300 flex items-center gap-1 mt-0.5">
+                              <Clock size={11} /> {deadline}
+                            </p>
+                          );
+                        })()}
                       </div>
                       <div className="flex gap-2 shrink-0">
                         <button

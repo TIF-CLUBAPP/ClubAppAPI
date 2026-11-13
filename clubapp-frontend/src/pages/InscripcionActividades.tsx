@@ -23,6 +23,25 @@ import { useToast } from '../context/ToastContext';
 const fmtCurrency = (val: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(val);
 
+/**
+ * Nombres de los profesores que dictan una actividad en la vista pública de socios:
+ * solo instructores con estado "Accepted" (se ocultan "Pending" y "Rejected").
+ * También se incluye el profesor primario (teacherName) si no está repetido.
+ */
+const acceptedInstructorNames = (a: Activity): string[] => {
+  const names = new Set<string>();
+  const accepted = (a.instructors ?? [])
+    .filter((i) => i.status === 'Accepted')
+    .map((i) => i.fullName)
+    .filter((n) => n && n.trim().length > 0);
+  accepted.forEach((n) => names.add(n));
+  if (a.teacherName && a.teacherName.trim().length > 0) {
+    names.add(a.teacherName);
+  }
+  return Array.from(names);
+};
+
+
 export default function InscripcionActividades() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [myEnrollments, setMyEnrollments] = useState<MyEnrollment[]>([]);
@@ -229,9 +248,20 @@ export default function InscripcionActividades() {
 
                       <div className="mt-auto flex items-center justify-between gap-3 pt-1">
                         <div className="flex flex-col">
-                          {a.teacherName && (
-                            <span className="text-sm font-semibold text-slate-300 flex items-center gap-1.5">
-                              <UserCheck size={14} className="text-sky-400" /> {a.teacherName}
+                          {acceptedInstructorNames(a).length > 0 ? (
+                            <div className="flex flex-col gap-1">
+                              {acceptedInstructorNames(a).map((name) => (
+                                <span
+                                  key={name}
+                                  className="text-sm font-semibold text-slate-300 flex items-center gap-1.5"
+                                >
+                                  <UserCheck size={14} className="text-sky-400" /> {name}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-sm font-semibold text-slate-500 flex items-center gap-1.5">
+                              <UserCheck size={14} className="text-slate-600" /> Profesor a designar
                             </span>
                           )}
                           <div className="flex flex-col gap-0.5">

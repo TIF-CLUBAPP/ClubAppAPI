@@ -65,4 +65,7 @@ public class InstructorDto
 
     /// <summary>Estado de la asignación del instructor (Pending/Accepted/Rejected).</summary>
     public string Status { get; set; } = "Accepted";
+
+    /// <summary>Fecha en que se envió la invitación (UTC). Solo relevante para los pendientes.</summary>
+    public DateTime? InvitedAt { get; set; }
 }

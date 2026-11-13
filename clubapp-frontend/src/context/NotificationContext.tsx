@@ -2,7 +2,6 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import type { AppNotification } from '../types/notification';
 import { notificationService } from '../services/notificationService';
 import { friendService } from '../services/friendService';
-import { activityService } from '../services/activityService';
 import { useAuth } from './AuthContext';
 import {
   startSignalRNotificationConnection,
@@ -17,15 +16,15 @@ interface NotificationContextType {
   actingId: number | null;
   refresh: () => Promise<void>;
   markAllRead: () => Promise<void>;
+  markRead: (id: string) => Promise<void>;
   remove: (id: string) => Promise<void>;
   resolveRequest: (notification: AppNotification, accept: boolean) => Promise<void>;
-  resolveInvitation: (notification: AppNotification, accept: boolean) => Promise<void>;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, isAuthenticated, token } = useAuth();
+  const { isAuthenticated, token } = useAuth();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [actingId, setActingId] = useState<number | null>(null);
@@ -109,6 +108,19 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, []);
 
+  const markRead = useCallback(async (id: string) => {
+    const strId = String(id);
+    // Marcamos como leída localmente de inmediato (feedback instantáneo).
+    setNotifications((prev) =>
+      prev.map((n) => (String(n.id) === strId ? { ...n, read: true } : n)),
+    );
+    try {
+      await notificationService.markAsRead(strId);
+    } catch {
+      // Sin conexión con el backend; el estado local ya quedó actualizado.
+    }
+  }, []);
+
   const remove = useCallback(async (id: string) => {
     const strId = String(id);
     // 1. Borra la notificación del estado local inmediatamente de forma infalible
@@ -145,21 +157,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, [remove]);
 
-  const resolveInvitation = useCallback(async (notification: AppNotification, accept: boolean) => {
-    const activityId = notification.activityId;
-    if (!activityId || !user?.id) return;
-    const teacherId = Number(user.id);
-    if (Number.isNaN(teacherId)) return;
-
-    setActingId(activityId);
-    try {
-      await activityService.setInstructorStatus(activityId, teacherId, accept ? 'Accepted' : 'Rejected');
-      await remove(notification.id);
-    } finally {
-      setActingId(null);
-    }
-  }, [remove, user]);
-
   const unreadCount = notifications.filter((n) => !n.read).length;
   const hasActionableUnread = notifications.some(
     (n) => !n.read && (n.category === 'friend_request' || n.category === 'payment' || n.category === 'activity_invitation')
@@ -175,9 +172,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         actingId,
         refresh: () => fetchNotifications(false),
         markAllRead,
+        markRead,
         remove,
         resolveRequest,
-        resolveInvitation,
       }}
     >
       {children}

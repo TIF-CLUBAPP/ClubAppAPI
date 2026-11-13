@@ -35,10 +35,14 @@ public class AttendanceService : IAttendanceService
         var result = new List<TeacherClassDto>();
         foreach (var schedule in schedules)
         {
-            var studentIds = await _context.Enrollments
-                .Where(e => e.ActivityId == schedule.ActivityId && e.Status == EnrollmentStatus.ACTIVE)
-                .Select(e => e.UserId)
+            var enrollments = await _context.Enrollments
+                .Where(e => e.ActivityId == schedule.ActivityId)
                 .ToListAsync();
+
+            var studentIds = enrollments
+                .Where(e => e.Status == EnrollmentStatus.ACTIVE)
+                .Select(e => e.UserId)
+                .ToList();
 
             var students = await _context.Users
                 .Where(u => studentIds.Contains(u.Id))
@@ -50,6 +54,21 @@ public class AttendanceService : IAttendanceService
                 .Where(r => r.ActivityScheduleId == schedule.Id && r.Date == date.Date)
                 .ToListAsync();
 
+            // Histórico completo de asistencia de esta clase (todas las fechas),
+            // agrupado por alumno para armar el resumen personal de cada uno.
+            var history = await _context.AttendanceRecords
+                .Where(r => r.ActivityScheduleId == schedule.Id)
+                .GroupBy(r => r.UserId)
+                .Select(g => new
+                {
+                    UserId = g.Key,
+                    Total = g.Count(),
+                    Presents = g.Count(r => r.Status == AttendanceStatus.PRESENT),
+                    Absents = g.Count(r => r.Status == AttendanceStatus.ABSENT),
+                    Justified = g.Count(r => r.Status == AttendanceStatus.JUSTIFIED),
+                })
+                .ToDictionaryAsync(x => x.UserId);
+
             result.Add(new TeacherClassDto
             {
                 ActivityId = schedule.ActivityId,
@@ -60,12 +79,27 @@ public class AttendanceService : IAttendanceService
                 Students = students.Select(u =>
                 {
                     var record = records.FirstOrDefault(r => r.UserId == u.Id);
+                    var enrollment = enrollments
+                        .Where(e => e.UserId == u.Id)
+                        .OrderByDescending(e => e.CreatedAt)
+                        .FirstOrDefault();
+
+                    history.TryGetValue(u.Id, out var stats);
+
                     return new ClassStudentDto
                     {
                         UserId = u.Id,
                         FullName = u.FullName,
                         Email = u.Email,
-                        Status = record?.Status ?? AttendanceStatus.ABSENT
+                        Status = record?.Status ?? AttendanceStatus.ABSENT,
+                        EnrollmentDate = enrollment?.EnrollmentDate,
+                        EnrollmentStatus = enrollment == null
+                            ? nameof(EnrollmentStatus.CANCELED)
+                            : enrollment.Status.ToString(),
+                        TotalClasses = stats?.Total ?? 0,
+                        Presents = stats?.Presents ?? 0,
+                        Absents = stats?.Absents ?? 0,
+                        Justified = stats?.Justified ?? 0
                     };
                 }).ToList()
             });

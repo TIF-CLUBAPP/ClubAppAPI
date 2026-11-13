@@ -16,6 +16,8 @@ export interface ActivityInstructor {
   fullName: string;
   email: string;
   status: AssignmentStatus;
+  /** Fecha en que se envió la invitación (ISO). Solo relevante para pendientes. */
+  invitedAt?: string | null;
 }
 
 // Actividad del catálogo (GET /api/activities)

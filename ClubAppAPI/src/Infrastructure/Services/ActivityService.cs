@@ -21,6 +21,9 @@ public class ActivityService : IActivityService
 
     public async Task<IEnumerable<ActivityDto>> GetAllAvailableActivitiesAsync()
     {
+        // Expira invitaciones vencidas antes de devolver el listado (tiempo real).
+        await ExpireOverdueInvitationsAsync();
+
         var activities = await _context.Activities
             .Include(a => a.Teacher)
             .Include(a => a.Space)
@@ -39,6 +42,9 @@ public class ActivityService : IActivityService
 
     public async Task<ActivityDto?> GetActivityByIdAsync(int activityId)
     {
+        // Expira invitaciones vencidas antes de devolver el detalle (tiempo real).
+        await ExpireOverdueInvitationsAsync();
+
         var activity = await _context.Activities
             .Include(a => a.Teacher)
             .Include(a => a.Space)
@@ -49,6 +55,58 @@ public class ActivityService : IActivityService
 
         if (activity == null) return null;
         return await MapAsync(activity);
+    }
+
+    /// <summary>
+    /// Vence automáticamente las invitaciones pendientes que superen los 3 días (72 horas)
+    /// sin respuesta: elimina el vínculo instructor-actividad y notifica tanto al invitado
+    /// como al creador de la actividad.
+    /// </summary>
+    public async Task ExpireOverdueInvitationsAsync()
+    {
+        var cutoff = DateTime.UtcNow.AddDays(-3);
+
+        var overdue = await _context.ActivityInstructors
+            .Include(i => i.Activity)
+            .Include(i => i.User)
+            .Where(i => i.Status == AssignmentStatus.Pending && i.InvitedAt <= cutoff)
+            .ToListAsync();
+
+        if (overdue.Count == 0)
+            return;
+
+        foreach (var invitation in overdue)
+        {
+            var activityName = invitation.Activity?.Name ?? "desconocida";
+            var teacherName = string.IsNullOrWhiteSpace(invitation.User?.FullName)
+                ? "El profesor"
+                : invitation.User!.FullName;
+
+            // 1. Notificar al invitado.
+            await _notificationService.NotifyAsync(
+                invitation.UserId,
+                "Invitación vencida",
+                $"Tu invitación para dictar la actividad \"{activityName}\" ha vencido tras 3 días sin respuesta.",
+                NotificationCategory.ActivityInvitation,
+                invitation.ActivityId.ToString());
+
+            // 2. Notificar al creador (profesor primario), si existe y no es el propio invitado.
+            var creatorId = invitation.Activity?.TeacherId;
+            if (creatorId.HasValue && creatorId.Value != invitation.UserId)
+            {
+                await _notificationService.NotifyAsync(
+                    creatorId.Value,
+                    "Invitación vencida",
+                    $"La invitación enviada a {teacherName} para la actividad \"{activityName}\" venció tras 3 días sin respuesta.",
+                    NotificationCategory.System,
+                    invitation.ActivityId.ToString());
+            }
+
+            // 3. Liberar la asignación eliminando el registro pendiente.
+            _context.ActivityInstructors.Remove(invitation);
+        }
+
+        await _context.SaveChangesAsync();
     }
 
     public async Task<ActivityDto> CreateActivityAsync(SaveActivityRequest dto, int actorId, UserRole actorRole)
@@ -188,21 +246,25 @@ public class ActivityService : IActivityService
         existing.IsActive = dto.IsActive;
         existing.SpaceId = dto.SpaceId;
 
+        // El profesor primario (TeacherId) solo lo puede reasignar un administrador.
+        // Un profesor que edita su propia actividad conserva su TeacherId (él mismo).
         if (actorRole != UserRole.TEACHER)
         {
             existing.TeacherId = dto.TeacherId;
-
-            var instructorIds = ResolveInstructorIds(dto, actorId, actorRole);
-            await EnsureInstructorsExistAsync(instructorIds);
-
-            if (existing.TeacherId == null && instructorIds.Count > 0)
-                existing.TeacherId = instructorIds[0];
-
-            // Conservamos el estado previo de los instructores que ya estaban
-            // (p. ej. Accepted/Accepted por invitación respondida); los nuevos entran Pending.
-            var previousStatuses = existing.Instructors.ToDictionary(i => i.UserId, i => i.Status);
-            ReplaceInstructors(existing, instructorIds, actorId, previousStatuses);
         }
+
+        // La sincronización de instructores se ejecuta SIEMPRE (para cualquier rol),
+        // de modo que los profesores agregados/quitados desde el modal se persistan
+        // también cuando el que edita es un TEACHER.
+        var instructorIds = ResolveInstructorIds(dto, actorId, actorRole);
+        await EnsureInstructorsExistAsync(instructorIds);
+
+        if (existing.TeacherId == null && instructorIds.Count > 0)
+            existing.TeacherId = instructorIds[0];
+
+        // Conservamos el estado previo de los instructores que ya estaban
+        // (p. ej. Accepted por invitación respondida); los nuevos entran Pending.
+        ReplaceInstructors(existing, instructorIds, actorId);
 
         _context.ActivitySchedules.RemoveRange(existing.Schedules);
         var newSchedules = BuildSchedules(dto.Schedules);
@@ -214,10 +276,8 @@ public class ActivityService : IActivityService
 
         await _context.SaveChangesAsync();
 
-        if (actorRole != UserRole.TEACHER)
-        {
-            await NotifyPendingInstructorsAsync(existing);
-        }
+        await NotifyPendingInstructorsAsync(existing);
+
         return true;
     }
 
@@ -318,6 +378,13 @@ public class ActivityService : IActivityService
         if (assignment == null)
             throw new NotFoundException("ActivityInstructor", teacherId);
 
+        // Una invitación pendiente de más de 3 días (72 hs) ya no puede aceptarse.
+        if (assignment.Status == AssignmentStatus.Pending
+            && assignment.InvitedAt.AddDays(3) <= DateTime.UtcNow)
+        {
+            throw new AppValidationException("Esta invitación ya venció.");
+        }
+
         if (status == AssignmentStatus.Rejected)
         {
             // Se elimina el vínculo, dejando al profesor fuera de la clase.
@@ -375,6 +442,7 @@ public class ActivityService : IActivityService
 
         var instructorIds = activity.Instructors.Select(i => i.UserId).Distinct().ToList();
         var instructorStatuses = activity.Instructors.ToDictionary(i => i.UserId, i => i.Status);
+        var instructorInvitedAt = activity.Instructors.ToDictionary(i => i.UserId, i => i.InvitedAt);
         var instructorUsers = instructorIds.Count == 0
             ? new List<User>()
             : await _context.Users
@@ -418,7 +486,10 @@ public class ActivityService : IActivityService
                     Email = u.Email,
                     Status = instructorStatuses.TryGetValue(u.Id, out var st)
                         ? st.ToString()
-                        : AssignmentStatus.Accepted.ToString()
+                        : AssignmentStatus.Accepted.ToString(),
+                    InvitedAt = instructorInvitedAt.TryGetValue(u.Id, out var invitedAt)
+                        ? invitedAt
+                        : (DateTime?)null
                 })
                 .ToList(),
             SpaceId = activity.SpaceId,
@@ -555,44 +626,53 @@ public class ActivityService : IActivityService
             .Select(id => new ActivityInstructor
             {
                 UserId = id,
-                Status = id == actorId ? AssignmentStatus.Accepted : AssignmentStatus.Pending
+                Status = id == actorId ? AssignmentStatus.Accepted : AssignmentStatus.Pending,
+                InvitedAt = DateTime.UtcNow
             })
             .ToList();
     }
 
     /// <summary>
-    /// Reemplaza los instructores de una actividad conservando el estado previo de los que ya
-    /// existían (invitaciones ya respondidas no se "resetean"), y marcando como Pending solo a
-    /// los nuevos colegas seleccionados desde el buscador.
+    /// Sincroniza los instructores de una actividad con la lista de IDs provista:
+    ///  - Conserva (actualizando en el mismo registro) a los profesores que ya estaban,
+    ///    manteniendo su <see cref="AssignmentStatus"/> previo.
+    ///  - Elimina a los profesores que fueron quitados del formulario.
+    ///  - Agrega a los nuevos profesores seleccionados con <see cref="AssignmentStatus.Pending"/>
+    ///    (excepto el propio actor/creador, que entra como <see cref="AssignmentStatus.Accepted"/>).
     /// </summary>
     private static void ReplaceInstructors(
         Activity activity,
         List<int> instructorIds,
-        int actorId,
-        IDictionary<int, AssignmentStatus>? previousStatuses = null)
+        int actorId)
     {
-        activity.Instructors.Clear();
+        var desiredIds = instructorIds.ToHashSet();
+
+        // 1. Eliminar los instructores que ya no están en la lista deseada.
+        var toRemove = activity.Instructors
+            .Where(i => !desiredIds.Contains(i.UserId))
+            .ToList();
+        foreach (var stale in toRemove)
+            activity.Instructors.Remove(stale);
+
+        // 2. Actualizar/añadir los instructores deseados.
         foreach (var id in instructorIds)
         {
-            AssignmentStatus status;
-            if (id == actorId)
+            var existing = activity.Instructors.FirstOrDefault(i => i.UserId == id);
+            if (existing != null)
             {
-                status = AssignmentStatus.Accepted;
-            }
-            else if (previousStatuses != null && previousStatuses.TryGetValue(id, out var prev))
-            {
-                status = prev;
-            }
-            else
-            {
-                status = AssignmentStatus.Pending;
+                // El actor nunca debe quedar pendiente de sí mismo; el resto
+                // conserva su estado previo (Accepted/Pending) ya persistido.
+                if (id == actorId)
+                    existing.Status = AssignmentStatus.Accepted;
+                continue;
             }
 
             activity.Instructors.Add(new ActivityInstructor
             {
                 ActivityId = activity.Id,
                 UserId = id,
-                Status = status
+                Status = id == actorId ? AssignmentStatus.Accepted : AssignmentStatus.Pending,
+                InvitedAt = DateTime.UtcNow
             });
         }
     }
