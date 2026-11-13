@@ -188,7 +188,7 @@ export const WeeklyScheduleSelector = ({
         return (
           <div
             key={block.id}
-            className="space-y-3.5 bg-slate-950/60 border border-slate-800 rounded-2xl p-4 transition-all"
+            className="space-y-4 bg-slate-950/60 border border-slate-800 rounded-2xl p-4 transition-all"
           >
             <div className="flex items-center justify-between pb-2 border-b border-slate-800/80 gap-2 flex-wrap">
               <div className="flex items-center gap-2">
@@ -218,35 +218,35 @@ export const WeeklyScheduleSelector = ({
 
             <div>
               <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <span className="text-xs font-semibold text-slate-400">
                   Días del bloque
                 </span>
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <button
                     type="button"
                     onClick={() => handleSelectWeekDays(block.id)}
-                    className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold border border-slate-700 transition"
+                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition"
                   >
                     Lunes a Viernes
                   </button>
                   <button
                     type="button"
                     onClick={() => handleSelectWeekendDays(block.id)}
-                    className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-300 text-[11px] font-semibold border border-slate-700 transition"
+                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-300 text-xs font-semibold border border-slate-700 transition"
                   >
                     Fin de semana
                   </button>
                   <button
                     type="button"
                     onClick={() => handleSelectAllAvailable(block.id)}
-                    className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 text-[11px] font-semibold border border-slate-700 transition"
+                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-semibold border border-slate-700 transition"
                   >
                     Disponibles
                   </button>
                   <button
                     type="button"
                     onClick={() => handleClearDays(block.id)}
-                    className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 text-[11px] font-semibold border border-slate-700 transition"
+                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs font-semibold border border-slate-700 transition"
                   >
                     Limpiar
                   </button>
@@ -264,11 +264,11 @@ export const WeeklyScheduleSelector = ({
                         key={d.id}
                         type="button"
                         disabled
-                        className="py-2 px-1 rounded-xl text-xs font-bold flex flex-col items-center justify-center gap-0.5 border bg-slate-900/30 border-slate-800/40 text-slate-600 opacity-40 cursor-not-allowed"
+                        className="py-2 px-1 rounded-lg text-sm font-semibold flex flex-col items-center justify-center gap-0.5 border bg-slate-900/30 border-slate-800/40 text-slate-600 opacity-40 cursor-not-allowed"
                         title={`${d.name} (asignado en otro bloque)`}
                       >
                         <span className="line-through">{d.label}</span>
-                        <span className="text-[9px] font-normal hidden sm:inline">Ocupado</span>
+                        <span className="text-[10px] font-normal hidden sm:inline">Ocupado</span>
                       </button>
                     );
                   }
@@ -278,7 +278,7 @@ export const WeeklyScheduleSelector = ({
                       key={d.id}
                       type="button"
                       onClick={() => handleToggleDay(block.id, d.id)}
-                      className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 border ${
+                      className={`py-2 px-1 rounded-lg text-sm font-semibold transition-all flex flex-col items-center justify-center gap-0.5 border ${
                         isSelected
                           ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300 shadow-sm shadow-emerald-500/10'
                           : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
@@ -286,7 +286,7 @@ export const WeeklyScheduleSelector = ({
                       title={d.name}
                     >
                       <span>{d.label}</span>
-                      <span className="text-[9px] font-normal opacity-70 hidden sm:inline">
+                      <span className="text-[10px] font-normal opacity-70 hidden sm:inline">
                         {d.name.slice(0, 3)}
                       </span>
                     </button>
@@ -295,10 +295,10 @@ export const WeeklyScheduleSelector = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2.5 border-t border-slate-800/80">
+            <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-800/80">
               <div>
-                <label className="block text-[11px] font-bold text-slate-400 mb-1">Hora Inicio</label>
-                <div className="relative">
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Hora inicio</label>
+                <div className="relative inline-block w-full">
                   <input
                     type="text"
                     value={block.startTime}
@@ -307,14 +307,14 @@ export const WeeklyScheduleSelector = ({
                     maxLength={5}
                     inputMode="numeric"
                     autoComplete="off"
-                    className="w-28 pl-3 pr-8 py-2 bg-slate-900/80 border border-slate-700 text-slate-100 rounded-lg text-sm text-center focus:border-emerald-500 focus:outline-none"
+                    className="w-full h-10 pl-3 pr-10 bg-slate-900/80 border border-slate-700 text-slate-100 rounded-lg text-sm font-medium text-center focus:border-emerald-500 focus:outline-none"
                   />
-                  <Clock className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <Clock className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none w-4 h-4" />
                 </div>
               </div>
               <div>
-                <label className="block text-[11px] font-bold text-slate-400 mb-1">Hora Fin</label>
-                <div className="relative">
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Hora fin</label>
+                <div className="relative inline-block w-full">
                   <input
                     type="text"
                     value={block.endTime}
@@ -323,9 +323,9 @@ export const WeeklyScheduleSelector = ({
                     maxLength={5}
                     inputMode="numeric"
                     autoComplete="off"
-                    className="w-28 pl-3 pr-8 py-2 bg-slate-900/80 border border-slate-700 text-slate-100 rounded-lg text-sm text-center focus:border-emerald-500 focus:outline-none"
+                    className="w-full h-10 pl-3 pr-10 bg-slate-900/80 border border-slate-700 text-slate-100 rounded-lg text-sm font-medium text-center focus:border-emerald-500 focus:outline-none"
                   />
-                  <Clock className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <Clock className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none w-4 h-4" />
                 </div>
               </div>
             </div>

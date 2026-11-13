@@ -67,3 +67,13 @@ public class NegotiationProposalRequest
     public decimal? PriceMember { get; set; }
     public decimal? FacilityCanon { get; set; }
 }
+
+/// <summary>
+/// Petición para que un instructor invitado acepte o rechace su asignación
+/// (PATCH /api/activities/{activityId}/instructors/{teacherId}/status).
+/// </summary>
+public class InstructorStatusRequest
+{
+    /// <summary>"Accepted" o "Rejected".</summary>
+    public string Status { get; set; } = "Accepted";
+}

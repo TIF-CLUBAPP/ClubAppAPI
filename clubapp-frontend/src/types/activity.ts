@@ -8,11 +8,14 @@ export interface ActivitySchedule {
   spaceId?: number;  // Espacio asignado (si aplica)
 }
 
+export type AssignmentStatus = 'Pending' | 'Accepted' | 'Rejected';
+
 // Profesor/administrador a cargo de una actividad
 export interface ActivityInstructor {
   id: number;
   fullName: string;
   email: string;
+  status: AssignmentStatus;
 }
 
 // Actividad del catálogo (GET /api/activities)

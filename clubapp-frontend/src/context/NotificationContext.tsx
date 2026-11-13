@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import type { AppNotification } from '../types/notification';
 import { notificationService } from '../services/notificationService';
 import { friendService } from '../services/friendService';
+import { activityService } from '../services/activityService';
 import { useAuth } from './AuthContext';
 import {
   startSignalRNotificationConnection,
@@ -18,12 +19,13 @@ interface NotificationContextType {
   markAllRead: () => Promise<void>;
   remove: (id: string) => Promise<void>;
   resolveRequest: (notification: AppNotification, accept: boolean) => Promise<void>;
+  resolveInvitation: (notification: AppNotification, accept: boolean) => Promise<void>;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated, token } = useAuth();
+  const { user, isAuthenticated, token } = useAuth();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [actingId, setActingId] = useState<number | null>(null);
@@ -143,9 +145,24 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, [remove]);
 
+  const resolveInvitation = useCallback(async (notification: AppNotification, accept: boolean) => {
+    const activityId = notification.activityId;
+    if (!activityId || !user?.id) return;
+    const teacherId = Number(user.id);
+    if (Number.isNaN(teacherId)) return;
+
+    setActingId(activityId);
+    try {
+      await activityService.setInstructorStatus(activityId, teacherId, accept ? 'Accepted' : 'Rejected');
+      await remove(notification.id);
+    } finally {
+      setActingId(null);
+    }
+  }, [remove, user]);
+
   const unreadCount = notifications.filter((n) => !n.read).length;
   const hasActionableUnread = notifications.some(
-    (n) => !n.read && (n.category === 'friend_request' || n.category === 'payment')
+    (n) => !n.read && (n.category === 'friend_request' || n.category === 'payment' || n.category === 'activity_invitation')
   );
 
   return (
@@ -160,6 +177,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         markAllRead,
         remove,
         resolveRequest,
+        resolveInvitation,
       }}
     >
       {children}

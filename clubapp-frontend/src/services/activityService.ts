@@ -71,4 +71,20 @@ export const activityService = {
     return response.data;
   },
 
+  /**
+   * Permite al instructor invitado aceptar o rechazar su asignación
+   * (PATCH /api/activities/{activityId}/instructors/{teacherId}/status).
+   */
+  setInstructorStatus: async (
+    activityId: number,
+    teacherId: number,
+    status: 'Accepted' | 'Rejected',
+  ): Promise<Activity> => {
+    const response = await api.patch<Activity>(
+      `/activities/${activityId}/instructors/${teacherId}/status`,
+      { status },
+    );
+    return response.data;
+  },
+
 };

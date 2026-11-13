@@ -20,4 +20,7 @@ public interface IActivityService
     /// <summary>Registra una nueva contraoferta de Precio Socio / Canon de instalaciones.</summary>
     Task<ActivityDto?> ProposeNegotiationAsync(int activityId, NegotiationProposalRequest request, int actorId, UserRole actorRole);
 
+    /// <summary>Permite que un instructor invitado acepte o rechace su asignación a una actividad.</summary>
+    Task<ActivityDto?> SetInstructorStatusAsync(int activityId, int teacherId, AssignmentStatus status, int actorId);
+
 }

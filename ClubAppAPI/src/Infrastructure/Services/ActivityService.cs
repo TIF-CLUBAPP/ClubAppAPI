@@ -11,10 +11,12 @@ namespace ClubApp.Infrastructure.Services;
 public class ActivityService : IActivityService
 {
     private readonly ApplicationContext _context;
+    private readonly INotificationService _notificationService;
 
-    public ActivityService(ApplicationContext context)
+    public ActivityService(ApplicationContext context, INotificationService notificationService)
     {
         _context = context;
+        _notificationService = notificationService;
     }
 
     public async Task<IEnumerable<ActivityDto>> GetAllAvailableActivitiesAsync()
@@ -107,12 +109,14 @@ public class ActivityService : IActivityService
             RequiresBooking = dto.RequiresBooking,
             Schedule = dto.Schedule?.Trim() ?? string.Empty,
             IsActive = dto.IsActive,
-            Instructors = instructorIds.Select(id => new ActivityInstructor { UserId = id }).ToList(),
+            Instructors = BuildInstructors(instructorIds, actorId),
             Schedules = BuildSchedules(dto.Schedules)
         };
 
         _context.Activities.Add(activity);
         await _context.SaveChangesAsync();
+
+        await NotifyPendingInstructorsAsync(activity);
 
         return await MapAsync(activity);
     }
@@ -194,7 +198,10 @@ public class ActivityService : IActivityService
             if (existing.TeacherId == null && instructorIds.Count > 0)
                 existing.TeacherId = instructorIds[0];
 
-            ReplaceInstructors(existing, instructorIds);
+            // Conservamos el estado previo de los instructores que ya estaban
+            // (p. ej. Accepted/Accepted por invitación respondida); los nuevos entran Pending.
+            var previousStatuses = existing.Instructors.ToDictionary(i => i.UserId, i => i.Status);
+            ReplaceInstructors(existing, instructorIds, actorId, previousStatuses);
         }
 
         _context.ActivitySchedules.RemoveRange(existing.Schedules);
@@ -206,6 +213,11 @@ public class ActivityService : IActivityService
         existing.Schedules = newSchedules;
 
         await _context.SaveChangesAsync();
+
+        if (actorRole != UserRole.TEACHER)
+        {
+            await NotifyPendingInstructorsAsync(existing);
+        }
         return true;
     }
 
@@ -272,7 +284,8 @@ public class ActivityService : IActivityService
             activity.Instructors.Add(new ActivityInstructor
             {
                 ActivityId = activity.Id,
-                UserId = userId
+                UserId = userId,
+                Status = AssignmentStatus.Accepted
             });
 
             // Backward compat: si no había un profesor primario, este lo pasa a ser.
@@ -284,12 +297,84 @@ public class ActivityService : IActivityService
         return await MapAsync(activity);
     }
 
+    public async Task<ActivityDto?> SetInstructorStatusAsync(
+        int activityId, int teacherId, AssignmentStatus status, int actorId)
+    {
+        var activity = await _context.Activities
+            .Include(a => a.Teacher)
+            .Include(a => a.Space)
+            .Include(a => a.Schedules)
+            .Include(a => a.Instructors)
+                .ThenInclude(i => i.User)
+            .FirstOrDefaultAsync(a => a.Id == activityId);
+
+        if (activity == null) return null;
+
+        // Solo el propio instructor invitado puede aceptar/rechazar su asignación.
+        if (teacherId != actorId)
+            throw new NotAllowedException("Solo podés responder invitaciones dirigidas a vos.");
+
+        var assignment = activity.Instructors.FirstOrDefault(i => i.UserId == teacherId);
+        if (assignment == null)
+            throw new NotFoundException("ActivityInstructor", teacherId);
+
+        if (status == AssignmentStatus.Rejected)
+        {
+            // Se elimina el vínculo, dejando al profesor fuera de la clase.
+            activity.Instructors.Remove(assignment);
+
+            // Si era el profesor primario, liberamos la referencia para no dejar un ídem huérfano.
+            if (activity.TeacherId == teacherId)
+                activity.TeacherId = null;
+        }
+        else
+        {
+            assignment.Status = AssignmentStatus.Accepted;
+        }
+
+        await _context.SaveChangesAsync();
+
+        await NotifyInvitationDecisionToCreatorAsync(activity, assignment, status);
+
+        return await MapAsync(activity);
+    }
+
+    /// <summary>
+    /// Notifica al creador / profesor primario de la actividad la decisión (aceptar o rechazar)
+    /// tomada por un instructor invitado, para que la vea reflejada en su panel de notificaciones.
+    /// </summary>
+    private async Task NotifyInvitationDecisionToCreatorAsync(
+        Activity activity, ActivityInstructor assignment, AssignmentStatus status)
+    {
+        // Sin profesor primario/creador no hay a quién notificar.
+        if (activity.TeacherId == null)
+            return;
+
+        // No notificar al mismo instructor que está respondiendo (evita auto-notificaciones).
+        if (activity.TeacherId == assignment.UserId)
+            return;
+
+        var teacherName = string.IsNullOrWhiteSpace(assignment.User?.FullName)
+            ? "El profesor"
+            : assignment.User!.FullName;
+
+        var verdict = status == AssignmentStatus.Accepted ? "aceptado" : "rechazado";
+
+        await _notificationService.NotifyAsync(
+            activity.TeacherId,
+            "Respuesta a invitación",
+            $"{teacherName} ha {verdict} tu invitación a la actividad \"{activity.Name}\".",
+            NotificationCategory.System,
+            activity.Id.ToString());
+    }
+
     private async Task<ActivityDto> MapAsync(Activity activity)
     {
         var enrolledCount = await _context.Enrollments
             .CountAsync(e => e.ActivityId == activity.Id && e.Status == EnrollmentStatus.ACTIVE);
 
         var instructorIds = activity.Instructors.Select(i => i.UserId).Distinct().ToList();
+        var instructorStatuses = activity.Instructors.ToDictionary(i => i.UserId, i => i.Status);
         var instructorUsers = instructorIds.Count == 0
             ? new List<User>()
             : await _context.Users
@@ -330,7 +415,10 @@ public class ActivityService : IActivityService
                 {
                     Id = u.Id,
                     FullName = u.FullName,
-                    Email = u.Email
+                    Email = u.Email,
+                    Status = instructorStatuses.TryGetValue(u.Id, out var st)
+                        ? st.ToString()
+                        : AssignmentStatus.Accepted.ToString()
                 })
                 .ToList(),
             SpaceId = activity.SpaceId,
@@ -456,16 +544,85 @@ public class ActivityService : IActivityService
         return ids;
     }
 
-    private static void ReplaceInstructors(Activity activity, List<int> instructorIds)
+    /// <summary>
+    /// Construye la lista de instructores para una actividad nueva: el creador/actor
+    /// queda <see cref="AssignmentStatus.Accepted"/> y los demás colegas se añaden como
+    /// <see cref="AssignmentStatus.Pending"/> a la espera de su aceptación.
+    /// </summary>
+    private static List<ActivityInstructor> BuildInstructors(List<int> instructorIds, int actorId)
+    {
+        return instructorIds
+            .Select(id => new ActivityInstructor
+            {
+                UserId = id,
+                Status = id == actorId ? AssignmentStatus.Accepted : AssignmentStatus.Pending
+            })
+            .ToList();
+    }
+
+    /// <summary>
+    /// Reemplaza los instructores de una actividad conservando el estado previo de los que ya
+    /// existían (invitaciones ya respondidas no se "resetean"), y marcando como Pending solo a
+    /// los nuevos colegas seleccionados desde el buscador.
+    /// </summary>
+    private static void ReplaceInstructors(
+        Activity activity,
+        List<int> instructorIds,
+        int actorId,
+        IDictionary<int, AssignmentStatus>? previousStatuses = null)
     {
         activity.Instructors.Clear();
         foreach (var id in instructorIds)
         {
+            AssignmentStatus status;
+            if (id == actorId)
+            {
+                status = AssignmentStatus.Accepted;
+            }
+            else if (previousStatuses != null && previousStatuses.TryGetValue(id, out var prev))
+            {
+                status = prev;
+            }
+            else
+            {
+                status = AssignmentStatus.Pending;
+            }
+
             activity.Instructors.Add(new ActivityInstructor
             {
                 ActivityId = activity.Id,
-                UserId = id
+                UserId = id,
+                Status = status
             });
+        }
+    }
+
+    /// <summary>
+    /// Crea una notificación <see cref="NotificationCategory.ActivityInvitation"/> por cada
+    /// instructor que haya quedado en estado <see cref="AssignmentStatus.Pending"/>.
+    /// El creador/actor nunca recibe invitación a sí mismo, ya que entra directamente como
+    /// <see cref="AssignmentStatus.Accepted"/>; solo los colegas realmente pendientes son avisados.
+    /// </summary>
+    private async Task NotifyPendingInstructorsAsync(Activity activity)
+    {
+        // Solo los instructores realmente pendientes (el actor entra Accepted y los colegas
+        // ya aceptados/rechazados no se re-notifican) reciben la invitación.
+        var pendingIds = activity.Instructors
+            .Where(i => i.Status == AssignmentStatus.Pending)
+            .Select(i => i.UserId)
+            .ToList();
+
+        if (pendingIds.Count == 0)
+            return;
+
+        foreach (var id in pendingIds)
+        {
+            await _notificationService.NotifyAsync(
+                id,
+                "Invitación a actividad",
+                $"Te invitaron a la actividad \"{activity.Name}\".",
+                NotificationCategory.ActivityInvitation,
+                activity.Id.ToString());
         }
     }
 

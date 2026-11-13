@@ -1,5 +1,12 @@
 namespace ClubApp.Domain.Entities;
 
+public enum AssignmentStatus
+{
+    Pending,
+    Accepted,
+    Rejected
+}
+
 /// <summary>
 /// Relación muchos-a-muchos entre una <see cref="Activity"/> y los usuarios
 /// (profesores y administradores) que están a cargo de dictarla.
@@ -11,4 +18,6 @@ public class ActivityInstructor
 
     public int UserId { get; set; }
     public virtual User User { get; set; } = null!;
+
+    public AssignmentStatus Status { get; set; } = AssignmentStatus.Accepted;
 }

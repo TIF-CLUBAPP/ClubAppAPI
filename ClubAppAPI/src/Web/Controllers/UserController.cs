@@ -70,6 +70,45 @@ public class UsersController : ControllerBase
         return Ok(users);
     }
 
+    /// <summary>
+    /// Lista reducida de profesores a cargo (TEACHER + ADMIN + SUPERADMIN) disponibles
+    /// para asignar como instructors de una actividad. Accesible para cualquier usuario
+    /// autenticado (a diferencia de GET /api/users, que es solo para administradores),
+    /// de modo que un profesor también pueda sumar colegas a su clase.
+    /// </summary>
+    [HttpGet("teachers")]
+    [Authorize(Roles = "TEACHER,ADMIN,SUPERADMIN")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetTeachers()
+    {
+        var teachersTask = _userService.GetAllUsersAsync(role: UserRole.TEACHER);
+        var adminsTask = _userService.GetAllUsersAsync(role: UserRole.ADMIN);
+        var superAdminsTask = _userService.GetAllUsersAsync(role: UserRole.SUPERADMIN);
+
+        await Task.WhenAll(teachersTask, adminsTask, superAdminsTask);
+
+        var teachers = teachersTask.Result;
+        var admins = adminsTask.Result;
+        var superAdmins = superAdminsTask.Result;
+
+        var unique = teachers
+            .Concat(admins)
+            .Concat(superAdmins)
+            .GroupBy(u => u.Id)
+            .Select(g => new
+            {
+                g.First().Id,
+                g.First().FirstName,
+                g.First().LastName,
+                g.First().FullName,
+                g.First().Email,
+                Role = g.First().Role.ToString(),
+                TipoProfesor = g.First().TipoProfesor.ToString()
+            });
+
+        return Ok(unique);
+    }
+
     [HttpGet("{id:int}")]
     [Authorize(Roles = "ADMIN,SUPERADMIN")]
     public async Task<IActionResult> GetById(int id)

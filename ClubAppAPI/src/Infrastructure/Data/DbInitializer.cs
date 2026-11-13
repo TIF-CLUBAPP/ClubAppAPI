@@ -249,6 +249,37 @@ namespace ClubApp.Infrastructure.Data
             }
 
             // ==========================================
+            // 1.1 BACKFILL DE ROLES DE PROFESORES DE PRUEBA
+            // ==========================================
+            // Versiones anteriores del seeder crearon los usuarios "profesor1-4@clubapp.com"
+            // con Role = ADMIN. El guard `if (!context.Users.Any())` impide que se vuelvan a
+            // insertar, por lo que esos registros persistieron con el rol incorrecto.
+            // Este bloque corrige de forma idempotente el rol a TEACHER en cada arranque,
+            // sin tocar el resto de los campos ni a otros usuarios.
+            var profesorEmails = new[]
+            {
+                "profesor1@clubapp.com",
+                "profesor2@clubapp.com",
+                "profesor3@clubapp.com",
+                "profesor4@clubapp.com"
+            };
+
+            var profesoresACorregir = context.Users
+                .Where(u => profesorEmails.Contains(u.Email) && u.Role != UserRole.TEACHER)
+                .ToList();
+
+            if (profesoresACorregir.Any())
+            {
+                foreach (var profesor in profesoresACorregir)
+                {
+                    profesor.Role = UserRole.TEACHER;
+                    Console.WriteLine($"[DbInitializer] Corrigiendo rol a TEACHER: {profesor.Email}");
+                }
+
+                context.SaveChanges();
+            }
+
+            // ==========================================
             // 2. SEEDING DE ACTIVIDADES
             // ==========================================
             if (!context.Activities.Any())

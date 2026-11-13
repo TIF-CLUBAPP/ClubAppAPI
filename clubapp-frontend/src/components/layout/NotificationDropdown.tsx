@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Bell,
   BadgeCheck,
+  CalendarClock,
   Check,
   CheckCheck,
   CreditCard,
@@ -39,6 +40,11 @@ const CATEGORY_STYLES: Record<
     iconClass: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
     labelClass: 'text-emerald-400',
   },
+  activity_invitation: {
+    label: 'Invitación a actividad',
+    iconClass: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
+    labelClass: 'text-amber-400',
+  },
   announcement: {
     label: 'Avisos & Actividades',
     iconClass: 'text-violet-400 bg-violet-500/10 border-violet-500/20',
@@ -71,6 +77,8 @@ function CategoryIcon({ category }: { category: NotificationCategory }) {
       return <CreditCard size={size} />;
     case 'membership':
       return <BadgeCheck size={size} />;
+    case 'activity_invitation':
+      return <CalendarClock size={size} />;
     default:
       return <Megaphone size={size} />;
   }
@@ -104,6 +112,7 @@ export default function NotificationDropdown() {
     markAllRead,
     remove,
     resolveRequest,
+    resolveInvitation,
   } = useNotifications();
 
 
@@ -223,6 +232,29 @@ export default function NotificationDropdown() {
                           type="button"
                           onClick={() => resolveRequest(n, false)}
                           disabled={actingId === n.requestId}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-slate-400 border border-slate-700 text-[11px] font-semibold hover:text-rose-400 hover:border-rose-500/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <X size={13} />
+                          Rechazar
+                        </button>
+                      </div>
+                    )}
+
+                    {n.category === 'activity_invitation' && n.activityId && (
+                      <div className="flex items-center gap-2 mt-2">
+                        <button
+                          type="button"
+                          onClick={() => resolveInvitation(n, true)}
+                          disabled={actingId === n.activityId}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-semibold hover:bg-emerald-500/20 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Check size={13} />
+                          Aceptar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => resolveInvitation(n, false)}
+                          disabled={actingId === n.activityId}
                           className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-slate-400 border border-slate-700 text-[11px] font-semibold hover:text-rose-400 hover:border-rose-500/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <X size={13} />

@@ -77,6 +77,35 @@ public class ActivitiesController : ControllerBase
         return Ok(updated);
     }
 
+    /// <summary>
+    /// Permite que un instructor invitado acepte o rechace su asignación a una actividad
+    /// (PATCH /api/activities/{activityId}/instructors/{teacherId}/status).
+    /// </summary>
+    [HttpPatch("{activityId:int}/instructors/{teacherId:int}/status")]
+    [Authorize(Roles = "TEACHER,ADMIN,SUPERADMIN")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SetInstructorStatus(
+        int activityId,
+        int teacherId,
+        [FromBody] InstructorStatusRequest request)
+    {
+        var (actorId, _) = GetActorIdentity();
+
+        if (!Enum.TryParse<AssignmentStatus>(request?.Status, true, out var status)
+            || (status != AssignmentStatus.Accepted && status != AssignmentStatus.Rejected))
+        {
+            return BadRequest(new { message = "El estado debe ser 'Accepted' o 'Rejected'." });
+        }
+
+        var updated = await _activityService.SetInstructorStatusAsync(activityId, teacherId, status, actorId);
+        if (updated == null) return NotFound(new { message = $"No se encontró la actividad con ID {activityId}" });
+
+        return Ok(updated);
+    }
+
     [HttpDelete("{activityId:int}")]
     [Authorize(Roles = "ADMIN,SUPERADMIN,TEACHER")]
     public async Task<IActionResult> Delete(int activityId)

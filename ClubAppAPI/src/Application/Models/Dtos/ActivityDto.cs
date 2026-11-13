@@ -62,4 +62,7 @@ public class InstructorDto
     public int Id { get; set; }
     public string FullName { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
+
+    /// <summary>Estado de la asignación del instructor (Pending/Accepted/Rejected).</summary>
+    public string Status { get; set; } = "Accepted";
 }

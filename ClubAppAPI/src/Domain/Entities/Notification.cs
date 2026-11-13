@@ -8,7 +8,8 @@ public enum NotificationCategory
     Booking,
     Payment,
     System,
-    Membership
+    Membership,
+    ActivityInvitation
 }
 
 public class Notification : BaseEntity

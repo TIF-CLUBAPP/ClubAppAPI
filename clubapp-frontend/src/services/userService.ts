@@ -23,6 +23,15 @@ export const userService = {
     return response.data;
   },
 
+  /**
+   * Lista reducida de profesores a cargo disponibles para asignar como instructors.
+   * Accesible para cualquier usuario autenticado (GET /api/users/teachers).
+   */
+  getTeachers: async (): Promise<UserListItem[]> => {
+    const response = await api.get<UserListItem[]>('/users/teachers');
+    return response.data;
+  },
+
   /** Actualiza el rol de un usuario. `newRole` es el valor numérico del enum backend. */
   updateRole: async (id: number, newRole: number): Promise<{ message: string }> => {
     const response = await api.patch(`/users/${id}/role`, { newRole });

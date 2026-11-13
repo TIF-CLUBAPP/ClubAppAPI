@@ -25,6 +25,8 @@ const mapCategory = (category: string): NotificationCategory => {
       return 'payment';
     case 'Membership':
       return 'membership';
+    case 'ActivityInvitation':
+      return 'activity_invitation';
     default:
       return 'announcement';
   }
@@ -38,6 +40,7 @@ const mapNotification = (n: BackendNotification): AppNotification => ({
   createdAt: n.createdAt ?? n.sentAt ?? new Date().toISOString(),
   read: n.isRead,
   requestId: n.category === 'FriendRequest' && n.referenceId ? Number(n.referenceId) : undefined,
+  activityId: n.category === 'ActivityInvitation' && n.referenceId ? Number(n.referenceId) : undefined,
 });
 
 const sortByNewest = (items: AppNotification[]): AppNotification[] =>

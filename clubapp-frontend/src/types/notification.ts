@@ -5,6 +5,7 @@ export type NotificationCategory =
   | 'rental' // Alquiler de canchas / reservas
   | 'payment' // Pagos grupales / cuotas pendientes
   | 'membership' // Membresías / alta como socio
+  | 'activity_invitation' // Invitación a actividades (profesores)
   | 'announcement'; // Actividades / avisos del club
 
 export interface AppNotification {
@@ -21,4 +22,6 @@ export interface AppNotification {
   requestId?: number;
   /** Nombre del actor involucrado (solo para `friend_request`). */
   actorName?: string;
+  /** Id de la actividad (solo para `activity_invitation`). */
+  activityId?: number;
 }

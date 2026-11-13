@@ -46,6 +46,20 @@ const overlaps = (aStart: string, aEnd: string, bStart: string, bEnd: string): b
 const fmtCurrency = (val: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(val);
 
+// Normaliza un texto removiendo tildes/acentos para búsquedas fuzzy (case-insensitive).
+const normalizeDiacritics = (value: string): string =>
+  (value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+// Etiqueta legible del rol para incluirlo en la búsqueda del selector de profesores.
+const roleLabel = (role?: string | number): string => {
+  const roleStr = String(role).toUpperCase();
+  if (roleStr === '1' || roleStr === 'TEACHER') return 'profesor profesora profe';
+  if (roleStr === '2' || roleStr === 'ADMIN') return 'admin administrador directivo';
+  if (roleStr === '3' || roleStr === 'SUPERADMIN') return 'superadmin super administrador';
+  if (roleStr === '0' || roleStr === 'MEMBER') return 'socio miembro alumno';
+  return '';
+};
+
 const emptyForm = (): SaveActivityRequest => ({
   name: '',
   description: '',
@@ -157,7 +171,7 @@ export default function GestionActividades() {
       setActivities(acts);
       setSpaces(sps);
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'No se pudieron cargar las actividades.');
+      toast.error(err?.response?.data?.message ?? err?.message ?? 'No se pudieron cargar las actividades.');
     } finally {
       setLoading(false);
     }
@@ -165,17 +179,23 @@ export default function GestionActividades() {
 
   const loadProfessors = async () => {
     try {
-      const [teachers, admins, superAdmins] = await Promise.all([
-        userService.getUsers({ role: 'TEACHER' }),
-        userService.getUsers({ role: 'ADMIN' }),
-        userService.getUsers({ role: 'SUPERADMIN' }),
-      ]);
-      const unique = Array.from(
-        new Map([...teachers, ...admins, ...superAdmins].map((u) => [u.id, u])).values(),
-      );
-      setProfessors(unique);
+      if (isStaff) {
+        // Los administradores listan vía /users (incluye payload completo).
+        const [teachers, admins, superAdmins] = await Promise.all([
+          userService.getUsers({ role: 'TEACHER' }),
+          userService.getUsers({ role: 'ADMIN' }),
+          userService.getUsers({ role: 'SUPERADMIN' }),
+        ]);
+        const unique = Array.from(
+          new Map([...teachers, ...admins, ...superAdmins].map((u) => [u.id, u])).values(),
+        );
+        setProfessors(unique);
+      } else {
+        // Un TEACHER (o cualquier usuario autenticado) usa el endpoint reducido /users/teachers.
+        const list = await userService.getTeachers();
+        setProfessors(list);
+      }
     } catch {
-      // Si un TEACHER abre la página no puede listar /users; no debe bloquear la carga.
       setProfessors([]);
     }
   };
@@ -183,7 +203,6 @@ export default function GestionActividades() {
   useEffect(() => { load(); }, []);
 
   useEffect(() => {
-    if (!isStaff) return;
     loadProfessors();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isStaff]);
@@ -230,15 +249,59 @@ export default function GestionActividades() {
     });
   }, [activities, scopeFilter, isStaff, currentUser]);
 
-  // Profesores filtrados por el texto de búsqueda en el selector.
-  const filteredProfessors = useMemo(() => {
-    const q = instructorSearch.trim().toLowerCase();
-    if (!q) return professors;
-    return professors.filter(
-      (p) =>
-        p.fullName.toLowerCase().includes(q) ||
-        p.email.toLowerCase().includes(q),
+  // Actividades en las que el usuario logueado tiene una invitación pendiente.
+  const pendingInvitations = useMemo(() => {
+    const myId = currentUser?.id ? Number(currentUser.id) : null;
+    if (myId == null) return [];
+    return activities.filter((a) =>
+      (a.instructors ?? []).some((i) => i.id === myId && i.status === 'Pending'),
     );
+  }, [activities, currentUser]);
+
+  // Responde (acepta o rechaza) una invitación pendiente a una actividad.
+  const handleRespondInvitation = async (a: Activity, accept: boolean) => {
+    const myId = currentUser?.id ? Number(currentUser.id) : null;
+    if (myId == null || Number.isNaN(myId)) {
+      toast.error('No se pudo identificar tu usuario para responder la invitación.');
+      return;
+    }
+    try {
+      await activityService.setInstructorStatus(a.id, myId, accept ? 'Accepted' : 'Rejected');
+      toast.success(accept ? 'Invitación aceptada.' : 'Invitación rechazada.');
+      await load();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? err?.message ?? 'No se pudo responder la invitación.');
+    }
+  };
+
+  // Profesores filtrados por el texto de búsqueda en el selector.
+  // Búsqueda flexible: ignora mayúsculas/minúsculas y tildes, y busca por
+  // nombre, apellido, nombre completo, email y rol (p.ej. "profe" => TEACHER).
+  const filteredProfessors = useMemo(() => {
+    const q = normalizeDiacritics(instructorSearch.trim().toLowerCase());
+    if (!q) return professors;
+
+    return professors.filter((p) => {
+      const haystack = normalizeDiacritics(
+        `${p.firstName ?? ''} ${p.lastName ?? ''} ${p.fullName ?? ''} ${p.email ?? ''} ${roleLabel(p.role)}`.toLowerCase()
+      );
+
+      // Coincidencia por cualquier campo (nombre/apellido/email/rol).
+      if (haystack.includes(q)) return true;
+
+      // Palabras genéricas tipo "profe"/"profesor" => listar todos los TEACHER.
+      const isTeacherRole = p.role === 'TEACHER' || String(p.role) === '1';
+      if ((q === 'profe' || q === 'profesor' || q === 'profesora' || q === 'profa') && isTeacherRole) {
+        return true;
+      }
+
+      // Match de tokens sueltos: "juan perez" o "perez juan" coinciden aunque
+      // estén en distinto orden o solo se tipee parte de un campo.
+      return q
+        .split(/\s+/)
+        .filter(Boolean)
+        .every((token) => haystack.includes(token));
+    });
   }, [professors, instructorSearch]);
 
 
@@ -323,6 +386,9 @@ export default function GestionActividades() {
     setServerError(null);
     setScheduleMode('detailed');
     setMassiveBlocks([{ id: '1', days: [1, 2, 3, 4, 5], startTime: '08:00', endTime: '20:00' }]);
+    setInstructorsOpen(false);
+    setInstructorSearch('');
+    loadProfessors();
     setModalOpen(true);
   };
 
@@ -357,6 +423,9 @@ export default function GestionActividades() {
     });
     setScheduleMode('detailed');
     setMassiveBlocks(schedulesToBlocks(initialSchedules));
+    setInstructorsOpen(false);
+    setInstructorSearch('');
+    loadProfessors();
     setModalOpen(true);
   };
 
@@ -459,7 +528,7 @@ export default function GestionActividades() {
       setDeleteTarget(null);
       await load();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'No se pudo eliminar la actividad.');
+      toast.error(err?.response?.data?.message ?? err?.message ?? 'No se pudo eliminar la actividad.');
     } finally {
       setDeleting(false);
     }
@@ -474,7 +543,7 @@ export default function GestionActividades() {
       const data = await activityService.getSettlement(activity.id);
       setSettlement(data);
     } catch (err: any) {
-      setSettlementError(err?.response?.data?.message ?? 'No se pudo cargar la liquidación.');
+      setSettlementError(err?.response?.data?.message ?? err?.message ?? 'No se pudo cargar la liquidación.');
     } finally {
       setSettlementLoading(false);
     }
@@ -516,7 +585,7 @@ export default function GestionActividades() {
       setModalOpen(false);
       await load();
     } catch (err: any) {
-      const message = err?.response?.data?.message ?? err?.response?.data?.detail ?? null;
+      const message = err?.response?.data?.message ?? err?.message ?? null;
       setServerError(message ?? 'No se pudo guardar la actividad.');
       toast.error(message ?? 'No se pudo guardar la actividad.');
     } finally {
@@ -530,7 +599,7 @@ export default function GestionActividades() {
       toast.success('Acuerdo aprobado correctamente.');
       await load();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'No se pudo aprobar el acuerdo.');
+      toast.error(err?.response?.data?.message ?? err?.message ?? 'No se pudo aprobar el acuerdo.');
     }
   };
 
@@ -552,7 +621,7 @@ export default function GestionActividades() {
       setProposeTarget(null);
       await load();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'No se pudo proponer el nuevo valor.');
+      toast.error(err?.response?.data?.message ?? err?.message ?? 'No se pudo proponer el nuevo valor.');
     } finally {
       setProposeSaving(false);
     }
@@ -619,6 +688,53 @@ export default function GestionActividades() {
                 Todas las Actividades
               </button>
             </div>
+
+            {!loading && currentUser?.role === 'TEACHER' && pendingInvitations.length > 0 && (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-5 space-y-3">
+                <div className="flex items-center gap-2 text-amber-300 text-sm font-bold">
+                  <AlertTriangle size={16} /> Invitaciones Pendientes
+                </div>
+                <p className="text-xs text-slate-300">
+                  Fuiste invitado a dictar las siguientes actividades. Aceptá o rechazá cada invitación.
+                </p>
+                <div className="flex flex-col gap-3">
+                  {pendingInvitations.map((a) => (
+                    <div
+                      key={a.id}
+                      className="flex items-center justify-between gap-3 flex-wrap rounded-xl bg-slate-900/60 border border-slate-800 p-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-white truncate">{a.name}</p>
+                        <p className="text-xs text-slate-400 flex items-center gap-1">
+                          <Dumbbell size={12} className="text-emerald-400" /> {a.category}
+                          {a.spaceName && (
+                            <>
+                              <MapPin size={12} className="ml-2 text-sky-400" /> {a.spaceName}
+                            </>
+                          )}
+                        </p>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleRespondInvitation(a, true)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 text-slate-950 text-xs font-bold hover:bg-emerald-400 transition"
+                        >
+                          <CheckCircle2 size={14} /> Aceptar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRespondInvitation(a, false)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold hover:bg-rose-900/40 hover:border-rose-900/30 transition"
+                        >
+                          <X size={14} /> Rechazar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {loading ? (
               <p className="text-slate-300">Cargando...</p>
@@ -700,19 +816,33 @@ export default function GestionActividades() {
                     <div className="flex items-center justify-between text-sm text-slate-300 mt-auto">
                       <span className="flex items-center gap-1.5 min-w-0">
                         <Users size={14} className="text-violet-400 shrink-0" />
-                        <span className="truncate">
-                          Cupo: {a.maxCapacity}
-                          {(a.instructors ?? []).length > 0 && (
-                            <span className="text-slate-400">
-                              {' · '}
-                              <GraduationCap size={14} className="inline mr-0.5 text-sky-400" />
-                              {(a.instructors ?? []).map((i) => i.fullName).join(', ')}
-                            </span>
-                          )}
-                        </span>
+                        <span className="truncate">Cupo: {a.maxCapacity}</span>
                       </span>
                       <span className="font-semibold text-emerald-400 shrink-0">{Math.max(a.availableSpots, 0)} disponibles</span>
                     </div>
+
+                    {(a.instructors ?? []).length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {(a.instructors ?? []).map((i) => (
+                          <span
+                            key={i.id}
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold border ${
+                              i.status === 'Pending'
+                                ? 'text-amber-300 bg-amber-500/10 border-amber-500/20'
+                                : 'text-sky-200 bg-sky-500/10 border-sky-500/20'
+                            }`}
+                          >
+                            <GraduationCap size={12} />
+                            {i.fullName}
+                            {i.status === 'Pending' && (
+                              <span className="px-1.5 py-px rounded bg-amber-500/20 text-amber-200 text-[9px] font-bold uppercase tracking-wide">
+                                Pendiente
+                              </span>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    )}
 
                     {a.paymentCollector === 'PROFESSOR_DIRECT' && (
                       <button
@@ -1031,13 +1161,12 @@ export default function GestionActividades() {
                     )}
                   </div>
 
-                  {isStaff && (
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setInstructorsOpen((v) => !v);
-                          setInstructorSearch('');
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInstructorsOpen((v) => !v);
+                        setInstructorSearch('');
                         }}
                         className="w-full flex items-center justify-between gap-2 bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
                       >
@@ -1089,11 +1218,10 @@ export default function GestionActividades() {
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
+                  </div>
 
-                <div>
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-2 border-b border-slate-800">
+                  <div>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-2 border-b border-slate-800">
                     <label className="block text-base font-bold text-white">Días y horarios</label>
                     <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 self-start sm:self-auto">
                       <button
@@ -1165,8 +1293,8 @@ export default function GestionActividades() {
                                 </div>
 
                                 <div>
-                                  <label className="block text-sm font-medium text-slate-400 mb-1">Inicio</label>
-                                  <div className="relative">
+                                  <label className="block text-xs font-semibold text-slate-400 mb-1">Hora inicio</label>
+                                  <div className="relative flex items-center">
                                     <input
                                       type="text"
                                       value={row.startTime}
@@ -1177,13 +1305,13 @@ export default function GestionActividades() {
                                       autoComplete="off"
                                       className="w-28 h-10 pl-3 pr-8 bg-slate-900/80 border border-slate-700 text-slate-100 rounded-lg text-sm font-medium text-center focus:border-emerald-500 focus:outline-none"
                                     />
-                                    <Clock className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                    <Clock className="w-4 h-4 text-slate-400 absolute right-3 pointer-events-none" />
                                   </div>
                                 </div>
 
                                 <div>
-                                  <label className="block text-sm font-medium text-slate-400 mb-1">Fin</label>
-                                  <div className="relative">
+                                  <label className="block text-xs font-semibold text-slate-400 mb-1">Hora fin</label>
+                                  <div className="relative flex items-center">
                                     <input
                                       type="text"
                                       value={row.endTime}
@@ -1194,7 +1322,7 @@ export default function GestionActividades() {
                                       autoComplete="off"
                                       className="w-28 h-10 pl-3 pr-8 bg-slate-900/80 border border-slate-700 text-slate-100 rounded-lg text-sm font-medium text-center focus:border-emerald-500 focus:outline-none"
                                     />
-                                    <Clock className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                    <Clock className="w-4 h-4 text-slate-400 absolute right-3 pointer-events-none" />
                                   </div>
                                 </div>
 
