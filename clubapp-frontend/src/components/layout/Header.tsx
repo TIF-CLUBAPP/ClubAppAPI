@@ -42,6 +42,8 @@ export default function Header() {
     '/deudores': 'Deudores & Cuotas',
     '/espacios': 'Espacios & Canchas',
     '/socios': 'Socios',
+    '/control-socios': 'Control de Socios',
+    '/control-recaudacion': 'Control de Recaudación',
     '/asistencia': 'Asistencia',
     '/cuenta': 'Mi Cuenta'
   };

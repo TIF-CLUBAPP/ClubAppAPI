@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import type { UserRole } from '../types/auth';
 import Header from '../components/layout/Header';
 import Sidebar from '../components/layout/Sidebar';
 import WelcomeHero from '../components/dashboard/WelcomeHero';
@@ -11,6 +12,33 @@ import AdminDashboard from '../components/dashboard/views/AdminDashboard';
 import MemberDashboard from '../components/dashboard/views/MemberDashboard';
 
 const WELCOME_KEY = 'clubapp_welcomeBannerDismissed';
+
+/**
+ * Normaliza el rol del usuario a un valor canónico de `UserRole`.
+ * El rol puede llegar como nombre de enum ("ADMIN"), como código numérico del
+ * backend (0=MEMBER, 1=TEACHER, 2=ADMIN, 3=SUPERADMIN) o con distinta mayúscula.
+ */
+const normalizeRole = (role: unknown): UserRole => {
+  const raw = String(role ?? '').trim().toUpperCase();
+  switch (raw) {
+    case '3':
+    case 'SUPERADMIN':
+    case 'SUPER ADMIN':
+      return 'SUPERADMIN';
+    case '2':
+    case 'ADMIN':
+    case 'ADMINISTRADOR':
+      return 'ADMIN';
+    case '1':
+    case 'TEACHER':
+    case 'PROFESOR':
+      return 'TEACHER';
+    case '0':
+    case 'MEMBER':
+    default:
+      return 'MEMBER';
+  }
+};
 
 export default function Dashboard() {
   const { user, isAuthenticated } = useAuth();
@@ -25,17 +53,22 @@ export default function Dashboard() {
     setShowBanner(false);
   };
 
-  // Obtenemos el rol desde el AuthContext (MEMBER, ADMIN, SUPERADMIN)
-  const role = user?.role || 'MEMBER';
+  // Obtenemos el rol desde el AuthContext y lo normalizamos (admite códigos
+  // numéricos del enum del backend, mayúsculas/minúsculas y nombres en español).
+  const role = normalizeRole(user?.role);
   const firstName =
     user?.firstName ?? user?.fullName?.split(' ')[0] ?? user?.email?.split('@')[0] ?? 'Usuario';
 
-  // Renderiza la vista completa adaptada al rol
+  // Renderiza la vista completa adaptada al rol.
+  // - ADMIN / SUPERADMIN → panel administrativo con métricas globales del club.
+  // - TEACHER            → panel docente ("Mis Clases de Hoy").
+  // - MEMBER             → panel de socio.
   const renderDashboardByRole = () => {
     switch (role) {
       case 'SUPERADMIN':
-        return <SuperAdminDashboard />;
       case 'ADMIN':
+        return <SuperAdminDashboard />;
+      case 'TEACHER':
         return <AdminDashboard />;
       case 'MEMBER':
       default:

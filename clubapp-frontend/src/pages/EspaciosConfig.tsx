@@ -824,9 +824,11 @@ export default function EspaciosConfig() {
                                 onChange={(e) => setFormData({...formData, canonBase: parseNumericInput(e.target.value)})}
                                 className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
                               />
+                              {/* Oculto: referencia a profesores independientes
                               <p className="text-[11px] text-slate-500 mt-1">
                                 Se precompleta como canon por defecto en las actividades de profesores independientes.
                               </p>
+                              */}
                             </div>
 
                             <div className="mt-3 pt-3 border-t border-slate-800 space-y-3">

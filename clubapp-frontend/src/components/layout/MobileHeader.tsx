@@ -146,14 +146,13 @@ export default function MobileHeader() {
 
   const isStaff = role === 'TEACHER' || role === 'ADMIN' || role === 'SUPERADMIN';
   const isAdmin = role === 'ADMIN' || role === 'SUPERADMIN';
-  const isSuper = role === 'SUPERADMIN';
 
   const menuItems: MenuItem[] = [
     { to: '/canchas', label: 'Reservar Cancha', icon: MapPin, show: true },
     { to: '/pagos', label: 'Pagos & Cuotas', icon: DollarSign, show: isAdmin },
     { to: '/asistencia', label: 'Asistencia', icon: ClipboardCheck, show: isStaff },
     { to: '/gestion-actividades', label: 'Gestión de Actividades', icon: Dumbbell, show: isStaff },
-    { to: '/deudores', label: 'Deudores & Cuotas', icon: AlertTriangle, show: isSuper },
+    { to: '/deudores', label: 'Deudores & Cuotas', icon: AlertTriangle, show: isAdmin },
     { to: '/espacios', label: 'Espacios & Canchas', icon: Map, show: isAdmin },
     { to: '/socios', label: 'Socios', icon: Users, show: isAdmin },
     { to: '/cuenta', label: 'Mi Cuenta', icon: UserCircle2, show: true },

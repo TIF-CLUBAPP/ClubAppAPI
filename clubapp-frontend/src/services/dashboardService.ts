@@ -1,5 +1,5 @@
 import { api } from './api';
-import type { DashboardStats, SectorStatus } from '../types/dashboard';
+import type { DashboardStats, SectorStatus, ControlSocios, ControlRecaudacion } from '../types/dashboard';
 import type { DashboardDto } from '../types/dashboard';
 
 export const dashboardService = {
@@ -10,6 +10,18 @@ export const dashboardService = {
 
   getStats: async (): Promise<DashboardStats> => {
     const response = await api.get<DashboardStats>('/dashboard/stats');
+    return response.data;
+  },
+
+  /** Panel "Control de Socios" (GET /api/dashboard/control-socios). */
+  getControlSocios: async (rango: string = 'mes'): Promise<ControlSocios> => {
+    const response = await api.get<ControlSocios>('/dashboard/control-socios', { params: { rango } });
+    return response.data;
+  },
+
+  /** Panel "Control de Recaudación" (GET /api/dashboard/control-recaudacion). */
+  getControlRecaudacion: async (rango: string = 'mes'): Promise<ControlRecaudacion> => {
+    const response = await api.get<ControlRecaudacion>('/dashboard/control-recaudacion', { params: { rango } });
     return response.data;
   },
 

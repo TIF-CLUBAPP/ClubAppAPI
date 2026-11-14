@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import ClubMapWidget from '../ClubMapWidget';
 import { useNavigate } from 'react-router-dom';
-import { Users, DollarSign, AlertCircle, ArrowRight, UserPlus, RefreshCw, Wallet, ClipboardCheck, X } from 'lucide-react';
+import { Users, DollarSign, AlertCircle, ArrowRight, UserPlus, RefreshCw, Wallet, ClipboardCheck, X, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { useDashboardStats } from '../../../hooks/useDashboardStats';
 import type { DashboardStats } from '../../../types/dashboard';
 import MemberQuickSearch from '../MemberQuickSearch';
@@ -23,88 +23,118 @@ function SkeletonCard() {
   );
 }
 
-function KpiCard({
-  label,
-  value,
-  highlight,
-  icon,
-  iconClass,
-  children,
-}: {
-  label: string;
-  value: string;
-  highlight?: string;
-  icon: React.ReactNode;
-  iconClass: string;
-  children?: React.ReactNode;
-}) {
-  return (
-    <div className="p-5 rounded-3xl bg-slate-900/80 border border-slate-800 h-full">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{label}</span>
-        <div className={`p-2 rounded-xl border ${iconClass}`}>{icon}</div>
-      </div>
-      <p className={`text-2xl font-black ${highlight ?? 'text-white'}`}>{value}</p>
-      {children && <div className="mt-1">{children}</div>}
-    </div>
-  );
-}
-
-// Tarjeta de Socios: métrica principal (activos), crecimiento del mes,
-// barra de progreso sobre el total y total registrado en badge claro.
+// Tarjeta de Socios y Usuarios: muestra de forma transparente la cantidad de
+// personas Socias, la cantidad de No Socias que participan en actividades y el
+// flujo mensual de altas/bajas, sin porcentajes confusos.
 function MembersStatsCard({ stats }: { stats: DashboardStats | null }) {
+  const navigate = useNavigate();
   const activos = stats?.sociosActivos ?? 0;
   const total = stats?.totalSocios ?? 0;
-  const nuevos = stats?.nuevosEsteMes ?? 0;
-  const activePercent = total > 0 ? Math.round((activos / total) * 100) : 0;
+  const noSocios = stats?.noSociosEnActividades ?? 0;
+  const altas = stats?.nuevosEsteMes ?? 0;
+  const bajas = stats?.bajasEsteMes ?? 0;
 
   return (
     <div className="p-5 rounded-3xl bg-slate-900/80 border border-slate-800 relative overflow-hidden h-full">
       {/* Decoración sutil de fondo */}
       <div className="absolute -top-12 -right-12 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
 
-      <div className="relative">
+      <div className="relative flex flex-col h-full">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-3">
           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-            <Users size={15} className="text-emerald-400" /> Socios
+            <Users size={15} className="text-emerald-400" /> Socios y Usuarios
           </span>
           <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
             <Users size={18} />
           </div>
         </div>
 
-        {/* Métrica principal + indicador de crecimiento */}
-        <div className="flex items-end justify-between gap-3">
+        {/* Dos datos: Socios activos vs No Socios en actividades */}
+        <div className="grid grid-cols-2 gap-4">
           <div>
-            <p className="text-2xl font-black text-white">{stats ? formatNumber(activos) : '—'}</p>
-            <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mt-0.5">Activos</p>
+            <p className="text-4xl font-black text-white leading-none">
+              {stats ? formatNumber(activos) : '—'}
+            </p>
+            <p className="text-sm font-bold text-slate-200 my-1">Socios activos</p>
+            <p className="text-xs font-medium text-slate-500">de {stats ? formatNumber(total) : '—'} registrados</p>
           </div>
-          <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold whitespace-nowrap">
-            +{formatNumber(nuevos)} este mes
-          </span>
-        </div>
-
-        {/* Barra de progreso: % de activos sobre el total */}
-        <div className="mt-4">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] text-slate-500 font-medium">Activos sobre el total</span>
-            <span className="text-[10px] font-bold text-emerald-400">{activePercent}%</span>
-          </div>
-          <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-linear-to-r from-emerald-500 to-teal-400 transition-all duration-700"
-              style={{ width: `${activePercent}%` }}
-            />
+          <div className="text-right">
+            <p className="text-4xl font-black text-emerald-400 leading-none">
+              {stats ? formatNumber(noSocios) : '—'}
+            </p>
+            <p className="text-sm font-bold text-slate-200 my-1">No Socios</p>
+            <p className="text-xs font-medium text-slate-500">en actividades</p>
           </div>
         </div>
 
-        {/* Footer: total registrados en badge claro */}
-        <div className="mt-4 pt-4 border-t border-slate-800/80 flex items-center justify-between">
-          <span className="text-[10px] text-slate-500 font-medium">Total registrados</span>
-          <span className="text-xs font-bold text-white bg-slate-950 border border-slate-800 px-2.5 py-1 rounded-lg">
-            {stats ? `${formatNumber(activos)} / ${formatNumber(total)}` : '— / —'}
+        {/* Movimiento del mes (altas/bajas compactas) */}
+        <div className="mt-4 pt-3 border-t border-slate-800/80">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ArrowUpRight size={14} className="text-emerald-400" />
+              <span className="text-base font-extrabold text-emerald-400">+{formatNumber(altas)}</span>
+              <span className="text-[11px] font-medium text-slate-500">Altas</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <ArrowDownRight size={14} className="text-rose-400" />
+              <span className="text-base font-extrabold text-rose-400">-{formatNumber(bajas)}</span>
+              <span className="text-[11px] font-medium text-slate-500">Bajas</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Botón de acceso al panel */}
+        <div className="mt-auto pt-4">
+          <button
+            onClick={() => navigate('/control-socios')}
+            className="w-full py-2.5 px-4 rounded-xl text-sm font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center justify-center gap-2 transition-all duration-200"
+          >
+            Ver Control de Socios <ArrowRight size={16} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Tarjeta de Recaudación del Mes: total destacado en tamaño grande y prominente,
+// con desglose por Cuotas y por Actividades debajo.
+function RevenueCard({ stats }: { stats: DashboardStats | null }) {
+  const total = stats?.totalRecaudado ?? 0;
+  const cuotas = stats?.recaudacionCuotas ?? 0;
+  const actividades = stats?.recaudacionActividades ?? 0;
+
+  return (
+    <div className="p-5 rounded-3xl bg-slate-900/80 border border-slate-800 relative overflow-hidden h-full">
+      <div className="absolute -top-12 -right-12 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+
+      <div className="relative">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+            <DollarSign size={15} className="text-emerald-400" /> Recaudación del Mes
           </span>
+          <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <DollarSign size={18} />
+          </div>
+        </div>
+
+        {/* Total destacado */}
+        <p className="text-4xl font-black text-white leading-none tracking-tight">
+          {stats ? formatCurrency(total) : '—'}
+        </p>
+        <p className="text-[11px] text-emerald-400 font-semibold my-1">Total recaudado</p>
+
+        {/* Desglose inferior compacto */}
+        <div className="border-t border-white/10 pt-3 mt-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-slate-400">Por Cuotas</span>
+            <span className="text-sm font-bold text-white">{stats ? formatCurrency(cuotas) : '—'}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-slate-400">Por Actividades</span>
+            <span className="text-sm font-bold text-white">{stats ? formatCurrency(actividades) : '—'}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -140,14 +170,18 @@ function OverdueFeesCard({ stats }: { stats: DashboardStats | null }) {
           {/* Métricas: cuota impaga y total adeudado */}
           <div className="grid grid-cols-2 gap-4 mt-3">
             <div>
-              <p className="text-2xl font-bold text-rose-500">{stats ? formatNumber(vencidas) : '—'}</p>
-              <p className="text-xs text-slate-400 mt-1">
+              <p className="text-4xl font-black text-rose-500 leading-none">
+                {stats ? formatNumber(vencidas) : '—'}
+              </p>
+              <p className="text-[11px] font-semibold text-slate-400 my-1.5">
                 cuota{vencidas !== 1 ? 's' : ''} impaga{vencidas !== 1 ? 's' : ''}
               </p>
             </div>
             <div className="text-right">
-              <p className="text-2xl font-bold text-white">{stats ? formatCurrency(montoDeuda) : '—'}</p>
-              <p className="text-xs text-slate-400 mt-1">Total adeudado</p>
+              <p className="text-4xl font-black text-white leading-none">
+                {stats ? formatCurrency(montoDeuda) : '—'}
+              </p>
+              <p className="text-[11px] font-semibold text-slate-400 my-1.5">Total adeudado</p>
             </div>
           </div>
         </div>
@@ -157,7 +191,7 @@ function OverdueFeesCard({ stats }: { stats: DashboardStats | null }) {
           <button
             onClick={() => navigate('/deudores')}
             disabled={!hasDebt}
-            className="w-full py-2.5 px-4 rounded-xl text-sm font-medium bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200"
+            className="w-full py-2.5 px-4 rounded-xl text-sm font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200"
           >
             {hasDebt ? (
               <>
@@ -241,20 +275,11 @@ export default function SuperAdminDashboard() {
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {/* Tarjeta de Socios (activos, total registrado y nuevos del mes) */}
+              {/* Tarjeta de Socios y Usuarios (socios, no socios y altas/bajas) */}
               <MembersStatsCard stats={stats} />
 
-              {/* Recaudación Mes */}
-              <KpiCard
-                label="Recaudación Mes"
-                value={stats ? formatCurrency(stats.monthlyRevenue) : '—'}
-                icon={<DollarSign size={18} />}
-                iconClass="bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-              >
-                <span className="text-[10px] text-emerald-400 font-bold inline-block">
-                  {stats ? Math.round(stats.collectedPercentage) : 0}% Cobrado
-                </span>
-              </KpiCard>
+              {/* Recaudación del Mes (total + desglose cuotas/actividades) */}
+              <RevenueCard stats={stats} />
 
               {/* Cuotas Vencidas */}
               <OverdueFeesCard stats={stats} />

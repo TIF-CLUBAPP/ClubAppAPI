@@ -276,6 +276,12 @@ export default function Cuenta() {
     }
   };
 
+  // No-op para evitar errores de variables/imports no utilizados mientras la
+  // sección "Configuración de Cobros Directos" está oculta temporalmente.
+  if (false) {
+    console.log(paymentInfo, paymentLoading, paymentSaving, mpConnecting, handleSaveAlias, handleConnectMercadoPago, Wallet, Link2);
+  }
+
   const receivedCount = requests.received.length;
   const sentCount = requests.sent.length;
 
@@ -489,7 +495,7 @@ export default function Cuenta() {
               </div>
             )}
 
-            {/* Configuración de Cobros Directos (profesores / staff) */}
+            {/* Oculto: Configuración de Cobros Directos (profesores independientes)
             {tab === 'perfil' && isStaffRole(user?.role) && (
                 <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6">
                   <div className="flex items-center gap-2 mb-1">
@@ -563,6 +569,7 @@ export default function Cuenta() {
                   )}
                 </div>
             )}
+            */}
 
             {tab === 'amigos' && (
               <div className="space-y-3">

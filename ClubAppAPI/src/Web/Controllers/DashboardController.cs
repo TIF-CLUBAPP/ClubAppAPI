@@ -41,4 +41,30 @@ public class DashboardController : ControllerBase
         var sectors = await _dashboardService.GetSectorsAsync();
         return Ok(sectors);
     }
+
+    /// <summary>
+    /// Panel "Control de Socios": flujo temporal y métricas individuales.
+    /// Rango: dia | semana | mes | anio (por defecto "mes").
+    /// </summary>
+    [HttpGet("control-socios")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetControlSocios([FromQuery] string rango = "mes")
+    {
+        var dto = await _dashboardService.GetControlSociosAsync(rango);
+        return Ok(dto);
+    }
+
+    /// <summary>
+    /// Panel "Control de Recaudación": ingresos temporales por cuotas/alquileres/actividades.
+    /// Rango: dia | semana | mes | anio (por defecto "mes").
+    /// </summary>
+    [HttpGet("control-recaudacion")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetControlRecaudacion([FromQuery] string rango = "mes")
+    {
+        var dto = await _dashboardService.GetControlRecaudacionAsync(rango);
+        return Ok(dto);
+    }
 }

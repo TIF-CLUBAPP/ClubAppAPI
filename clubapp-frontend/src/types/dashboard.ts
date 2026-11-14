@@ -6,7 +6,17 @@ export interface DashboardStats {
   totalSocios: number;
   /** Nuevos socios registrados en el mes en curso. */
   nuevosEsteMes: number;
-  /** Recaudación del mes en curso (pagos completados). */
+  /** Usuarios NO socios con al menos una inscripción activa a actividades. */
+  noSociosEnActividades: number;
+  /** Usuarios que se dieron de baja en el mes (membresía cancelada/vencida). */
+  bajasEsteMes: number;
+  /** Recaudación del mes por CUOTAS. */
+  recaudacionCuotas: number;
+  /** Recaudación del mes por ACTIVIDADES. */
+  recaudacionActividades: number;
+  /** Total recaudado del mes (cuotas + actividades). */
+  totalRecaudado: number;
+  /** Recaudación del mes en curso (pagos completados). Retrocompatible. */
   monthlyRevenue: number;
   /** Porcentaje cobrado del mes (0-100). */
   collectedPercentage: number;
@@ -49,4 +59,58 @@ export interface DashboardDto {
   recentCuotas: any[];
   upcomingReservations: any[];
 }
+
+// ============ Paneles de control exclusivos para administradores ============
+
+/** Selector de rango temporal compartido por ambos paneles. */
+export type RangoTemporal = 'dia' | 'semana' | 'mes' | 'anio';
+
+/** Punto de la serie temporal de flujo de socios. */
+export interface PuntoSerie {
+  etiqueta: string;
+  clave: string;
+  altas: number;
+  bajas: number;
+  neto: number;
+}
+
+/** Punto temporal de ingresos desglosados. */
+export interface IngresoPeriodo {
+  etiqueta: string;
+  clave: string;
+  cuotas: number;
+  alquileres: number;
+  actividades: number;
+  total: number;
+}
+
+/** Estadística individual por persona. */
+export interface PersonaMetrica {
+  userId: number;
+  fullName: string;
+  esSocio: boolean;
+  alquileres: number;
+  actividades: number;
+}
+
+/** Respuesta del panel "Control de Socios" (GET /api/dashboard/control-socios). */
+export interface ControlSocios {
+  sociosActivos: number;
+  noSociosEnActividades: number;
+  altasMes: number;
+  bajasMes: number;
+  netoMes: number;
+  serieTemporal: PuntoSerie[];
+  personas: PersonaMetrica[];
+}
+
+/** Respuesta del panel "Control de Recaudación" (GET /api/dashboard/control-recaudacion). */
+export interface ControlRecaudacion {
+  totalCuotas: number;
+  totalAlquileres: number;
+  totalActividades: number;
+  totalGeneral: number;
+  serieTemporal: IngresoPeriodo[];
+}
+
 

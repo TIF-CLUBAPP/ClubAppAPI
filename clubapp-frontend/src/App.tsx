@@ -22,6 +22,8 @@ import { PagosCuotas } from './pages/PagosCuotas';
 import { MisCuotas } from './pages/MisCuotas';
 import EspaciosConfig from './pages/EspaciosConfig';
 import Cuenta from './pages/Cuenta';
+import ControlSocios from './pages/ControlSocios';
+import ControlRecaudacion from './pages/ControlRecaudacion';
 // Error pages
 import Forbidden403 from './pages/errors/Forbidden403';
 import Unauthorized401 from './pages/errors/Unauthorized401';
@@ -86,6 +88,8 @@ export default function App() {
               <Route path="/pagos" element={<PagosCuotas />} />
               <Route path="/mis-cuotas" element={<MisCuotas />} />
               <Route path="/cuenta" element={<Cuenta />} />
+              <Route path="/control-socios" element={<ControlSocios />} />
+              <Route path="/control-recaudacion" element={<ControlRecaudacion />} />
             </Route>
 
             {/* 404 - Página no encontrada (comodín) */}

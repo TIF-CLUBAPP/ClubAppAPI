@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import Header from '../components/layout/Header';
 import Sidebar from '../components/layout/Sidebar';
+import Combobox from '../components/ui/Combobox';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { userService } from '../services/userService';
@@ -118,6 +119,10 @@ function ActionButtons({
   onTeacherType: (u: UserListItem) => void;
 }) {
   const disabled = isSelf || !canManage;
+  // Evitar error de variables no utilizadas al ocultar botones
+  if (false) { console.log(onPayout, onTeacherType); }
+
+
   const disabledTooltip = isSelf
     ? 'No podés modificar tu propia cuenta'
     : 'Solo un Super Admin puede gestionar este usuario';
@@ -127,6 +132,7 @@ function ActionButtons({
 
   return (
     <div className="flex items-center gap-1.5">
+      {/*
       {item.role === 'TEACHER' && (
         <button
           onClick={() => onTeacherType(item)}
@@ -147,6 +153,7 @@ function ActionButtons({
           <Wallet size={16} className="text-emerald-400" />
         </button>
       )}
+      */}
       <button
         onClick={() => onRole(item)}
         disabled={disabled}
@@ -376,62 +383,75 @@ function RoleModal({
   onConfirm: () => void;
   onClose: () => void;
 }) {
+  // Convierte las opciones de rol (RoleOption) al formato del Combobox custom.
+  const roleOptions = useMemo(
+    () => roles.map((r) => ({ value: r.value, label: r.label })),
+    [roles],
+  );
+
+  const selectedRoleLabel = roles.find((r) => r.value === value)?.label;
+
   return (
     <ModalShell onClose={onClose}>
       <div className="flex items-start justify-between">
-        <div className="p-2.5 rounded-2xl bg-sky-500/10 border border-sky-500/20 text-sky-300">
-          <UserCog size={20} />
+        <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
+          <UserCog size={22} />
         </div>
         <button
           onClick={onClose}
-          className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
+          className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
         >
-          <X size={18} />
+          <X size={20} />
         </button>
       </div>
 
-      <h3 className="mt-4 text-lg font-black text-white">Cambiar Rol de Usuario</h3>
-      <p className="mt-1 text-xs text-slate-400">
+      <h3 className="mt-5 text-xl font-black text-white">Cambiar Rol de Usuario</h3>
+      <p className="mt-2 text-sm leading-relaxed text-slate-400">
         Estás por cambiar el rol de{' '}
-        <strong className="text-slate-200">{user.fullName}</strong>. El nuevo rol se aplica de
-        inmediato.
+        <strong className="text-slate-100 font-semibold">{user.fullName}</strong>. El nuevo rol se
+        aplica de inmediato.
       </p>
 
-      <label className="mt-5 block text-[10px] uppercase tracking-wider text-slate-500 font-bold">
-        Nuevo rol
-      </label>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value as UserRole)}
-        className="mt-1.5 w-full px-3.5 py-3 rounded-2xl bg-slate-950 border border-slate-700 text-white text-sm font-semibold focus:border-sky-500 focus:outline-none transition-all"
-      >
-        {roles.map((r) => (
-          <option key={r.value} value={r.value} className="bg-slate-900">
-            {r.label}
-          </option>
-        ))}
-      </select>
+      <div className="mt-6">
+        <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
+          Nuevo rol
+        </label>
+        <div className="mt-2">
+          <Combobox
+            value={value}
+            options={roleOptions}
+            placeholder="Seleccionar rol…"
+            noResultsText="No hay roles que coincidan"
+            onChange={(v) => onChange((v ?? 'MEMBER') as UserRole)}
+          />
+        </div>
+        {selectedRoleLabel && (
+          <p className="mt-2 text-xs text-slate-500">
+            Rol actual seleccionado: <span className="text-slate-300 font-semibold">{selectedRoleLabel}</span>
+          </p>
+        )}
+      </div>
 
       {error && (
-        <div className="mt-4 flex items-center gap-2 px-4 py-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300">
-          <AlertCircle size={15} className="shrink-0" /> {error}
+        <div className="mt-5 flex items-center gap-2.5 px-4 py-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-sm text-rose-300">
+          <AlertCircle size={16} className="shrink-0" /> {error}
         </div>
       )}
 
-      <div className="mt-6 grid grid-cols-2 gap-3">
+      <div className="mt-7 grid grid-cols-2 gap-3">
         <button
           onClick={onClose}
           disabled={processing}
-          className="py-3 rounded-2xl border border-slate-700 text-slate-300 hover:text-white text-sm font-bold transition-all disabled:opacity-50"
+          className="py-3.5 rounded-2xl border border-slate-700 text-slate-300 hover:text-white text-sm font-bold transition-all disabled:opacity-50"
         >
           Cancelar
         </button>
         <button
           onClick={onConfirm}
           disabled={processing}
-          className="py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-slate-950 text-sm font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          className="py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-sm font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50"
         >
-          {processing ? <Loader2 size={15} className="animate-spin" /> : <ShieldCheck size={15} />}
+          {processing ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
           Confirmar
         </button>
       </div>

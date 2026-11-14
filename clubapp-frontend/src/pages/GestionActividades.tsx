@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Edit2, Trash2, X, Save, Clock, MapPin,
@@ -195,16 +195,16 @@ export default function GestionActividades() {
 
   const toast = useToast();
 
-  const load = async () => {
+  const load = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const [acts, sps] = await Promise.all([activityService.getActivities(), spaceService.getSpaces()]);
       setActivities(acts);
       setSpaces(sps);
     } catch (err: any) {
       toast.error(err?.response?.data?.message ?? err?.message ?? 'No se pudieron cargar las actividades.');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -253,6 +253,17 @@ export default function GestionActividades() {
   const spaceOptions = useMemo(
     () => spaces.map((s) => ({ value: String(s.id), label: s.name, secondary: s.sportCategory })),
     [spaces],
+  );
+
+  // Opciones del Combobox de "Tipo de Cobro". La opción de cobro directo por el
+  // profesor se mantiene oculta temporalmente (sin borrar) para la presentación.
+  const paymentCollectorOptions = useMemo(
+    () => [
+      { value: 'CLUB', label: 'Cobrado por el Club' },
+      // Oculto: cobro directo por el profesor
+      // { value: 'PROFESSOR_DIRECT', label: 'Cobrado por el Profesor' },
+    ],
+    [],
   );
 
   // Determina si el usuario logueado puede editar/eliminar una actividad.
@@ -348,6 +359,10 @@ export default function GestionActividades() {
     }
     return false;
   }, [form.teacherId, form.instructorIds, editing, professors, currentUser]);
+
+  // No-op para evitar error de variable no utilizada mientras el bloque de canon
+  // está oculto temporalmente para la presentación.
+  if (false) { console.log(isIndependentTeacher); }
 
   // Precompleta el canon de instalaciones y descuentos con los del espacio al crear.
   useEffect(() => {
@@ -550,18 +565,26 @@ export default function GestionActividades() {
     if (fieldErrors.schedules) setFieldErrors({ ...fieldErrors, schedules: undefined });
   };
 
-  const confirmDelete = async () => {
+  const confirmDelete = async (e?: MouseEvent<HTMLButtonElement>) => {
     if (!deleteTarget) return;
+    // Prevenimos cualquier comportamiento por defecto del evento para evitar saltos.
+    e?.preventDefault();
+    // Guardamos la posición de scroll actual antes de mutar el estado.
+    const scrollPos = window.scrollY;
     setDeleting(true);
     try {
       await activityService.deleteActivity(deleteTarget.id);
       toast.success('Actividad eliminada correctamente.');
       setDeleteTarget(null);
-      await load();
+      // Recargamos sin activar el indicador de carga para no colapsar la altura
+      // de la página (lo que provocaba el salto hacia arriba).
+      await load(true);
     } catch (err: any) {
       toast.error(err?.response?.data?.message ?? err?.message ?? 'No se pudo eliminar la actividad.');
     } finally {
       setDeleting(false);
+      // Restauramos la posición exacta de scroll tras actualizar el estado.
+      window.scrollTo({ top: scrollPos, left: 0, behavior: 'auto' });
     }
   };
 
@@ -579,6 +602,10 @@ export default function GestionActividades() {
       setSettlementLoading(false);
     }
   };
+
+  // No-op para evitar error de variable no utilizada mientras el botón "Ver
+  // Liquidación" (cobro directo) está oculto temporalmente para la presentación.
+  if (false) { console.log(openSettlement); }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -887,6 +914,7 @@ export default function GestionActividades() {
                       </div>
                     )}
 
+                    {/* Oculto: botón de liquidación de cobro directo (PROFESSOR_DIRECT)
                     {a.paymentCollector === 'PROFESSOR_DIRECT' && (
                       <button
                         onClick={() => openSettlement(a)}
@@ -895,6 +923,7 @@ export default function GestionActividades() {
                         <Receipt size={14} /> Ver Liquidación
                       </button>
                     )}
+                    */}
 
                     {a.estadoNegociacion === 'PENDIENTE' && (
                       <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 space-y-2">
@@ -1061,16 +1090,15 @@ export default function GestionActividades() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1">Tipo de Cobro</label>
-                  <select
+                  <Combobox
                     value={form.paymentCollector}
-                    onChange={(e) =>
-                      setForm({ ...form, paymentCollector: e.target.value as SaveActivityRequest['paymentCollector'] })
-                    }
-                    className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
-                  >
-                    <option value="CLUB">Cobrado por el Club</option>
-                    <option value="PROFESSOR_DIRECT">Cobrado por el Profesor</option>
-                  </select>
+                    options={paymentCollectorOptions}
+                    placeholder="Seleccionar tipo de cobro…"
+                    noResultsText="No hay opciones que coincidan"
+                    onChange={(v) => {
+                      setForm({ ...form, paymentCollector: (v as SaveActivityRequest['paymentCollector']) ?? 'CLUB' });
+                    }}
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1096,6 +1124,7 @@ export default function GestionActividades() {
                   </div>
                 </div>
 
+                {/* Oculto: Canon de Instalaciones y Descuentos (solo profesores independientes)
                 {isIndependentTeacher && (
                   <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-4 space-y-3">
                     <div>
@@ -1167,6 +1196,7 @@ export default function GestionActividades() {
                     </div>
                   </div>
                 )}
+                */}
 
                 <div>
                   <div className="flex items-center justify-between mb-1.5">

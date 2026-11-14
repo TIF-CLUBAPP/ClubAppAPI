@@ -11,7 +11,9 @@ import {
   Dumbbell,
   MapPin,
   ClipboardCheck,
-  Map
+  Map,
+  LineChart,
+  BarChart3
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -68,7 +70,7 @@ export default function Sidebar() {
         </Link>
 
         {/* Menú de Navegación con Links de React Router */}
-        <nav className="space-y-1 text-[13px] font-medium pb-4">
+        <nav className="space-y-1 text-[13px] font-medium pb-4 whitespace-nowrap">
           <Link 
             to="/dashboard" 
             className={`flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all ${
@@ -159,7 +161,7 @@ export default function Sidebar() {
             </Link>
           )}
 
-          {isAuthenticated && (role === 'SUPERADMIN') && (
+          {isAuthenticated && (role === 'ADMIN' || role === 'SUPERADMIN') && (
             <Link
               to="/deudores"
               className={`flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all ${
@@ -209,6 +211,32 @@ export default function Sidebar() {
               }`}
             >
               <Users size={18} /> Socios
+            </Link>
+          )}
+
+          {isAuthenticated && (role === 'ADMIN' || role === 'SUPERADMIN') && (
+            <Link 
+              to="/control-socios" 
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all ${
+                location.pathname === '/control-socios'
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+              }`}
+            >
+              <LineChart size={18} /> Control de Socios
+            </Link>
+          )}
+
+          {isAuthenticated && (role === 'ADMIN' || role === 'SUPERADMIN') && (
+            <Link 
+              to="/control-recaudacion" 
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all ${
+                location.pathname === '/control-recaudacion'
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+              }`}
+            >
+              <BarChart3 size={18} /> Control de Recaudación
             </Link>
           )}
         </nav>
