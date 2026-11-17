@@ -1015,6 +1015,17 @@ namespace ClubApp.Infrastructure.Data
             {
                 ["Clases de Tenis"] = "Tenis Adultos",
                 ["Pádel Avanzado"] = "Pádel Nivel 6",
+                // Deduplicación por tildes/mayúsculas (evita "Futbol sub 15" vs "Fútbol Sub 15").
+                ["Futbol sub 15"] = "Fútbol Sub 15",
+                ["Futbol Sub15"] = "Fútbol Sub 15",
+                ["Basquet Juvenil"] = "Básquet Juvenil",
+                ["Basquet"] = "Básquet Juvenil",
+                ["Padel Nivel 6"] = "Pádel Nivel 6",
+                ["Padel Avanzado"] = "Pádel Nivel 6",
+                ["Spinning/GYM"] = "Spinning / GYM",
+                ["Natacion Libre"] = "Natación Libre / Adultos",
+                ["Natacion Escuela"] = "Natación Escuela Niños",
+                ["Musculacion"] = "Musculación Libre",
             };
 
             foreach (var rename in renameActivities)
@@ -1057,8 +1068,13 @@ namespace ClubApp.Infrastructure.Data
                 var changed = false;
                 if (existing.Category != desired.Category) { existing.Category = desired.Category; changed = true; }
                 if (existing.Description != desired.Description) { existing.Description = desired.Description; changed = true; }
+                if (existing.Price != desired.Price) { existing.Price = desired.Price; changed = true; }
                 if (existing.PriceMember != desired.PriceMember) { existing.PriceMember = desired.PriceMember; changed = true; }
                 if (existing.PriceNonMember != desired.PriceNonMember) { existing.PriceNonMember = desired.PriceNonMember; changed = true; }
+                if (existing.DiaVencimiento != desired.DiaVencimiento) { existing.DiaVencimiento = desired.DiaVencimiento; changed = true; }
+                if (existing.TipoRecargoMora != desired.TipoRecargoMora) { existing.TipoRecargoMora = desired.TipoRecargoMora; changed = true; }
+                if (existing.RecargoMoraSocio != desired.RecargoMoraSocio) { existing.RecargoMoraSocio = desired.RecargoMoraSocio; changed = true; }
+                if (existing.RecargoMoraNoSocio != desired.RecargoMoraNoSocio) { existing.RecargoMoraNoSocio = desired.RecargoMoraNoSocio; changed = true; }
                 if (existing.PaymentCollector != desired.PaymentCollector) { existing.PaymentCollector = desired.PaymentCollector; changed = true; }
                 if (existing.ProfessorFacilityFeeMember != desired.ProfessorFacilityFeeMember) { existing.ProfessorFacilityFeeMember = desired.ProfessorFacilityFeeMember; changed = true; }
                 if (existing.ProfessorFacilityFeeNonMember != desired.ProfessorFacilityFeeNonMember) { existing.ProfessorFacilityFeeNonMember = desired.ProfessorFacilityFeeNonMember; changed = true; }
@@ -1108,6 +1124,90 @@ namespace ClubApp.Infrastructure.Data
                     Status = EnrollmentStatus.ACTIVE,
                     CreatedAt = DateTime.UtcNow
                 });
+            }
+
+            // Inserta (si no existe) una cuota de actividad con un período, estado y
+            // recargo determinados. Idempotente por (UserId, Period, Concepto, ActivityId).
+            void EnsureActivityPayment(
+                int userId, Activity activity, bool esSocio, string period,
+                PaymentStatus status, bool paidInCurrentMonth)
+            {
+                // La clave única de Payment es (UserId, Period, Concepto, ActivityId).
+                if (context.Payments.Any(p =>
+                        p.UserId == userId
+                        && p.Period == period
+                        && p.Concepto == CuotaConcepto.Actividad
+                        && p.ActivityId == activity.Id))
+                    return;
+
+                var diaVencimiento = Math.Clamp(activity.DiaVencimiento, 1, 28);
+                var dueDate = ResolveActivityDueDate(period, diaVencimiento);
+
+                var precioBase = esSocio ? activity.PriceMember : activity.PriceNonMember;
+                var recargo = CalcularRecargoActividadSeeder(precioBase, esSocio, activity, diaVencimiento);
+
+                // Fecha de pago: si está pagada y corresponde al mes corriente, se paga
+                // en Noviembre 2026 para que compute en "Recaudación del Mes".
+                var paymentDate = status == PaymentStatus.Paid
+                    ? (DateTime?)DateTime.SpecifyKind(
+                        paidInCurrentMonth
+                            ? new DateTime(2026, 11, 15, 11, 0, 0)
+                            : new DateTime(2026, 10, 12, 11, 0, 0),
+                        DateTimeKind.Utc)
+                    : null;
+
+                context.Payments.Add(new Payment
+                {
+                    UserId = userId,
+                    Period = period,
+                    Concepto = CuotaConcepto.Actividad,
+                    ActivityId = activity.Id,
+                    ActivityName = activity.Name,
+                    DueDate = dueDate,
+                    Amount = precioBase,
+                    LateFeeApplied = recargo,
+                    MarketplaceFee = 0m,
+                    PaymentMethod = status == PaymentStatus.Paid ? "Efectivo" : string.Empty,
+                    Status = status,
+                    PaymentDate = paymentDate,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
+            // Resuelve la fecha de vencimiento de una cuota de actividad a partir del
+            // período "yyyy-MM" y el día de vencimiento (1-28). Réplica de la lógica
+            // del PaymentService para que el seed quede consistente con la app.
+            static DateTime ResolveActivityDueDate(string period, int diaVencimiento)
+            {
+                var parts = period.Split('-');
+                if (parts.Length == 2 && int.TryParse(parts[0], out var year) && int.TryParse(parts[1], out var month))
+                {
+                    var maxDay = DateTime.DaysInMonth(year, month);
+                    var day = Math.Min(diaVencimiento, maxDay);
+                    return new DateTime(year, month, day);
+                }
+
+                return new DateTime(2026, 11, Math.Min(diaVencimiento, 30));
+            }
+
+            // Réplica de CalcularRecargoActividad del PaymentService, pero parametrizable
+            // respecto a una "fecha actual" fija en el seed (17 de Noviembre de 2026).
+            static decimal CalcularRecargoActividadSeeder(decimal precioBase, bool esSocio, Activity activity, int diaVencimiento)
+            {
+                if (activity.TipoRecargoMora == TipoRecargoMora.Ninguno || precioBase <= 0m)
+                    return 0m;
+
+                // Fecha de referencia del seed: 17 de Noviembre de 2026.
+                var ahora = new DateTime(2026, 11, 17);
+                var recargo = esSocio ? activity.RecargoMoraSocio : activity.RecargoMoraNoSocio;
+                if (recargo <= 0m || ahora.Day <= diaVencimiento)
+                    return 0m;
+
+                var incremento = activity.TipoRecargoMora == TipoRecargoMora.Porcentaje
+                    ? precioBase * (recargo / 100m)
+                    : recargo;
+
+                return Math.Round(incremento, 2, MidpointRounding.AwayFromZero);
             }
 
             // 8.1 Profesores de prueba (4, con credenciales de acceso "1234")
@@ -1164,6 +1264,20 @@ namespace ClubApp.Infrastructure.Data
                 Dni = "40000004",
                 Phone = "+54900000004",
                 BirthDate = new DateTime(1987, 11, 3),
+                CreatedAt = DateTime.UtcNow
+            });
+
+            var teacherNatacion = EnsureUser(new User
+            {
+                BadgeNum = "P-005",
+                FirstName = "Lucía",
+                LastName = "Moline",
+                Email = "profesor.natacion@clubapp.com",
+                PasswordHash = hashedPassword,
+                Role = UserRole.TEACHER,
+                Dni = "40000005",
+                Phone = "+54900000005",
+                BirthDate = new DateTime(1992, 3, 18),
                 CreatedAt = DateTime.UtcNow
             });
 
@@ -1244,7 +1358,13 @@ namespace ClubApp.Infrastructure.Data
             }
             context.SaveChanges();
 
-            // 8.3 Actividades comerciales (cupos variados para probar la UI de inscripción)
+            // 8.3 Actividades comerciales (cupos variados para probar la UI de inscripción).
+            // Cada actividad configura sus reglas financieras reales: día de vencimiento,
+            // tipo de recargo y valores de recargo para Socios / No Socios.
+            // NOTA: la fecha de referencia del seed es el 17 de Noviembre de 2026.
+
+            // 1) Tenis Adultos — LLENA (cupo 8/8). Cobra el profesor (PROFESSOR_DIRECT):
+            //    NO genera deuda en "Mis Cuotas" del club (validación de cobro directo).
             var tenis = EnsureActivity(new Activity
             {
                 Name = "Tenis Adultos",
@@ -1253,6 +1373,10 @@ namespace ClubApp.Infrastructure.Data
                 Price = 8000m,
                 PriceMember = 8000m,
                 PriceNonMember = 12000m,
+                DiaVencimiento = 10,
+                TipoRecargoMora = TipoRecargoMora.Ninguno,
+                RecargoMoraSocio = 0m,
+                RecargoMoraNoSocio = 0m,
                 PaymentCollector = PaymentCollectorType.PROFESSOR_DIRECT,
                 ProfessorFacilityFeeMember = 1500m,
                 ProfessorFacilityFeeNonMember = 3000m,
@@ -1267,6 +1391,8 @@ namespace ClubApp.Infrastructure.Data
                 CreatedAt = DateTime.UtcNow
             });
 
+            // 3) Fútbol Sub 15 — MITAD DE CAPACIDAD (cupo 24, 12 insc). Cobra el Club.
+            //    Vencimiento día 15 con recargo MONTO FIJO ($2500 socio / $4000 no socio).
             var futbol = EnsureActivity(new Activity
             {
                 Name = "Fútbol Sub 15",
@@ -1275,12 +1401,16 @@ namespace ClubApp.Infrastructure.Data
                 Price = 5000m,
                 PriceMember = 5000m,
                 PriceNonMember = 8000m,
+                DiaVencimiento = 15,
+                TipoRecargoMora = TipoRecargoMora.MontoFijo,
+                RecargoMoraSocio = 2500m,
+                RecargoMoraNoSocio = 4000m,
                 PaymentCollector = PaymentCollectorType.CLUB,
                 ProfessorFacilityFeeMember = 0m,
                 ProfessorFacilityFeeNonMember = 0m,
                 ProfessorMercadoPagoPublicKey = null,
                 ProfessorMercadoPagoAccessToken = null,
-                MaxCapacity = 30,
+                MaxCapacity = 24,
                 TeacherId = teacherFutbol.Id,
                 SpaceId = ResolveSpaceId("Cancha Fútbol Práctica 1 Italia 1400"),
                 RequiresBooking = false,
@@ -1289,6 +1419,9 @@ namespace ClubApp.Infrastructure.Data
                 CreatedAt = DateTime.UtcNow
             });
 
+            // 6) Spinning / GYM — Cupo variado. Cobra el Club.
+            //    SIN RECARGO (TipoRecargoMora = Ninguno), vencimiento día 10: aunque esté
+            //    vencida no suma punitorio.
             var spinning = EnsureActivity(new Activity
             {
                 Name = "Spinning / GYM",
@@ -1297,6 +1430,10 @@ namespace ClubApp.Infrastructure.Data
                 Price = 6000m,
                 PriceMember = 6000m,
                 PriceNonMember = 9000m,
+                DiaVencimiento = 10,
+                TipoRecargoMora = TipoRecargoMora.Ninguno,
+                RecargoMoraSocio = 0m,
+                RecargoMoraNoSocio = 0m,
                 PaymentCollector = PaymentCollectorType.CLUB,
                 ProfessorFacilityFeeMember = 1000m,
                 ProfessorFacilityFeeNonMember = 2000m,
@@ -1311,6 +1448,8 @@ namespace ClubApp.Infrastructure.Data
                 CreatedAt = DateTime.UtcNow
             });
 
+            // 5) Básquet Juvenil — 100% LIBRE (cupo 15, 0 insc). Cobra el Club.
+            //    Vencimiento día 10 con recargo PORCENTAJE (para probar inscripción desde cero).
             var basquet = EnsureActivity(new Activity
             {
                 Name = "Básquet Juvenil",
@@ -1319,6 +1458,10 @@ namespace ClubApp.Infrastructure.Data
                 Price = 5500m,
                 PriceMember = 5500m,
                 PriceNonMember = 8500m,
+                DiaVencimiento = 10,
+                TipoRecargoMora = TipoRecargoMora.Porcentaje,
+                RecargoMoraSocio = 10m,
+                RecargoMoraNoSocio = 15m,
                 PaymentCollector = PaymentCollectorType.CLUB,
                 ProfessorFacilityFeeMember = 1000m,
                 ProfessorFacilityFeeNonMember = 2000m,
@@ -1333,6 +1476,8 @@ namespace ClubApp.Infrastructure.Data
                 CreatedAt = DateTime.UtcNow
             });
 
+            // 2) Pádel Nivel 6 — A 1 CUPO DE LLENARSE (cupo 10, 9 insc). Cobra el Club.
+            //    Vencimiento día 1 con recargo PORCENTAJE (10% socio / 15% no socio).
             var padel = EnsureActivity(new Activity
             {
                 Name = "Pádel Nivel 6",
@@ -1341,16 +1486,105 @@ namespace ClubApp.Infrastructure.Data
                 Price = 9000m,
                 PriceMember = 9000m,
                 PriceNonMember = 13000m,
-                PaymentCollector = PaymentCollectorType.PROFESSOR_DIRECT,
-                ProfessorFacilityFeeMember = 2000m,
-                ProfessorFacilityFeeNonMember = 3500m,
-                ProfessorMercadoPagoPublicKey = "APP_USR-padel-public-key",
-                ProfessorMercadoPagoAccessToken = "APP_USR-2222222222222222-020202-bbbbbbbbbbbb",
+                DiaVencimiento = 1,
+                TipoRecargoMora = TipoRecargoMora.Porcentaje,
+                RecargoMoraSocio = 10m,
+                RecargoMoraNoSocio = 15m,
+                PaymentCollector = PaymentCollectorType.CLUB,
+                ProfessorFacilityFeeMember = 0m,
+                ProfessorFacilityFeeNonMember = 0m,
+                ProfessorMercadoPagoPublicKey = null,
+                ProfessorMercadoPagoAccessToken = null,
                 MaxCapacity = 10,
                 TeacherId = teacherPadel.Id,
                 SpaceId = ResolveSpaceId("Pádel Cancha 1"),
                 RequiresBooking = false,
                 Schedule = "Viernes 19:00 hs",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            });
+
+            // 4) Natación Libre / Adultos — POCOS INSCRIPTOS (cupo 20, 3 insc). Cobra el Club.
+            //    Vencimiento día 28 con recargo PORCENTAJE: las cuotas de noviembre quedan
+            //    PENDIENTES (aún no llegó el día 28), sin recargo.
+            var natacionLibre = EnsureActivity(new Activity
+            {
+                Name = "Natación Libre / Adultos",
+                Description = "Natación libre supervisada para adultos.",
+                Category = "Natación",
+                Price = 7000m,
+                PriceMember = 7000m,
+                PriceNonMember = 10500m,
+                DiaVencimiento = 28,
+                TipoRecargoMora = TipoRecargoMora.Porcentaje,
+                RecargoMoraSocio = 12m,
+                RecargoMoraNoSocio = 18m,
+                PaymentCollector = PaymentCollectorType.CLUB,
+                ProfessorFacilityFeeMember = 0m,
+                ProfessorFacilityFeeNonMember = 0m,
+                ProfessorMercadoPagoPublicKey = null,
+                ProfessorMercadoPagoAccessToken = null,
+                MaxCapacity = 20,
+                TeacherId = teacherGym.Id,
+                SpaceId = ResolveSpaceId("Pileta Olímpica Peñarol"),
+                RequiresBooking = false,
+                Schedule = "Lunes, Miércoles y Viernes 19:00 hs",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            });
+
+            // 7) Musculación Libre — GRATUITA (PrecioSocio = 0, PrecioNoSocio = 0).
+            //    Validación: no genera deuda en "Mis Cuotas" del club.
+            var musculacion = EnsureActivity(new Activity
+            {
+                Name = "Musculación Libre",
+                Description = "Acceso libre a la sala de musculación del gimnasio.",
+                Category = "Fitness",
+                Price = 0m,
+                PriceMember = 0m,
+                PriceNonMember = 0m,
+                DiaVencimiento = 10,
+                TipoRecargoMora = TipoRecargoMora.Ninguno,
+                RecargoMoraSocio = 0m,
+                RecargoMoraNoSocio = 0m,
+                PaymentCollector = PaymentCollectorType.CLUB,
+                ProfessorFacilityFeeMember = 0m,
+                ProfessorFacilityFeeNonMember = 0m,
+                ProfessorMercadoPagoPublicKey = null,
+                ProfessorMercadoPagoAccessToken = null,
+                MaxCapacity = 30,
+                TeacherId = teacherGym.Id,
+                SpaceId = ResolveSpaceId("GYM Peñarol"),
+                RequiresBooking = false,
+                Schedule = "Lunes a Sábados 08:00 a 20:00 hs",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            });
+
+            // 8) Natación Escuela Niños — PROFESOR_DIRECT con costo: validación de que
+            //    el cobro directo por profesor NO genera deuda en "Mis Cuotas" del club.
+            var natacionEscuela = EnsureActivity(new Activity
+            {
+                Name = "Natación Escuela Niños",
+                Description = "Escuela de natación para niños dictada por profesor independiente.",
+                Category = "Natación",
+                Price = 6500m,
+                PriceMember = 6500m,
+                PriceNonMember = 9500m,
+                DiaVencimiento = 10,
+                TipoRecargoMora = TipoRecargoMora.Ninguno,
+                RecargoMoraSocio = 0m,
+                RecargoMoraNoSocio = 0m,
+                PaymentCollector = PaymentCollectorType.PROFESSOR_DIRECT,
+                ProfessorFacilityFeeMember = 1800m,
+                ProfessorFacilityFeeNonMember = 2800m,
+                ProfessorMercadoPagoPublicKey = "APP_USR-natacion-public-key",
+                ProfessorMercadoPagoAccessToken = "APP_USR-3333333333333333-030303-cccccccccccc",
+                MaxCapacity = 16,
+                TeacherId = teacherNatacion.Id,
+                SpaceId = ResolveSpaceId("Pileta Olímpica Peñarol"),
+                RequiresBooking = false,
+                Schedule = "Lunes y Miércoles 17:00 hs",
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
             });
@@ -1361,29 +1595,87 @@ namespace ClubApp.Infrastructure.Data
             EnsureSchedules(spinning.Id, (2, "09:00", "10:00"), (4, "09:00", "10:00"), (6, "10:00", "11:00"));
             EnsureSchedules(basquet.Id, (3, "16:00", "17:30"), (5, "16:00", "17:30"));
             EnsureSchedules(padel.Id, (5, "19:00", "20:00"));
+            EnsureSchedules(natacionLibre.Id, (1, "19:00", "20:00"), (3, "19:00", "20:00"), (5, "19:00", "20:00"));
+            EnsureSchedules(natacionEscuela.Id, (1, "17:00", "18:00"), (3, "17:00", "18:00"));
 
             // 8.5 Inscripciones (idempotentes por UserId + ActivityId + Estado ACTIVE)
-            // Tenis Adultos: cupo 8 → 8 inscripciones (SIN CUPO disponible). 3 socios + 5 no socios.
+            // Los cupos quedan en los niveles pedidos para probar la UI de inscripción:
+            //  - LLENA (0 disponibles), 1 cupo restante, ~50%, pocos inscriptos, 100% libre.
+            // Tenis Adultos (PROFESSOR_DIRECT): cupo 8 → 8 inscripciones (SIN CUPO). 3 socios + 5 no socios.
             EnsureEnrollment(socios[0].Id, tenis.Id);
             EnsureEnrollment(socios[1].Id, tenis.Id);
             EnsureEnrollment(socios[2].Id, tenis.Id);
             for (int i = 0; i < 5; i++) EnsureEnrollment(noSocios[i].Id, tenis.Id);
 
-            // Pádel Nivel 6: cupo 10 → 9 inscripciones (1 solo cupo restante). 5 socios + 4 no socios.
+            // Pádel Nivel 6 (CLUB): cupo 10 → 9 inscripciones (1 solo cupo restante). 5 socios + 4 no socios.
             for (int i = 0; i < 5; i++) EnsureEnrollment(socios[i].Id, padel.Id);
             for (int i = 0; i < 4; i++) EnsureEnrollment(noSocios[i].Id, padel.Id);
 
-            // Spinning / GYM: cupo 12 → 7 inscripciones (5 cupos disponibles). 4 socios + 3 no socios.
+            // Fútbol Sub 15 (CLUB): cupo 24 → 12 inscripciones (~50%). 8 socios + 4 no socios.
+            for (int i = 0; i < 8; i++) EnsureEnrollment(socios[i].Id, futbol.Id);
+            for (int i = 0; i < 4; i++) EnsureEnrollment(noSocios[i].Id, futbol.Id);
+
+            // Natación Libre / Adultos (CLUB): cupo 20 → 3 inscripciones (recién abierta). 2 socios + 1 no socio.
+            EnsureEnrollment(socios[0].Id, natacionLibre.Id);
+            EnsureEnrollment(socios[1].Id, natacionLibre.Id);
+            EnsureEnrollment(noSocios[0].Id, natacionLibre.Id);
+
+            // Básquet Juvenil (CLUB): cupo 15 → 0 inscripciones (100% libre).
+
+            // Spinning / GYM (CLUB): cupo 12 → 7 inscripciones. 4 socios + 3 no socios.
             for (int i = 0; i < 4; i++) EnsureEnrollment(socios[i].Id, spinning.Id);
             for (int i = 0; i < 3; i++) EnsureEnrollment(noSocios[i].Id, spinning.Id);
 
-            // Básquet Juvenil: cupo 15 → 10 inscripciones (5 cupos disponibles). 6 socios + 4 no socios.
-            for (int i = 0; i < 6; i++) EnsureEnrollment(socios[i].Id, basquet.Id);
-            for (int i = 0; i < 4; i++) EnsureEnrollment(noSocios[i].Id, basquet.Id);
+            // Musculación Libre (GRATUITA): cupo 30 → 6 inscripciones. 4 socios + 2 no socios.
+            for (int i = 0; i < 4; i++) EnsureEnrollment(socios[i].Id, musculacion.Id);
+            for (int i = 0; i < 2; i++) EnsureEnrollment(noSocios[i].Id, musculacion.Id);
 
-            // Fútbol Sub 15: cupo 30 → 12 inscripciones (18 cupos disponibles). 8 socios + 4 no socios.
-            for (int i = 0; i < 8; i++) EnsureEnrollment(socios[i].Id, futbol.Id);
-            for (int i = 0; i < 4; i++) EnsureEnrollment(noSocios[i].Id, futbol.Id);
+            // Natación Escuela Niños (PROFESSOR_DIRECT): cupo 16 → 4 inscripciones. 3 socios + 1 no socio.
+            for (int i = 0; i < 3; i++) EnsureEnrollment(socios[i].Id, natacionEscuela.Id);
+            EnsureEnrollment(noSocios[0].Id, natacionEscuela.Id);
+
+            context.SaveChanges();
+
+            // ==========================================
+            // 8.6 SEEDING DE PAGOS DE ACTIVIDAD (CuotaConcepto.Actividad)
+            // ==========================================
+            // Genera un historial financiero realista y variado para que el Dashboard
+            // ("Recaudación del Mes → Por Actividades") y "Control de Recaudación"
+            // muestren cifras concretas. Cubre Paid / Pending / Overdue según la regla
+            // de vencimiento y recargo de cada actividad.
+            var currentPeriod = "2026-11";
+            var previousPeriod = "2026-10";
+
+            // --- Pádel Nivel 6 (vencimiento día 1, recargo %): cuotas de Noviembre VENCIDAS.
+            for (int i = 0; i < 3; i++) EnsureActivityPayment(socios[i].Id, padel, true, currentPeriod, PaymentStatus.Paid, true);
+            EnsureActivityPayment(socios[3].Id, padel, true, currentPeriod, PaymentStatus.Overdue, false);
+            EnsureActivityPayment(socios[4].Id, padel, true, currentPeriod, PaymentStatus.Overdue, false);
+            EnsureActivityPayment(noSocios[0].Id, padel, false, currentPeriod, PaymentStatus.Paid, true);
+            for (int i = 1; i < 4; i++) EnsureActivityPayment(noSocios[i].Id, padel, false, currentPeriod, PaymentStatus.Overdue, false);
+            EnsureActivityPayment(socios[0].Id, padel, true, previousPeriod, PaymentStatus.Paid, false);
+
+            // --- Fútbol Sub 15 (vencimiento día 15, recargo $ fijo): cuotas de Noviembre VENCIDAS.
+            for (int i = 0; i < 5; i++) EnsureActivityPayment(socios[i].Id, futbol, true, currentPeriod, PaymentStatus.Paid, true);
+            for (int i = 5; i < 8; i++) EnsureActivityPayment(socios[i].Id, futbol, true, currentPeriod, PaymentStatus.Overdue, false);
+            for (int i = 0; i < 2; i++) EnsureActivityPayment(noSocios[i].Id, futbol, false, currentPeriod, PaymentStatus.Paid, true);
+            for (int i = 2; i < 4; i++) EnsureActivityPayment(noSocios[i].Id, futbol, false, currentPeriod, PaymentStatus.Overdue, false);
+            EnsureActivityPayment(socios[0].Id, futbol, true, previousPeriod, PaymentStatus.Paid, false);
+            EnsureActivityPayment(socios[1].Id, futbol, true, previousPeriod, PaymentStatus.Paid, false);
+
+            // --- Natación Libre / Adultos (vencimiento día 28, recargo %): PENDIENTES.
+            EnsureActivityPayment(socios[0].Id, natacionLibre, true, currentPeriod, PaymentStatus.Pending, false);
+            EnsureActivityPayment(socios[1].Id, natacionLibre, true, currentPeriod, PaymentStatus.Pending, false);
+            EnsureActivityPayment(noSocios[0].Id, natacionLibre, false, currentPeriod, PaymentStatus.Pending, false);
+
+            // --- Spinning / GYM (vencimiento día 10, SIN recargo): vencidas sin punitorio.
+            for (int i = 0; i < 3; i++) EnsureActivityPayment(socios[i].Id, spinning, true, currentPeriod, PaymentStatus.Paid, true);
+            EnsureActivityPayment(socios[3].Id, spinning, true, currentPeriod, PaymentStatus.Overdue, false);
+            EnsureActivityPayment(noSocios[0].Id, spinning, false, currentPeriod, PaymentStatus.Paid, true);
+            for (int i = 1; i < 3; i++) EnsureActivityPayment(noSocios[i].Id, spinning, false, currentPeriod, PaymentStatus.Overdue, false);
+
+            // --- Musculación Libre (GRATUITA, precio 0): NO genera Payment de actividad.
+            // --- Tenis Adultos y Natación Escuela Niños (PROFESSOR_DIRECT): NO generan
+            //     Payment en "Mis Cuotas" (cobro directo del profesor).
 
             context.SaveChanges();
         }
