@@ -21,6 +21,20 @@ public class Activity : BaseEntity
     [Column(TypeName = "decimal(18,2)")]
     public decimal PriceNonMember { get; set; }
 
+    /// <summary>Día del mes (1-28) hasta el cual se puede pagar sin recargo.</summary>
+    public int DiaVencimiento { get; set; } = 10;
+
+    /// <summary>Tipo de recargo por mora aplicable pasado el día de vencimiento.</summary>
+    public TipoRecargoMora TipoRecargoMora { get; set; } = TipoRecargoMora.Ninguno;
+
+    /// <summary>Valor del recargo por mora para Socios (porcentaje % o monto fijo $).</summary>
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal RecargoMoraSocio { get; set; }
+
+    /// <summary>Valor del recargo por mora para No Socios (porcentaje % o monto fijo $).</summary>
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal RecargoMoraNoSocio { get; set; }
+
     public PaymentCollectorType PaymentCollector { get; set; } = PaymentCollectorType.CLUB;
 
     [Column(TypeName = "decimal(18,2)")]

@@ -72,14 +72,22 @@ namespace ClubApp.Infrastructure.Data
 
             // Configuración de Payment
             modelBuilder.Entity<Payment>()
-                .HasIndex(p => new { p.UserId, p.Period })
-                .IsUnique(); // Un usuario solo puede tener un pago por período
+                .HasIndex(p => new { p.UserId, p.Period, p.Concepto, p.ActivityId })
+                .IsUnique(); // Un usuario tiene una cuota social por período y una cuota de actividad por período
 
             modelBuilder.Entity<Payment>()
                 .HasOne(p => p.User)
                 .WithMany()
                 .HasForeignKey(p => p.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            // Payment -> Activity (opcional, solo cuotas de actividad). Se conserva el
+            // registro contable si la actividad se elimina (SetNull).
+            modelBuilder.Entity<Payment>()
+                .HasOne(p => p.Activity)
+                .WithMany()
+                .HasForeignKey(p => p.ActivityId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             // Actividad -> Profesor (opcional). Si se borra el profesor, la actividad queda sin docente.
             modelBuilder.Entity<Activity>()

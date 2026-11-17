@@ -27,6 +27,7 @@ import {
   maskTimeInput,
 } from '../components/activities/WeeklyScheduleSelector';
 import Combobox from '../components/ui/Combobox';
+import Select from '../components/ui/Select';
 
 const DAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
@@ -97,6 +98,10 @@ const emptyForm = (): SaveActivityRequest => ({
   category: SPORT_CATEGORIES[0],
   priceMember: 0,
   priceNonMember: 0,
+  diaVencimiento: 10,
+  tipoRecargoMora: 'Ninguno',
+  recargoMoraSocio: 0,
+  recargoMoraNoSocio: 0,
   facilityCanon: 0,
   aplicaDescuentoSocios: false,
   tipoDescuentoCanon: 'MONTO_FIJO',
@@ -452,6 +457,10 @@ export default function GestionActividades() {
       category: a.category,
       priceMember: a.priceMember,
       priceNonMember: a.priceNonMember,
+      diaVencimiento: a.diaVencimiento ?? 10,
+      tipoRecargoMora: a.tipoRecargoMora ?? 'Ninguno',
+      recargoMoraSocio: a.recargoMoraSocio ?? 0,
+      recargoMoraNoSocio: a.recargoMoraNoSocio ?? 0,
       facilityCanon: a.facilityCanon,
       aplicaDescuentoSocios: a.aplicaDescuentoSocios,
       tipoDescuentoCanon: a.tipoDescuentoCanon,
@@ -1124,6 +1133,76 @@ export default function GestionActividades() {
                   </div>
                 </div>
 
+                {/* Reglas de Cobro y Mora */}
+                <div className="rounded-xl border border-slate-700/60 bg-slate-900/40 p-4 space-y-4">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-200">Reglas de Cobro y Mora</h4>
+                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                      Día del mes límite para pagar sin recargo y punitorio aplicable por atraso.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-1">Día de vencimiento (1-28)</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={28}
+                        value={form.diaVencimiento === 0 ? '' : form.diaVencimiento}
+                        onChange={(e) => {
+                          const v = Math.min(28, Math.max(1, parseNumericInput(e.target.value) || 1));
+                          setForm({ ...form, diaVencimiento: v });
+                        }}
+                        className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-1">Tipo de recargo por atraso</label>
+                      <Select
+                        value={form.tipoRecargoMora}
+                        options={[
+                          { value: 'Ninguno', label: 'Sin recargo' },
+                          { value: 'Porcentaje', label: 'Porcentaje (%)' },
+                          { value: 'MontoFijo', label: 'Monto fijo ($)' },
+                        ]}
+                        onChange={(v) => setForm({ ...form, tipoRecargoMora: v as SaveActivityRequest['tipoRecargoMora'] })}
+                      />
+                    </div>
+                  </div>
+
+                  {form.tipoRecargoMora !== 'Ninguno' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-1">
+                          Recargo Socio ({form.tipoRecargoMora === 'Porcentaje' ? '%' : '$'})
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={form.recargoMoraSocio === 0 ? '' : form.recargoMoraSocio}
+                          onChange={(e) => setForm({ ...form, recargoMoraSocio: parseNumericInput(e.target.value) })}
+                          className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-1">
+                          Recargo No Socio ({form.tipoRecargoMora === 'Porcentaje' ? '%' : '$'})
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={form.recargoMoraNoSocio === 0 ? '' : form.recargoMoraNoSocio}
+                          onChange={(e) => setForm({ ...form, recargoMoraNoSocio: parseNumericInput(e.target.value) })}
+                          className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* Oculto: Canon de Instalaciones y Descuentos (solo profesores independientes)
                 {isIndependentTeacher && (
                   <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-4 space-y-3">
@@ -1354,15 +1433,12 @@ export default function GestionActividades() {
                               <div className="flex flex-wrap items-end gap-2">
                                 <div className="flex-1 min-w-30">
                                   <label className="block text-sm font-medium text-slate-400 mb-1">Día</label>
-                                  <select
-                                    value={row.dayOfWeek}
-                                    onChange={(e) => updateScheduleRow(index, { dayOfWeek: Number(e.target.value) })}
-                                    className="w-full h-10 bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg px-3 text-sm font-medium focus:border-emerald-500 outline-none"
-                                  >
-                                    {DAYS.map((d, i) => (
-                                      <option key={d} value={i}>{d}</option>
-                                    ))}
-                                  </select>
+                                  <Select
+                                    value={String(row.dayOfWeek)}
+                                    options={DAYS.map((d, i) => ({ value: String(i), label: d }))}
+                                    onChange={(v) => updateScheduleRow(index, { dayOfWeek: Number(v) })}
+                                    triggerClassName="h-10 px-3"
+                                  />
                                 </div>
 
                                 <div>

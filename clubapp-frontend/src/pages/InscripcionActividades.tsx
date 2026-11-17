@@ -86,6 +86,13 @@ export default function InscripcionActividades() {
       return;
     }
 
+    // Si la cobra el Club (CLUB) y la actividad tiene costo, mostramos un aviso
+    // informando el vencimiento y que la cuota se gestiona desde "Mis Cuotas".
+    if (activity.paymentCollector === 'CLUB' && (activity.priceMember > 0 || activity.priceNonMember > 0)) {
+      setPendingActivity(activity);
+      return;
+    }
+
     await confirmEnroll(activity);
   };
 
@@ -277,7 +284,17 @@ export default function InscripcionActividades() {
                                 {a.priceNonMember > 0 ? fmtCurrency(a.priceNonMember) : 'Gratuita'}
                               </span>
                             </span>
+                            {(a.priceMember > 0 || a.priceNonMember > 0) && (
+                              <span className="text-xs text-slate-500">
+                                Vence el día {a.diaVencimiento} de cada mes
+                              </span>
+                            )}
                           </div>
+                          {a.paymentCollector === 'CLUB' && (a.priceMember > 0 || a.priceNonMember > 0) && (
+                            <p className="text-[11px] text-sky-300/80 mt-1">
+                              La cuota se gestiona y abona desde <span className="font-semibold">Mis Cuotas</span>.
+                            </p>
+                          )}
                         </div>
 
                         {isEnrolled ? (
@@ -324,7 +341,7 @@ export default function InscripcionActividades() {
         </main>
       </div>
 
-      {/* Modal de cobro directo del profesor (PROFESSOR_DIRECT) */}
+      {/* Modal de confirmación de inscripción (CLUB con cuota en Mis Cuotas o PROFESSOR_DIRECT) */}
       {pendingActivity && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <motion.div
@@ -335,7 +352,11 @@ export default function InscripcionActividades() {
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Wallet size={18} className="text-emerald-400" />
-                <h3 className="text-lg font-black text-white">Cobro directo del profesor</h3>
+                <h3 className="text-lg font-black text-white">
+                  {pendingActivity.paymentCollector === 'PROFESSOR_DIRECT'
+                    ? 'Cobro directo del profesor'
+                    : 'Inscripción a la actividad'}
+                </h3>
               </div>
               <button
                 type="button"
@@ -346,6 +367,8 @@ export default function InscripcionActividades() {
               </button>
             </div>
 
+            {pendingActivity.paymentCollector === 'PROFESSOR_DIRECT' ? (
+              <>
             <p className="mt-2 text-sm text-slate-300">
               La actividad <span className="font-bold text-white">{pendingActivity.name}</span> se cobra
               directamente al profesor. Coordiná el pago con:
@@ -404,6 +427,47 @@ export default function InscripcionActividades() {
             <p className="mt-4 text-[11px] text-slate-500">
               La inscripción queda registrada, pero el pago se coordina directamente con el profesor.
             </p>
+              </>
+            ) : (
+              <>
+            <p className="mt-2 text-sm text-slate-300">
+              Al inscribirte en <span className="font-bold text-white">{pendingActivity.name}</span> se generará
+              tu cuota mensual y la vas a poder ver y abonar desde{' '}
+              <span className="font-semibold text-emerald-300">Mis Cuotas</span>.
+            </p>
+
+            <div className="mt-4 space-y-3">
+              <div className="rounded-2xl border border-slate-700 bg-slate-950/60 p-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-400">Vencimiento mensual</span>
+                  <span className="font-semibold text-white">día {pendingActivity.diaVencimiento}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm mt-2">
+                  <span className="text-slate-400">Socio</span>
+                  <span className="font-semibold text-white">
+                    {pendingActivity.priceMember > 0 ? fmtCurrency(pendingActivity.priceMember) : 'Gratuita'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm mt-1">
+                  <span className="text-slate-400">No Socio</span>
+                  <span className="font-semibold text-white">
+                    {pendingActivity.priceNonMember > 0 ? fmtCurrency(pendingActivity.priceNonMember) : 'Gratuita'}
+                  </span>
+                </div>
+                {pendingActivity.tipoRecargoMora && pendingActivity.tipoRecargoMora !== 'Ninguno' && (
+                  <p className="mt-3 text-[11px] text-amber-300/80">
+                    Pasada la fecha de vencimiento se aplicará un recargo por mora.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <p className="mt-4 text-[11px] text-slate-500">
+              La cuota se gestiona desde <span className="font-semibold">Mis Cuotas</span> y se actualiza
+              automáticamente cada mes mientras estés inscripto.
+            </p>
+              </>
+            )}
 
             <div className="mt-5 flex items-center gap-2">
               <button

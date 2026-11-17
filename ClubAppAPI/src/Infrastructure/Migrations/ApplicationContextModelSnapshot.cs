@@ -40,6 +40,9 @@ namespace Infrastructure.Migrations
                     b.Property<decimal?>("DescuentoMaximoCanon")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<int>("DiaVencimiento")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("EstadoNegociacion")
                         .HasColumnType("TEXT");
 
@@ -86,6 +89,12 @@ namespace Infrastructure.Migrations
                     b.Property<decimal?>("ProposedPriceMember")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<decimal>("RecargoMoraNoSocio")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("RecargoMoraSocio")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<bool>("RequiresBooking")
                         .HasColumnType("INTEGER");
 
@@ -100,6 +109,9 @@ namespace Infrastructure.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("TipoDescuentoCanon")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TipoRecargoMora")
                         .HasColumnType("INTEGER");
 
                     b.Property<decimal>("ValorDescuentoPorSocio")
@@ -563,10 +575,23 @@ namespace Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("ActivityId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ActivityName")
+                        .HasMaxLength(120)
+                        .HasColumnType("TEXT");
+
                     b.Property<decimal>("Amount")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<int>("Concepto")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("DueDate")
                         .HasColumnType("TEXT");
 
                     b.Property<decimal>("LateFeeApplied")
@@ -607,9 +632,11 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ActivityId");
+
                     b.HasIndex("MembershipId");
 
-                    b.HasIndex("UserId", "Period")
+                    b.HasIndex("UserId", "Period", "Concepto", "ActivityId")
                         .IsUnique();
 
                     b.ToTable("Payments");
@@ -1096,6 +1123,11 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("ClubApp.Domain.Entities.Payment", b =>
                 {
+                    b.HasOne("ClubApp.Domain.Entities.Activity", "Activity")
+                        .WithMany()
+                        .HasForeignKey("ActivityId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("ClubApp.Domain.Entities.Membership", null)
                         .WithMany("Payments")
                         .HasForeignKey("MembershipId");
@@ -1105,6 +1137,8 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Activity");
 
                     b.Navigation("User");
                 });

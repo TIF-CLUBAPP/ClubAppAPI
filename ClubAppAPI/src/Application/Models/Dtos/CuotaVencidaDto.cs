@@ -40,6 +40,12 @@ public class CuotaVencidaDto
     /// <summary>Períodos vencidos en formato legible, ej: ["Junio 2026", "Julio 2026"].</summary>
     public List<string> PeriodosVencidos { get; set; } = new();
 
+    /// <summary>
+    /// Detalle discriminado de cada cuota impaga, para mostrar en el panel si la deuda
+    /// combina cuota social y cuotas de actividades (con su concepto, actividad y vencimiento).
+    /// </summary>
+    public List<CuotaDeudaDetalleDto> Cuotas { get; set; } = new();
+
     /// <summary>Monto total adeudado (incluye recargo por mora).</summary>
     public decimal MontoTotalAdeudado { get; set; }
 
@@ -48,4 +54,30 @@ public class CuotaVencidaDto
 
     /// <summary>IDs de las cuotas (Payments) impagas para registrar el cobro.</summary>
     public List<int> PaymentIds { get; set; } = new();
+}
+
+/// <summary>
+/// Detalle individual de una cuota impaga dentro de la deuda consolidada de un socio.
+/// </summary>
+public class CuotaDeudaDetalleDto
+{
+    public int PaymentId { get; set; }
+
+    /// <summary>"CuotaSocial" | "Actividad".</summary>
+    public string Concepto { get; set; } = "CuotaSocial";
+
+    public int? ActivityId { get; set; }
+    public string? ActivityName { get; set; }
+
+    /// <summary>Período en formato legible (ej. "Septiembre 2026").</summary>
+    public string Periodo { get; set; } = string.Empty;
+
+    /// <summary>Monto base.</summary>
+    public decimal Amount { get; set; }
+
+    /// <summary>Recargo por mora aplicado.</summary>
+    public decimal LateFeeApplied { get; set; }
+
+    /// <summary>Total (base + recargo).</summary>
+    public decimal Total => Amount + LateFeeApplied;
 }

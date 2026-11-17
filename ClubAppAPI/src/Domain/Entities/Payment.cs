@@ -12,6 +12,19 @@ namespace ClubApp.Domain.Entities
         Cancelled
     }
 
+    /// <summary>
+    /// Distingue el origen/concepto de una obligacion de pago para que las cuotas de
+    /// actividades convivan con la cuota social en el mismo circuito financiero.
+    /// </summary>
+    public enum CuotaConcepto
+    {
+        /// <summary>Cuota social / membresia mensual.</summary>
+        CuotaSocial = 0,
+
+        /// <summary>Cuota de una actividad (inscripcion mensual).</summary>
+        Actividad = 1
+    }
+
     public class Payment : BaseEntity
     {
         [Required]
@@ -20,6 +33,26 @@ namespace ClubApp.Domain.Entities
         [Required]
         [MaxLength(20)] // Formato "MM/YYYY" o "Mes Año"
         public string Period { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Concepto de la obligacion: cuota social vs cuota de actividad.
+        /// Permite discriminar ambos origenes en un unico listado de cuotas.
+        /// </summary>
+        public CuotaConcepto Concepto { get; set; } = CuotaConcepto.CuotaSocial;
+
+        /// <summary>Actividad asociada (solo cuando Concepto == Actividad). Null para cuota social.</summary>
+        public int? ActivityId { get; set; }
+        public virtual Activity? Activity { get; set; }
+
+        /// <summary>Nombre de la actividad (denormalizado para listados/comprobantes sin join).</summary>
+        [MaxLength(120)]
+        public string? ActivityName { get; set; }
+
+        /// <summary>
+        /// Fecha de vencimiento propia de la cuota de actividad (calculada con el
+        /// DiaVencimiento de la actividad). Null para la cuota social.
+        /// </summary>
+        public DateTime? DueDate { get; set; }
 
         [Required]
         [Column(TypeName = "decimal(18,2)")]

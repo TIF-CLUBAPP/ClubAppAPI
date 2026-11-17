@@ -29,6 +29,14 @@ export interface Activity {
   price: number;
   priceMember: number;
   priceNonMember: number;
+  /** Día del mes (1-28) hasta el cual se puede pagar sin recargo. */
+  diaVencimiento: number;
+  /** Tipo de recargo por mora: 'Ninguno' | 'Porcentaje' | 'MontoFijo'. */
+  tipoRecargoMora: 'Ninguno' | 'Porcentaje' | 'MontoFijo';
+  /** Valor del recargo por mora para Socios (% o $). */
+  recargoMoraSocio: number;
+  /** Valor del recargo por mora para No Socios (% o $). */
+  recargoMoraNoSocio: number;
   facilityCanon: number;
   aplicaDescuentoSocios: boolean;
   tipoDescuentoCanon: 'PORCENTAJE' | 'MONTO_FIJO';
@@ -80,6 +88,14 @@ export interface SaveActivityRequest {
   category: string;
   priceMember: number;
   priceNonMember: number;
+  /** Día del mes (1-28) hasta el cual se puede pagar sin recargo. */
+  diaVencimiento: number;
+  /** Tipo de recargo por mora: 'Ninguno' | 'Porcentaje' | 'MontoFijo'. */
+  tipoRecargoMora: 'Ninguno' | 'Porcentaje' | 'MontoFijo';
+  /** Valor del recargo por mora para Socios (% o $). */
+  recargoMoraSocio: number;
+  /** Valor del recargo por mora para No Socios (% o $). */
+  recargoMoraNoSocio: number;
   facilityCanon: number;
   aplicaDescuentoSocios: boolean;
   tipoDescuentoCanon: 'PORCENTAJE' | 'MONTO_FIJO';

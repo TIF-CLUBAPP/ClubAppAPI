@@ -130,6 +130,21 @@ public interface IPaymentService
     /// Cobro parcial: registra únicamente las cuotas indicadas y deja el resto impagas.
     /// </summary>
     Task<RegistrarPagoParcialResult> RegistrarPagoParcialAsync(IEnumerable<int> cuotaIds);
+
+    /// <summary>
+    /// Genera (de forma idempotente) la cuota de actividad del período actual para un
+    /// usuario recién inscripto, tomando PrecioSocio/PrecioNoSocio según corresponda y
+    /// aplicando el vencimiento y recargo por mora de la actividad. No hace nada si la
+    /// actividad es gratuita o si la cuota del período ya existe.
+    /// </summary>
+    Task GenerateActivityCuotaAsync(int userId, int activityId);
+
+    /// <summary>
+    /// Cancela las cuotas de actividad pendientes (no vencidas y no pagadas) de una
+    /// actividad para un usuario que se dio de baja. Devuelve la cantidad de cuotas
+    /// canceladas.
+    /// </summary>
+    Task<int> CancelPendingActivityCuotasAsync(int userId, int activityId);
 }
 
 /// <summary>

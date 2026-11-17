@@ -110,8 +110,17 @@ export const CuotasList: React.FC<CuotasListProps> = ({
                   )}
 
                   <div className="space-y-1 min-w-[180px]">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-base font-bold text-white">{cuota.periodo}</span>
+                      {cuota.concepto === 'Actividad' ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                          Actividad{cuota.activityName ? `: ${cuota.activityName}` : ''}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-500/10 text-slate-300 border border-slate-500/20">
+                          Cuota Social
+                        </span>
+                      )}
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                         isPaid ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
                         isMora ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :

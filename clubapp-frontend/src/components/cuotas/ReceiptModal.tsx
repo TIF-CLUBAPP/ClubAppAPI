@@ -102,7 +102,11 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
               <div className="print-dashed pt-3 border-t border-slate-800 space-y-1.5 text-xs">
                 <div className="flex justify-between text-slate-400">
                   <span>Concepto:</span>
-                  <span className="font-medium text-slate-200">Cuota Social {cuota.periodo}</span>
+                  <span className="font-medium text-slate-200">
+                    {cuota.concepto === 'Actividad'
+                      ? `Actividad: ${cuota.activityName || cuota.periodo}`
+                      : `Cuota Social ${cuota.periodo}`}
+                  </span>
                 </div>
                 <div className="flex justify-between text-slate-400">
                   <span>Monto Base:</span>

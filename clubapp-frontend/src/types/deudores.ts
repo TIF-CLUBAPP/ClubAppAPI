@@ -19,6 +19,8 @@ export interface CuotaVencida {
   cuotasPendientes?: number;
   cuotasImpagas?: number;
   periodosVencidos: string[];
+  /** Detalle discriminado de cada cuota impaga (concepto + actividad). */
+  cuotas?: CuotaDeudaDetalle[];
   montoTotalAdeudado: number;
   diasDeAtraso: number;
   paymentIds: number[];
@@ -33,4 +35,16 @@ export interface CuotaVencida {
   estadoCuota?: EstadoCuota;
   /** Motivo de la exención (ej. "Jubilado", "Staff"). */
   motivoExencion?: string;
+}
+
+/** Detalle individual de una cuota impaga (concepto social vs actividad). */
+export interface CuotaDeudaDetalle {
+  paymentId: number;
+  concepto: string; // "CuotaSocial" | "Actividad"
+  activityId?: number | null;
+  activityName?: string | null;
+  periodo: string;
+  amount: number;
+  lateFeeApplied: number;
+  total?: number;
 }

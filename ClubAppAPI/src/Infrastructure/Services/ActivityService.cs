@@ -148,6 +148,10 @@ public class ActivityService : IActivityService
             Price = dto.PriceMember,
             PriceMember = dto.PriceMember,
             PriceNonMember = dto.PriceNonMember,
+            DiaVencimiento = dto.DiaVencimiento,
+            TipoRecargoMora = Enum.TryParse<TipoRecargoMora>(dto.TipoRecargoMora, true, out var trmCreate) ? trmCreate : TipoRecargoMora.Ninguno,
+            RecargoMoraSocio = dto.RecargoMoraSocio,
+            RecargoMoraNoSocio = dto.RecargoMoraNoSocio,
             PaymentCollector = Enum.TryParse<PaymentCollectorType>(dto.PaymentCollector, true, out var pc) ? pc : PaymentCollectorType.CLUB,
             ProfessorFacilityFeeMember = facilityCanon,
             ProfessorFacilityFeeNonMember = facilityCanon,
@@ -224,6 +228,10 @@ public class ActivityService : IActivityService
         existing.Price = dto.PriceMember;
         existing.PriceMember = dto.PriceMember;
         existing.PriceNonMember = dto.PriceNonMember;
+        existing.DiaVencimiento = dto.DiaVencimiento;
+        existing.TipoRecargoMora = Enum.TryParse<TipoRecargoMora>(dto.TipoRecargoMora, true, out var trmUpdate) ? trmUpdate : TipoRecargoMora.Ninguno;
+        existing.RecargoMoraSocio = dto.RecargoMoraSocio;
+        existing.RecargoMoraNoSocio = dto.RecargoMoraNoSocio;
         existing.PaymentCollector = Enum.TryParse<PaymentCollectorType>(dto.PaymentCollector, true, out var pc) ? pc : PaymentCollectorType.CLUB;
         existing.ProfessorFacilityFeeMember = facilityCanon;
         existing.ProfessorFacilityFeeNonMember = facilityCanon;
@@ -458,6 +466,10 @@ public class ActivityService : IActivityService
             Price = activity.Price,
             PriceMember = activity.PriceMember,
             PriceNonMember = activity.PriceNonMember,
+            DiaVencimiento = activity.DiaVencimiento,
+            TipoRecargoMora = activity.TipoRecargoMora.ToString(),
+            RecargoMoraSocio = activity.RecargoMoraSocio,
+            RecargoMoraNoSocio = activity.RecargoMoraNoSocio,
             PaymentCollector = activity.PaymentCollector.ToString(),
             ProfessorFacilityFeeMember = activity.ProfessorFacilityFeeMember,
             ProfessorFacilityFeeNonMember = activity.ProfessorFacilityFeeNonMember,
@@ -586,6 +598,12 @@ public class ActivityService : IActivityService
 
         if (dto.Price < 0)
             throw new AppValidationException("El precio no puede ser negativo.");
+
+        if (dto.DiaVencimiento < 1 || dto.DiaVencimiento > 28)
+            throw new AppValidationException("El día de vencimiento debe estar entre 1 y 28.");
+
+        if (dto.RecargoMoraSocio < 0 || dto.RecargoMoraNoSocio < 0)
+            throw new AppValidationException("El recargo por mora no puede ser negativo.");
     }
 
     private static void EnsureCanManage(Activity activity, int actorId, UserRole actorRole)
@@ -864,5 +882,33 @@ public class ActivityService : IActivityService
 
         await _context.SaveChangesAsync();
         return await MapAsync(activity);
+    }
+
+    /// <inheritdoc />
+    public decimal CalcularMontoConRecargo(
+        decimal precioBase,
+        bool esSocio,
+        TipoRecargoMora tipoRecargo,
+        decimal recargoSocio,
+        decimal recargoNoSocio,
+        int diaVencimiento,
+        DateTime? fechaReferencia = null)
+    {
+        if (tipoRecargo == TipoRecargoMora.Ninguno || precioBase <= 0m)
+            return Math.Round(precioBase, 2);
+
+        // Sin día de vencimiento configurado no se aplica recargo: solo se carga
+        // cuando el día de referencia del mes ya supera el día de vencimiento.
+        var hoy = fechaReferencia ?? DateTime.Now;
+
+        var recargo = esSocio ? recargoSocio : recargoNoSocio;
+        if (recargo <= 0m || hoy.Day <= diaVencimiento)
+            return Math.Round(precioBase, 2);
+
+        var incremento = tipoRecargo == TipoRecargoMora.Porcentaje
+            ? precioBase * (recargo / 100m)
+            : recargo;
+
+        return Math.Round(precioBase + incremento, 2);
     }
 }

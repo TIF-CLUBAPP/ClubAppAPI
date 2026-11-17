@@ -35,6 +35,10 @@ public class SaveActivityRequest
     public decimal Price { get; set; }
     public decimal PriceMember { get; set; }
     public decimal PriceNonMember { get; set; }
+    public int DiaVencimiento { get; set; } = 10;
+    public string TipoRecargoMora { get; set; } = "Ninguno";
+    public decimal RecargoMoraSocio { get; set; }
+    public decimal RecargoMoraNoSocio { get; set; }
     public string PaymentCollector { get; set; } = "CLUB";
     public decimal ProfessorFacilityFeeMember { get; set; }
     public decimal ProfessorFacilityFeeNonMember { get; set; }

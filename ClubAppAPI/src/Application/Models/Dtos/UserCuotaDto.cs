@@ -21,6 +21,18 @@ public class UserCuotaDto
     /// <summary>Estado en texto: PENDING | PAID | OVERDUE | EXEMPT.</summary>
     public string Status { get; set; } = string.Empty;
 
+    /// <summary>Concepto de la cuota: "CuotaSocial" | "Actividad".</summary>
+    public string Concepto { get; set; } = "CuotaSocial";
+
+    /// <summary>ID de la actividad asociada (solo cuotas de actividad).</summary>
+    public int? ActivityId { get; set; }
+
+    /// <summary>Nombre de la actividad asociada (solo cuotas de actividad).</summary>
+    public string? ActivityName { get; set; }
+
+    /// <summary>Fecha de vencimiento propia de la cuota de actividad (ISO). Null para cuota social.</summary>
+    public DateTime? DueDate { get; set; }
+
     public DateTime? PaymentDate { get; set; }
 
     public string PaymentMethod { get; set; } = string.Empty;

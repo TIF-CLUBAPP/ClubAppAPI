@@ -12,6 +12,15 @@ public class PaymentDto
     /// <summary>Período de la cuota (MM/yyyy o yyyy-MM).</summary>
     public string Period { get; set; } = string.Empty;
 
+    /// <summary>Concepto de la cuota: "CuotaSocial" | "Actividad".</summary>
+    public string Concepto { get; set; } = "CuotaSocial";
+
+    /// <summary>Nombre de la actividad asociada (solo cuotas de actividad).</summary>
+    public string? ActivityName { get; set; }
+
+    /// <summary>Fecha de vencimiento propia de la cuota de actividad. Null para cuota social.</summary>
+    public DateTime? DueDate { get; set; }
+
     /// <summary>Monto base de la cuota (neto, sin mora ni comisión).</summary>
     public decimal Amount { get; set; }
 

@@ -9,6 +9,19 @@ public class ActivityDto
     public decimal Price { get; set; }
     public decimal PriceMember { get; set; }
     public decimal PriceNonMember { get; set; }
+
+    /// <summary>Día del mes (1-28) hasta el cual se puede pagar sin recargo.</summary>
+    public int DiaVencimiento { get; set; }
+
+    /// <summary>Tipo de recargo por mora: "Ninguno" | "Porcentaje" | "MontoFijo".</summary>
+    public string TipoRecargoMora { get; set; } = "Ninguno";
+
+    /// <summary>Valor del recargo por mora para Socios (% o $).</summary>
+    public decimal RecargoMoraSocio { get; set; }
+
+    /// <summary>Valor del recargo por mora para No Socios (% o $).</summary>
+    public decimal RecargoMoraNoSocio { get; set; }
+
     public string PaymentCollector { get; set; } = "CLUB";
     public decimal ProfessorFacilityFeeMember { get; set; }
     public decimal ProfessorFacilityFeeNonMember { get; set; }

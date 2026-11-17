@@ -121,7 +121,7 @@ public class PaymentService : IPaymentService
             .Include(p => p.User)
             .ToListAsync();
 
-        CheckAndUpdateOverdueStatus(payments);
+        await CheckAndUpdateOverdueStatusAsync(payments);
         await _context.SaveChangesAsync();
 
         return payments;
@@ -135,7 +135,7 @@ public class PaymentService : IPaymentService
 
         if (payment != null)
         {
-            CheckAndUpdateOverdueStatus(new[] { payment });
+            await CheckAndUpdateOverdueStatusAsync(new[] { payment });
             await _context.SaveChangesAsync();
         }
 
@@ -149,7 +149,7 @@ public class PaymentService : IPaymentService
             .Where(p => p.UserId == userId) 
             .ToListAsync();
 
-        CheckAndUpdateOverdueStatus(payments);
+        await CheckAndUpdateOverdueStatusAsync(payments);
         await _context.SaveChangesAsync();
 
         return payments;
@@ -905,6 +905,9 @@ public class PaymentService : IPaymentService
         UserId = p.UserId,
         UserName = $"{p.User?.FirstName} {p.User?.LastName}".Trim(),
         Period = p.Period,
+        Concepto = p.Concepto.ToString(),
+        ActivityName = p.ActivityName,
+        DueDate = p.DueDate,
         Amount = p.Amount,
         LateFeeApplied = p.LateFeeApplied,
         MarketplaceFee = p.MarketplaceFee,
@@ -917,14 +920,114 @@ public class PaymentService : IPaymentService
         ReceiptUrl = p.ReceiptUrl
     };
 
-    private static void CheckAndUpdateOverdueStatus(IEnumerable<Payment> payments)
+    private async Task CheckAndUpdateOverdueStatusAsync(IEnumerable<Payment> payments)
     {
+        var now = DateTime.Now;
+
+        // Carga las actividades referenciadas por cuotas de actividad pendientes para
+        // recomputar el recargo por mora cuando se supera el día de vencimiento.
+        var activityIds = payments
+            .Where(p => p.Concepto == CuotaConcepto.Actividad && p.ActivityId.HasValue)
+            .Select(p => p.ActivityId!.Value)
+            .Distinct()
+            .ToList();
+
+        var activitiesById = new Dictionary<int, Activity>();
+        if (activityIds.Count > 0)
+        {
+            activitiesById = (await _context.Activities
+                    .Where(a => activityIds.Contains(a.Id))
+                    .ToListAsync())
+                .ToDictionary(a => a.Id);
+        }
+
+        // Carga IsMember por usuario para diferenciar el recargo de socio vs no socio.
+        var userIds = payments.Select(p => p.UserId).Distinct().ToList();
+        var isMemberById = (await _context.Users
+                .Where(u => userIds.Contains(u.Id))
+                .Select(u => new { u.Id, u.IsMember })
+                .ToListAsync())
+            .ToDictionary(u => u.Id, u => u.IsMember);
+
         foreach (var payment in payments)
         {
-            // Nota: la logica de vencimiento por fecha se reimplementara en el Paso 2
-            // con FeeSettings + DueDayOfMonth. Por ahora solo se mantiene el estado.
-            _ = payment;
+            // Solo cuotas impagas (Pending) pueden pasar a vencidas (Overdue).
+            if (payment.Status != PaymentStatus.Pending) continue;
+
+            // Cuota de actividad: usa su propia fecha de vencimiento (DueDate), derivada
+            // del DiaVencimiento configurado en la actividad, y recomputa el recargo.
+            if (payment.Concepto == CuotaConcepto.Actividad && payment.DueDate.HasValue)
+            {
+                if (payment.DueDate.Value < now)
+                {
+                    payment.Status = PaymentStatus.Overdue;
+
+                    if (payment.ActivityId.HasValue &&
+                        activitiesById.TryGetValue(payment.ActivityId.Value, out var activity))
+                    {
+                        var esSocio = isMemberById.TryGetValue(payment.UserId, out var isMember) && isMember;
+                        var montoConRecargo = CalcularRecargoActividad(
+                            payment.Amount,
+                            esSocio,
+                            activity,
+                            Math.Clamp(activity.DiaVencimiento, 1, 28));
+                        payment.LateFeeApplied = Math.Round(montoConRecargo - payment.Amount, 2, MidpointRounding.AwayFromZero);
+                    }
+                }
+                continue;
+            }
+
+            // Cuota social: vencimiento por período. Una cuota del mes "yyyy-MM" se
+            // considera vencida si ya pasó la fecha de vencimiento de ese mes (día 28
+            // como cierre seguro, consistente con el proxy usado en el panel de deudores).
+            if (TryResolveSocialDueDate(payment.Period, out var due))
+            {
+                if (due < now)
+                {
+                    payment.Status = PaymentStatus.Overdue;
+                }
+            }
         }
+    }
+
+    /// <summary>
+    /// Resuelve la fecha de vencimiento de una cuota social a partir de su período "yyyy-MM"
+    /// y el día de vencimiento global configurado (FeeSettings.DueDayOfMonth).
+    /// </summary>
+    private static bool TryResolveSocialDueDate(string period, out DateTime due)
+    {
+        due = DateTime.MinValue;
+        if (string.IsNullOrWhiteSpace(period)) return false;
+
+        // Acepta "yyyy-MM" y "MM/yyyy".
+        int year, month;
+        var parts = period.Split('-');
+        if (parts.Length == 2 && int.TryParse(parts[0], out year) && int.TryParse(parts[1], out month))
+        {
+            // formato yyyy-MM
+        }
+        else
+        {
+            parts = period.Split('/');
+            if (parts.Length == 2 && int.TryParse(parts[1], out year) && int.TryParse(parts[0], out month))
+            {
+                // formato MM/yyyy
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        if (month < 1 || month > 12 || year < 1) return false;
+
+        // Día 28 como cierre seguro para cualquier mes; se usa el día del mes siguiente del
+        // período (la cuota del mes N vence a comienzos del mes N, por eso el vencimiento
+        // real se resuelve con el día de vencimiento del mes de la cuota).
+        var maxDay = DateTime.DaysInMonth(year, month);
+        var day = Math.Min(maxDay, 28);
+        due = new DateTime(year, month, day, 23, 59, 59);
+        return true;
     }
 
     // ==============================================================
@@ -976,6 +1079,19 @@ public class PaymentService : IPaymentService
                         .Select(p => FormatPeriodo(p.Period, p.CreatedAt))
                         .Where(p => !string.IsNullOrWhiteSpace(p))
                         .ToList(),
+                    Cuotas = g
+                        .OrderBy(p => p.Period)
+                        .Select(p => new CuotaDeudaDetalleDto
+                        {
+                            PaymentId = p.Id,
+                            Concepto = p.Concepto.ToString(),
+                            ActivityId = p.ActivityId,
+                            ActivityName = p.ActivityName,
+                            Periodo = FormatPeriodo(p.Period, p.CreatedAt),
+                            Amount = p.Amount,
+                            LateFeeApplied = p.LateFeeApplied
+                        })
+                        .ToList(),
                     MontoTotalAdeudado = totalAdeudado,
                     DiasDeAtraso = 0,
                     PaymentIds = g.Select(p => p.Id).OrderBy(id => id).ToList()
@@ -987,16 +1103,19 @@ public class PaymentService : IPaymentService
 
     public async Task<List<UserCuotaDto>> GetUserCuotasAsync(int userId)
     {
-        // 1) Asegura que exista la cuota del período vigente para poder pagarla con su ID real.
+        // 1) Asegura que exista la cuota del período vigente (social) y las cuotas de
+        //    actividades activas para poder pagarlas con su ID real.
         await EnsureCurrentPeriodCuotaAsync(userId);
+        await EnsureActivityPeriodCuotasAsync(userId);
 
         // 2) Carga todas las cuotas del usuario ordenadas por período.
         var payments = await _context.Payments
             .Where(p => p.UserId == userId)
             .OrderBy(p => p.Period)
+            .ThenBy(p => p.Concepto)
             .ToListAsync();
 
-        CheckAndUpdateOverdueStatus(payments);
+        await CheckAndUpdateOverdueStatusAsync(payments);
         await _context.SaveChangesAsync();
 
         // Las cuotas de membresía las cobra el Club. Se resuelve el alias una sola vez
@@ -1011,6 +1130,10 @@ public class PaymentService : IPaymentService
                 Amount = p.Amount,
                 LateFeeApplied = p.LateFeeApplied,
                 Status = p.Status.ToString().ToUpperInvariant(),
+                Concepto = p.Concepto.ToString(),
+                ActivityId = p.ActivityId,
+                ActivityName = p.ActivityName,
+                DueDate = p.DueDate,
                 PaymentDate = p.PaymentDate,
                 PaymentMethod = p.PaymentMethod,
                 CreatedAt = p.CreatedAt,
@@ -1033,7 +1156,7 @@ public class PaymentService : IPaymentService
         if (user == null || user.IsExemptFromFees || !user.IsMember) return;
 
         var exists = await _context.Payments
-            .AnyAsync(p => p.UserId == userId && p.Period == period);
+            .AnyAsync(p => p.UserId == userId && p.Period == period && p.Concepto == CuotaConcepto.CuotaSocial);
         if (exists) return;
 
         var settings = await GetFeeSettingsAsync();
@@ -1064,6 +1187,7 @@ public class PaymentService : IPaymentService
         {
             UserId = userId,
             Period = period,
+            Concepto = CuotaConcepto.CuotaSocial,
             Amount = amount,
             LateFeeApplied = 0m,
             PaymentMethod = string.Empty,
@@ -1073,6 +1197,114 @@ public class PaymentService : IPaymentService
         });
 
         await _context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Genera (si no existen) las cuotas del período actual para las inscripciones ACTIVAS
+    /// del usuario en actividades con costo mayor a 0. Determina el precio según si el
+    /// usuario es Socio o No Socio y calcula el vencimiento y recargo por mora con las
+    /// reglas de la actividad (DiaVencimiento + TipoRecargoMora).
+    /// </summary>
+    private async Task EnsureActivityPeriodCuotasAsync(int userId)
+    {
+        var now = DateTime.UtcNow;
+        var period = $"{now:yyyy-MM}";
+
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (user == null) return;
+
+        var enrollments = await _context.Enrollments
+            .Include(e => e.Activity)
+            .Where(e => e.UserId == userId && e.Status == EnrollmentStatus.ACTIVE)
+            .ToListAsync();
+
+        foreach (var enrollment in enrollments)
+        {
+            var activity = enrollment.Activity;
+            if (activity == null || !activity.IsActive) continue;
+
+            // Precio según condición de socio / no socio.
+            var precioBase = user.IsMember ? activity.PriceMember : activity.PriceNonMember;
+            if (precioBase <= 0m) continue;
+
+            var exists = await _context.Payments
+                .AnyAsync(p => p.UserId == userId
+                               && p.Period == period
+                               && p.Concepto == CuotaConcepto.Actividad
+                               && p.ActivityId == activity.Id);
+            if (exists) continue;
+
+            var diaVencimiento = Math.Clamp(activity.DiaVencimiento, 1, 28);
+            var dueDate = ResolveActivityDueDate(period, diaVencimiento);
+
+            // Recargo por mora solo si el día actual ya superó el de vencimiento.
+            var montoConRecargo = CalcularRecargoActividad(
+                precioBase, user.IsMember, activity, diaVencimiento);
+
+            var recargo = Math.Round(montoConRecargo - precioBase, 2, MidpointRounding.AwayFromZero);
+
+            _context.Payments.Add(new Payment
+            {
+                UserId = userId,
+                Period = period,
+                Concepto = CuotaConcepto.Actividad,
+                ActivityId = activity.Id,
+                ActivityName = activity.Name,
+                DueDate = dueDate,
+                Amount = precioBase,
+                LateFeeApplied = recargo > 0m ? recargo : 0m,
+                MarketplaceFee = 0m,
+                PaymentMethod = string.Empty,
+                Status = PaymentStatus.Pending,
+                PaymentDate = null,
+                CreatedAt = now
+            });
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Calcula la fecha de vencimiento de una cuota de actividad a partir del período
+    /// "yyyy-MM" y el día de vencimiento (1-28) configurado en la actividad.
+    /// </summary>
+    private static DateTime ResolveActivityDueDate(string period, int diaVencimiento)
+    {
+        int year, month;
+        var parts = period.Split('-');
+        if (parts.Length == 2 && int.TryParse(parts[0], out year) && int.TryParse(parts[1], out month))
+        {
+            var maxDay = DateTime.DaysInMonth(year, month);
+            var day = Math.Min(diaVencimiento, maxDay);
+            return new DateTime(year, month, day);
+        }
+
+        // Fallback: hoy + día de vencimiento.
+        var now = DateTime.UtcNow;
+        var d = Math.Min(diaVencimiento, DateTime.DaysInMonth(now.Year, now.Month));
+        return new DateTime(now.Year, now.Month, d);
+    }
+
+    /// <summary>
+    /// Aplica el recargo por mora configurado en la actividad cuando el día actual ya
+    /// supera el día de vencimiento. Diferencia socio vs no socio.
+    /// </summary>
+    private static decimal CalcularRecargoActividad(
+        decimal precioBase, bool esSocio, Activity activity, int diaVencimiento)
+    {
+        if (activity.TipoRecargoMora == TipoRecargoMora.Ninguno || precioBase <= 0m)
+            return Math.Round(precioBase, 2);
+
+        var ahora = DateTime.Now;
+        var recargo = esSocio ? activity.RecargoMoraSocio : activity.RecargoMoraNoSocio;
+        if (recargo <= 0m || ahora.Day <= diaVencimiento)
+            return Math.Round(precioBase, 2);
+
+        var incremento = activity.TipoRecargoMora == TipoRecargoMora.Porcentaje
+            ? precioBase * (recargo / 100m)
+            : recargo;
+
+        return Math.Round(precioBase + incremento, 2);
     }
 
     public async Task<string> CreateOrderAsync(IEnumerable<int> cuotaIds)
@@ -1558,6 +1790,77 @@ public class PaymentService : IPaymentService
         await CheckAndSendWelcomeNotificationAsync(payment.UserId);
 
         return "OK";
+    }
+
+    /// <inheritdoc />
+    public async Task GenerateActivityCuotaAsync(int userId, int activityId)
+    {
+        var now = DateTime.UtcNow;
+        var period = $"{now:yyyy-MM}";
+
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (user == null) return;
+
+        var activity = await _context.Activities.FindAsync(activityId);
+        if (activity == null || !activity.IsActive) return;
+
+        var precioBase = user.IsMember ? activity.PriceMember : activity.PriceNonMember;
+        if (precioBase <= 0m) return;
+
+        var exists = await _context.Payments
+            .AnyAsync(p => p.UserId == userId
+                           && p.Period == period
+                           && p.Concepto == CuotaConcepto.Actividad
+                           && p.ActivityId == activityId);
+        if (exists) return;
+
+        var diaVencimiento = Math.Clamp(activity.DiaVencimiento, 1, 28);
+        var dueDate = ResolveActivityDueDate(period, diaVencimiento);
+        var montoConRecargo = CalcularRecargoActividad(precioBase, user.IsMember, activity, diaVencimiento);
+        var recargo = Math.Round(montoConRecargo - precioBase, 2, MidpointRounding.AwayFromZero);
+
+        _context.Payments.Add(new Payment
+        {
+            UserId = userId,
+            Period = period,
+            Concepto = CuotaConcepto.Actividad,
+            ActivityId = activity.Id,
+            ActivityName = activity.Name,
+            DueDate = dueDate,
+            Amount = precioBase,
+            LateFeeApplied = recargo > 0m ? recargo : 0m,
+            MarketplaceFee = 0m,
+            PaymentMethod = string.Empty,
+            Status = PaymentStatus.Pending,
+            PaymentDate = null,
+            CreatedAt = now
+        });
+
+        await _context.SaveChangesAsync();
+    }
+
+    /// <inheritdoc />
+    public async Task<int> CancelPendingActivityCuotasAsync(int userId, int activityId)
+    {
+        var pendingCuotas = await _context.Payments
+            .Where(p => p.UserId == userId
+                        && p.ActivityId == activityId
+                        && p.Concepto == CuotaConcepto.Actividad
+                        && p.Status != PaymentStatus.Paid)
+            .ToListAsync();
+
+        var now = DateTime.Now;
+        var cuotasFuturas = pendingCuotas
+            .Where(p => !p.DueDate.HasValue || p.DueDate.Value >= now)
+            .ToList();
+
+        foreach (var cuota in cuotasFuturas)
+        {
+            cuota.Status = PaymentStatus.Cancelled;
+        }
+
+        await _context.SaveChangesAsync();
+        return cuotasFuturas.Count;
     }
 
     /// <summary>

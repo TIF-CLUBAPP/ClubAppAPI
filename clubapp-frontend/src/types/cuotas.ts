@@ -100,6 +100,12 @@ export interface Payment {
   userId: string;
   userName: string;
   period: string;
+  /** Concepto de la cuota: "CuotaSocial" | "Actividad". */
+  concepto?: string;
+  /** Nombre de la actividad (solo cuotas de actividad). */
+  activityName?: string | null;
+  /** Fecha de vencimiento propia de la cuota de actividad. */
+  dueDate?: string | null;
   amount: number;
   lateFeeApplied: number;
   totalAmount: number;
@@ -151,6 +157,8 @@ export interface CuotaVencida {
   dni: string;
   cantidadCuotasImpagas: number;
   periodosVencidos: string[];
+  /** Detalle discriminado de cada cuota impaga (concepto + actividad). */
+  cuotas?: CuotaDeudaDetalle[];
   montoTotalAdeudado: number;
   diasDeAtraso: number;
   paymentIds: number[];
@@ -165,6 +173,18 @@ export interface CuotaVencida {
   estadoCuota?: EstadoCuota;
   /** Motivo de la exención (ej. "Jubilado", "Staff"). */
   motivoExencion?: string;
+}
+
+/** Detalle individual de una cuota impaga (concepto social vs actividad). */
+export interface CuotaDeudaDetalle {
+  paymentId: number;
+  concepto: string; // "CuotaSocial" | "Actividad"
+  activityId?: number | null;
+  activityName?: string | null;
+  periodo: string;
+  amount: number;
+  lateFeeApplied: number;
+  total?: number;
 }
 
 
@@ -186,6 +206,12 @@ export interface MemberCuota {
   paidAt?: string;
   paymentMethod?: string;
   receiptNumber?: string;
+  /** Concepto de la cuota: "CuotaSocial" | "Actividad". */
+  concepto?: string;
+  /** Nombre de la actividad (solo cuotas de actividad). */
+  activityName?: string | null;
+  /** Fecha de vencimiento propia de la cuota de actividad (ISO). */
+  dueDate?: string | null;
   /** Alias / CBU / CVU que recibe la transferencia (Club o Profesor). */
   transferAlias?: string;
   /** Receptor final del cobro (para mostrar en el checkout). */
@@ -206,6 +232,12 @@ export interface UserCuota {
   amount: number;         // monto base
   lateFeeApplied: number; // recargo por mora
   status: string;         // "PENDING" | "PAID" | "OVERDUE" | "EXEMPT" | "CANCELLED"
+  /** Concepto de la cuota: "CuotaSocial" | "Actividad". */
+  concepto?: string;
+  activityId?: number | null;
+  activityName?: string | null;
+  /** Fecha de vencimiento propia de la cuota de actividad (ISO). */
+  dueDate?: string | null;
   paymentDate?: string | null;
   paymentMethod?: string;
   createdAt: string;
@@ -245,6 +277,10 @@ export interface PendingTransfer {
   membershipId: number;
   userName: string;
   period: string;
+  /** Concepto de la cuota: "CuotaSocial" | "Actividad". */
+  concepto?: string;
+  activityName?: string | null;
+  dueDate?: string | null;
   amount: number;
   lateFeeApplied: number;
   marketplaceFee: number;

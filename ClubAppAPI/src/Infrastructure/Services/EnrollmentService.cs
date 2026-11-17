@@ -68,6 +68,12 @@ public class EnrollmentService : IEnrollmentService
 
         await _context.Enrollments.AddAsync(enrollment);
         await _context.SaveChangesAsync();
+
+        // Genera la cuota de actividad del período vigente (idempotente) para que la
+        // obligación de pago quede registrada de inmediato en el circuito de cobros.
+        // Solo aplica cuando la actividad tiene costo mayor a 0.
+        await _paymentService.GenerateActivityCuotaAsync(userId, dto.ActivityId);
+
         return "OK";
     }
 
@@ -137,6 +143,11 @@ public class EnrollmentService : IEnrollmentService
 
         enrollment.Status = EnrollmentStatus.CANCELED;
         await _context.SaveChangesAsync();
+
+        // Limpia las cuotas de actividad pendientes (no vencidas, no pagadas) asociadas a
+        // esta inscripción al darse de baja, para que no sigan generando deuda futura.
+        await _paymentService.CancelPendingActivityCuotasAsync(enrollment.UserId, enrollment.ActivityId);
+
         return "OK";
     }
 }

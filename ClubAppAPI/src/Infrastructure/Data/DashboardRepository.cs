@@ -58,23 +58,21 @@ public class DashboardRepository : IDashboardRepository
 
         // 6. Recaudación del mes por CUOTAS: suma de TODOS los pagos acreditados
         //    (Paid) del mes en curso, sin importar el medio (Efectivo/Caja,
-        //    Transferencia o Mercado Pago). Se usa PaymentDate como referencia
-        //    temporal y, si no estuviera definido, se recurre a CreatedAt para no
-        //    dejar fuera ningún cobro registrado por caja.
+        //    Transferencia o Mercado Pago), excluyendo las cuotas de actividades
+        //    (que se desglosan por separado en "Por Actividades").
         var recaudacionCuotas = await _context.Payments
             .Where(p => p.Status == PaymentStatus.Paid
+                        && p.Concepto == CuotaConcepto.CuotaSocial
                         && (p.PaymentDate != null ? p.PaymentDate >= monthStart : p.CreatedAt >= monthStart))
             .SumAsync(p => p.Amount + p.LateFeeApplied);
 
-        // 7. Recaudación del mes por ACTIVIDADES: inscripciones activas del mes en curso
-        //    sobre actividades cobradas por el Club (PaymentCollector == CLUB), valorizadas
-        //    según el precio de socio o no socio. Las actividades con cobro directo del
-        //    profesor (PROFESSOR_DIRECT) no ingresan a la caja del club.
-        var recaudacionActividades = await _context.Enrollments
-            .Where(e => e.Status == EnrollmentStatus.ACTIVE
-                        && e.EnrollmentDate >= monthStart
-                        && e.Activity.PaymentCollector == PaymentCollectorType.CLUB)
-            .SumAsync(e => e.User.IsMember ? e.Activity.PriceMember : e.Activity.PriceNonMember);
+        // 7. Recaudación del mes por ACTIVIDADES: suma de los pagos acreditados de
+        //    cuotas de actividad (Concepto == Actividad) cobrados por el Club en el mes.
+        var recaudacionActividades = await _context.Payments
+            .Where(p => p.Status == PaymentStatus.Paid
+                        && p.Concepto == CuotaConcepto.Actividad
+                        && (p.PaymentDate != null ? p.PaymentDate >= monthStart : p.CreatedAt >= monthStart))
+            .SumAsync(p => p.Amount + p.LateFeeApplied);
 
         var totalRecaudado = recaudacionCuotas + recaudacionActividades;
 
@@ -298,22 +296,21 @@ public class DashboardRepository : IDashboardRepository
 
         var pagosRango = await _context.Payments
             .Where(p => p.Status == PaymentStatus.Paid && p.PaymentDate >= desde)
-            .Select(p => new { p.Amount, p.LateFeeApplied, EsAlquiler = _context.ResourceBookings.Any(b => b.PaymentId == p.Id) })
+            .Select(p => new {
+                p.Amount, p.LateFeeApplied, p.Concepto,
+                EsAlquiler = _context.ResourceBookings.Any(b => b.PaymentId == p.Id)
+            })
             .ToListAsync();
 
         decimal totalCuotas = 0m;
         decimal totalAlquileres = 0m;
+        decimal totalActividades = 0m;
         foreach (var p in pagosRango)
         {
             if (p.EsAlquiler) totalAlquileres += p.Amount + p.LateFeeApplied;
+            else if (p.Concepto == CuotaConcepto.Actividad) totalActividades += p.Amount + p.LateFeeApplied;
             else totalCuotas += p.Amount + p.LateFeeApplied;
         }
-
-        var totalActividades = await _context.Enrollments
-            .Where(e => e.Status == EnrollmentStatus.ACTIVE
-                        && e.EnrollmentDate >= desde
-                        && e.Activity.PaymentCollector == PaymentCollectorType.CLUB)
-            .SumAsync(e => e.User.IsMember ? e.Activity.PriceMember : e.Activity.PriceNonMember);
 
         var serie = await ConstruirSerieIngresosAsync(desde, granularidad);
 
@@ -370,7 +367,7 @@ public class DashboardRepository : IDashboardRepository
         var pagos = await _context.Payments
             .Where(p => p.Status == PaymentStatus.Paid && p.PaymentDate >= desde)
             .Select(p => new {
-                p.Amount, p.LateFeeApplied, p.PaymentDate,
+                p.Amount, p.LateFeeApplied, p.PaymentDate, p.Concepto,
                 EsAlquiler = _context.ResourceBookings.Any(b => b.PaymentId == p.Id)
             })
             .ToListAsync();
@@ -379,24 +376,14 @@ public class DashboardRepository : IDashboardRepository
             .GroupBy(p => ClaveBucket(p.PaymentDate ?? DateTime.UtcNow, granularidad))
             .OrderBy(g => g.Key);
 
-        var actividades = await _context.Enrollments
-            .Where(e => e.Status == EnrollmentStatus.ACTIVE
-                        && e.EnrollmentDate >= desde
-                        && e.Activity.PaymentCollector == PaymentCollectorType.CLUB)
-            .Select(e => new { e.EnrollmentDate, Monto = e.User.IsMember ? e.Activity.PriceMember : e.Activity.PriceNonMember })
-            .ToListAsync();
-
-        var activPorBucket = actividades
-            .GroupBy(a => ClaveBucket(a.EnrollmentDate, granularidad))
-            .ToDictionary(g => g.Key, g => g.Sum(x => x.Monto));
-
         var result = new List<IngresoPeriodoDto>();
         foreach (var g in porBucket)
         {
-            decimal cuotas = 0, alquileres = 0;
+            decimal cuotas = 0, alquileres = 0, actividades = 0;
             foreach (var p in g)
             {
                 if (p.EsAlquiler) alquileres += p.Amount + p.LateFeeApplied;
+                else if (p.Concepto == CuotaConcepto.Actividad) actividades += p.Amount + p.LateFeeApplied;
                 else cuotas += p.Amount + p.LateFeeApplied;
             }
             result.Add(new IngresoPeriodoDto
@@ -405,7 +392,7 @@ public class DashboardRepository : IDashboardRepository
                 Etiqueta = EtiquetaClave(g.Key, granularidad),
                 Cuotas = cuotas,
                 Alquileres = alquileres,
-                Actividades = activPorBucket.GetValueOrDefault(g.Key)
+                Actividades = actividades
             });
         }
         return result;

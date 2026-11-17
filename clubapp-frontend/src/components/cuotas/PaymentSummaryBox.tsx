@@ -12,11 +12,18 @@ interface PaymentSummaryBoxProps {
   totalToPay: number;
 }
 
-/** Etiqueta del concepto: período único o listado de períodos seleccionados. */
+/** Etiqueta del concepto: período único o listado de períodos/conceptos seleccionados. */
 const conceptLabel = (cuotas: MemberCuota[]): string => {
-  const periods = cuotas.map((c) => c.periodo).filter(Boolean);
-  if (periods.length <= 1) return `Cuota Social - ${periods[0] ?? ''}`;
-  return `Cuotas Sociales: ${periods.join(', ')}`;
+  if (cuotas.length <= 1) {
+    const c = cuotas[0];
+    if (!c) return '';
+    if (c.concepto === 'Actividad') return `Actividad: ${c.activityName || c.periodo}`;
+    return `Cuota Social - ${c.periodo}`;
+  }
+  // Mezcla de cuotas sociales y de actividades: se listan con su concepto.
+  return cuotas
+    .map((c) => (c.concepto === 'Actividad' ? `Actividad: ${c.activityName || c.periodo}` : `Cuota Social ${c.periodo}`))
+    .join(', ');
 };
 
 export const PaymentSummaryBox: React.FC<PaymentSummaryBoxProps> = ({

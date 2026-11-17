@@ -511,10 +511,18 @@ export default function Deudores() {
     setSelectedCuotaIds(prev => (prev.length === all.length ? [] : [...all]));
   };
 
-  // Valor dinámico de una cuota según la configuración global (FeeSettings).
+  // Valor dinámico de una cuota según la configuración global (FeeSettings) o, si la
+  // cuota es de una actividad (o el backend envió su detalle real), el monto real.
   // Aplica el recargo por mora cuando la fecha de vencimiento ya pasó.
   const getMontoCuota = useCallback(
     (cuotaId: number, periodo: string): number => {
+      // Si el backend envió el detalle discriminado de la cuota, se usa su monto real
+      // (base + recargo), que ya contempla el precio de la actividad vs la cuota social.
+      const detalle = paymentTarget?.cuotas?.find((c) => c.paymentId === cuotaId);
+      if (detalle) {
+        return (detalle.amount ?? 0) + (detalle.lateFeeApplied ?? 0);
+      }
+
       const base = feeSettings.baseFeeAmount ?? 0;
       const exencion = paymentTarget?.exencionPorcentaje ?? 0;
       const montoBase = Math.max(0, base * (1 - exencion / 100));
@@ -735,7 +743,15 @@ export default function Deudores() {
                           {pendingTransfers.map((t) => (
                             <tr key={t.id} className="text-slate-300">
                               <td className="py-2.5 pr-3 font-medium text-white">{t.userName || `Socio #${t.userId}`}</td>
-                              <td className="py-2.5 pr-3 text-slate-400">{t.period}</td>
+                              <td className="py-2.5 pr-3 text-slate-400">
+                                {t.concepto === 'Actividad' ? (
+                                  <span className="inline-flex items-center gap-1">
+                                    <span className="text-sky-400">{t.activityName || 'Actividad'}</span>
+                                  </span>
+                                ) : (
+                                  t.period
+                                )}
+                              </td>
                               <td className="py-2.5 pr-3 text-right">{formatCurrency((t.amount || 0) + (t.lateFeeApplied || 0))}</td>
                               <td className="py-2.5 pr-3 text-right text-sky-400">+{formatCurrency(t.marketplaceFee || 0)}</td>
                               <td className="py-2.5 pr-3 text-right font-bold text-amber-300">{formatCurrency(t.totalAmount || 0)}</td>
@@ -882,21 +898,36 @@ export default function Deudores() {
                               <div className="flex flex-wrap justify-center gap-1 max-w-50 mx-auto">
                                 {(() => {
                                   const periodos = getPeriodosValidos(d);
-                                  if (periodos.length === 0) {
+                                  const activityCuotas = (d.cuotas ?? []).filter(
+                                    (c) => c.concepto === 'Actividad',
+                                  );
+                                  if (periodos.length === 0 && activityCuotas.length === 0) {
                                     return (
                                       <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
                                         Adeuda cuota
                                       </span>
                                     );
                                   }
-                                  return periodos.map((p) => (
-                                    <span
-                                      key={p}
-                                      className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20 whitespace-nowrap"
-                                    >
-                                      {formatPeriodo(p)}
-                                    </span>
-                                  ));
+                                  return (
+                                    <>
+                                      {periodos.map((p) => (
+                                        <span
+                                          key={`p-${p}`}
+                                          className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20 whitespace-nowrap"
+                                        >
+                                          {formatPeriodo(p)}
+                                        </span>
+                                      ))}
+                                      {activityCuotas.map((c) => (
+                                        <span
+                                          key={`a-${c.paymentId}`}
+                                          className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-sky-500/10 text-sky-400 border border-sky-500/20 whitespace-nowrap"
+                                        >
+                                          {c.activityName || c.periodo}
+                                        </span>
+                                      ))}
+                                    </>
+                                  );
                                 })()}
                               </div>
                             </td>
@@ -1055,10 +1086,16 @@ export default function Deudores() {
 
                       <div className="max-h-52 overflow-y-auto scrollbar-minimal overscroll-contain rounded-xl border border-slate-800 bg-slate-950/40 divide-y divide-slate-800/80 p-1">
                         {(paymentTarget.paymentIds ?? []).map((cuotaId, idx) => {
-                          const periodo =
+                          const detalle = paymentTarget.cuotas?.find((c) => c.paymentId === cuotaId);
+                          const rawPeriodo =
                             paymentTarget.periodosVencidos?.[idx] ??
                             paymentTarget.periodosVencidos?.[0] ??
                             'Cuota';
+                          // Para cuotas de actividad mostramos su nombre; para la social, el período.
+                          const periodo =
+                            detalle?.concepto === 'Actividad'
+                              ? (detalle.activityName || rawPeriodo)
+                              : rawPeriodo;
                           const checked = selectedCuotaIds.includes(cuotaId);
                           // Una cuota está VENCIDA cuando su fecha de vencimiento (día
                           // configurado en FeeSettings) ya pasó respecto de hoy.

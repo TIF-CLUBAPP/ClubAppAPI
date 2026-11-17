@@ -41,25 +41,40 @@ const mapCuota = (p: UserCuota, s: FeeSettings): MemberCuota => {
   const year = parts?.[0] ?? '';
   const month = Number(parts?.[1] ?? 0);
   const mm = String(month).padStart(2, '0');
-  const fecha = `${String(dueDay).padStart(2, '0')}/${mm}/${year}`;
+
+  // Para cuotas de actividad se usa su propia fecha de vencimiento (DueDate); para la
+  // cuota social se calcula con el día de vencimiento global configurado.
+  let fecha: string;
+  if (p.concepto === 'Actividad' && p.dueDate) {
+    const d = new Date(p.dueDate);
+    fecha = Number.isNaN(d.getTime())
+      ? `${String(dueDay).padStart(2, '0')}/${mm}/${year}`
+      : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+  } else {
+    fecha = `${String(dueDay).padStart(2, '0')}/${mm}/${year}`;
+  }
 
   const status = STATUS_MAP[p.status] ?? 'PENDIENTE';
   const lateFee = Number(p.lateFeeApplied ?? 0);
   const total = Number(p.amount ?? 0) + lateFee;
+  const isActividad = (p.concepto ?? 'CuotaSocial') === 'Actividad';
 
   return {
     id: String(p.id),
     idReal: p.id,
-    periodo: formatPeriodName(p.period),
+    periodo: isActividad && p.activityName ? p.activityName : formatPeriodName(p.period),
     mesAno: p.period,
     fechaVencimiento: fecha,
     baseAmount: Number(p.amount ?? 0),
     discountPercentage: 0,
     isOverdue: status === 'EN_MORA',
     lateFeeAmount: lateFee,
-    lateFeeLabel: lateFee > 0 ? `+${s.lateFeePercentage ?? 0}% Mora` : undefined,
+    lateFeeLabel: lateFee > 0 ? (isActividad ? 'Recargo por mora' : `+${s.lateFeePercentage ?? 0}% Mora`) : undefined,
     totalAmount: total,
     status,
+    concepto: p.concepto ?? 'CuotaSocial',
+    activityName: p.activityName ?? null,
+    dueDate: p.dueDate ?? null,
     paidAt: p.paymentDate ? formatPaidAt(p.paymentDate) : undefined,
     paymentMethod: p.paymentMethod || undefined,
     receiptNumber: status === 'PAGADA' ? `REC-${year}-${mm}` : undefined,
