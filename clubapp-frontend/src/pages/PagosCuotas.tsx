@@ -785,7 +785,7 @@ export const PagosCuotas: React.FC = () => {
                             <p className="text-sm text-slate-400 mt-1">Valor ingresado por el administrador</p>
                           </div>
                           <p className="text-xs text-amber-200/80 leading-relaxed">
-                            💡 Los socios recibirán una notificación previa antes del inicio de vigencia.
+                            Los socios recibirán una notificación previa antes del inicio de vigencia.
                           </p>
                         </div>
 
@@ -909,7 +909,7 @@ export const PagosCuotas: React.FC = () => {
                       <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
                       <div className="text-sm text-amber-200 leading-relaxed">
                         <p className="font-semibold text-amber-300">
-                          ⚠️ Atención: Los cambios en el valor de la cuota se registrarán en el historial y comenzarán a aplicarse automáticamente a partir del próximo mes. Las cuotas y deudas vigentes hasta la fecha no sufrirán modificaciones.
+                          Atención: Los cambios en el valor de la cuota se registrarán en el historial y comenzarán a aplicarse automáticamente a partir del próximo mes. Las cuotas y deudas vigentes hasta la fecha no sufrirán modificaciones.
                         </p>
                         <p className="text-xs text-amber-300/80 mt-2">
                           Nueva tarifa vigente desde el <span className="font-bold">{getProximoMesLabel()}</span>.
@@ -943,8 +943,8 @@ export const PagosCuotas: React.FC = () => {
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
                 <div>
                   <h2 className="text-lg font-semibold flex items-center gap-2">
-                    <PauseCircle className="w-5 h-5 text-rose-400" />
-                    ⛔ Configuración de Corte de Servicio / Suspensión de Socio
+                    <ShieldAlert className="w-5 h-5 text-rose-400" />
+                    Configuración de Corte de Servicio / Suspensión de Socio
                   </h2>
                   <p className="text-xs text-slate-400 mt-1">
                     Definí los límites de mora a partir de los cuales un socio queda suspendido y no puede inscribirse a actividades ni reservar espacios.

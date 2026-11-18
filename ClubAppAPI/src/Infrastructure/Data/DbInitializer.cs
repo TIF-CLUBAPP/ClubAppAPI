@@ -1210,6 +1210,48 @@ namespace ClubApp.Infrastructure.Data
                 return Math.Round(incremento, 2, MidpointRounding.AwayFromZero);
             }
 
+            // Rellena la cuota social (CuotaConcepto.CuotaSocial) de un socio para un período
+            // dado, respetando la clave única (UserId, Period, Concepto, ActivityId). No genera
+            // la cuota para No Socios (no pagan membresía) ni para exentos o no miembros.
+            void EnsureSocialCuota(int userId, string period, PaymentStatus status, bool isMember, bool paidInCurrentMonth)
+            {
+                if (context.Payments.Any(p =>
+                        p.UserId == userId
+                        && p.Period == period
+                        && p.Concepto == CuotaConcepto.CuotaSocial))
+                    return;
+
+                // Monto base de la membresía; coincide con el canon mensual sembrado arriba.
+                var monto = isMember ? 15000m : 0m;
+
+                // Fecha de pago (solo si está pagada): mes corriente o anterior según corresponda
+                // al Dashboard de "Recaudación del Mes".
+                var paymentDate = status == PaymentStatus.Paid
+                    ? (DateTime?)DateTime.SpecifyKind(
+                        paidInCurrentMonth
+                            ? new DateTime(2026, 11, 10, 10, 0, 0)
+                            : new DateTime(2026, 10, 9, 10, 0, 0),
+                        DateTimeKind.Utc)
+                    : null;
+
+                context.Payments.Add(new Payment
+                {
+                    UserId = userId,
+                    Period = period,
+                    Concepto = CuotaConcepto.CuotaSocial,
+                    ActivityId = null,
+                    ActivityName = null,
+                    DueDate = null,
+                    Amount = monto,
+                    LateFeeApplied = 0m,
+                    MarketplaceFee = 0m,
+                    PaymentMethod = status == PaymentStatus.Paid ? "Efectivo" : string.Empty,
+                    Status = status,
+                    PaymentDate = paymentDate,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
             // 8.1 Profesores de prueba (4, con credenciales de acceso "1234")
             var teacherTenis = EnsureUser(new User
             {
@@ -1533,20 +1575,22 @@ namespace ClubApp.Infrastructure.Data
                 CreatedAt = DateTime.UtcNow
             });
 
-            // 7) Musculación Libre — GRATUITA (PrecioSocio = 0, PrecioNoSocio = 0).
-            //    Validación: no genera deuda en "Mis Cuotas" del club.
+            // 7) Musculación Libre — GRATUITA para Socios al día, CON COSTO para No Socios.
+            //    Regla de negocio: ninguna actividad puede ser gratuita ($0) para un No Socio.
+            //    El Socio paga $0 (beneficio por estar al día); el No Socio abona la tarifa de
+            //    mercado. Validación: los socios no generan deuda en "Mis Cuotas"; los no socios sí.
             var musculacion = EnsureActivity(new Activity
             {
                 Name = "Musculación Libre",
                 Description = "Acceso libre a la sala de musculación del gimnasio.",
                 Category = "Fitness",
-                Price = 0m,
+                Price = 4000m,
                 PriceMember = 0m,
-                PriceNonMember = 0m,
+                PriceNonMember = 4000m,
                 DiaVencimiento = 10,
-                TipoRecargoMora = TipoRecargoMora.Ninguno,
+                TipoRecargoMora = TipoRecargoMora.Porcentaje,
                 RecargoMoraSocio = 0m,
-                RecargoMoraNoSocio = 0m,
+                RecargoMoraNoSocio = 15m,
                 PaymentCollector = PaymentCollectorType.CLUB,
                 ProfessorFacilityFeeMember = 0m,
                 ProfessorFacilityFeeNonMember = 0m,
@@ -1673,9 +1717,54 @@ namespace ClubApp.Infrastructure.Data
             EnsureActivityPayment(noSocios[0].Id, spinning, false, currentPeriod, PaymentStatus.Paid, true);
             for (int i = 1; i < 3; i++) EnsureActivityPayment(noSocios[i].Id, spinning, false, currentPeriod, PaymentStatus.Overdue, false);
 
-            // --- Musculación Libre (GRATUITA, precio 0): NO genera Payment de actividad.
+            // --- Musculación Libre: GRATUITA para Socios (precio 0 ⇒ no genera Payment de
+            //     actividad) pero CON COSTO para No Socios, que sí generan su cuota de actividad.
+            for (int i = 0; i < 2; i++)
+                EnsureActivityPayment(noSocios[i].Id, musculacion, false, currentPeriod, PaymentStatus.Overdue, false);
             // --- Tenis Adultos y Natación Escuela Niños (PROFESSOR_DIRECT): NO generan
             //     Payment en "Mis Cuotas" (cobro directo del profesor).
+
+            // ==========================================
+            // 8.7 MATRIZ DE DEUDA CRUZADA (Cuota Social vs. Actividades)
+            // ==========================================
+            // Asigna la cuota social del período vigente (y anteriores) y combina con las
+            // deudas de actividad ya sembradas para que la pantalla "Deudores & Cuotas"
+            // muestre de un vistazo todos los perfiles de deuda:
+            //
+            //  - socios[3]  Valentina Díaz   → DEUDOR TOTAL (Cuota Social + 2 actividades: Pádel y Spinning vencidos).
+            //  - socios[9]  Julieta Juárez   → DEUDOR SOLO CUOTA SOCIAL (actividades pagas al día).
+            //  - socios[5]  Camila Fernández → DEUDOR SOLO ACTIVIDAD (socio, cuota social al día + Fútbol vencido).
+            //  - noSocios[1] Florencia Nav.  → DEUDOR SOLO ACTIVIDAD (no socio, sin cuota social, Pádel + Spinning vencidos).
+            //  - socios[11] Milagros Ledesma → AL DÍA / SIN DEUDAS (social y actividades al día).
+            //  - socios[6]  Matías González  → MOROSO CRÓNICO (Octubre + Noviembre, social y Fútbol, con recargo).
+
+            // Cuota social del mes corriente (Noviembre 2026): Paid para los al-día, Overdue para los morosos.
+            EnsureSocialCuota(socios[0].Id, currentPeriod, PaymentStatus.Paid, true, true);
+            EnsureSocialCuota(socios[1].Id, currentPeriod, PaymentStatus.Paid, true, true);
+            EnsureSocialCuota(socios[2].Id, currentPeriod, PaymentStatus.Paid, true, true);
+            EnsureSocialCuota(socios[3].Id, currentPeriod, PaymentStatus.Overdue, true, false); // Deudor Total
+            EnsureSocialCuota(socios[4].Id, currentPeriod, PaymentStatus.Paid, true, true);
+            EnsureSocialCuota(socios[5].Id, currentPeriod, PaymentStatus.Paid, true, true);   // Solo Actividad
+            EnsureSocialCuota(socios[6].Id, currentPeriod, PaymentStatus.Overdue, true, false); // Crónico
+            EnsureSocialCuota(socios[7].Id, currentPeriod, PaymentStatus.Paid, true, true);
+            EnsureSocialCuota(socios[8].Id, currentPeriod, PaymentStatus.Paid, true, true);
+            EnsureSocialCuota(socios[9].Id, currentPeriod, PaymentStatus.Overdue, true, false); // Solo Social
+            EnsureSocialCuota(socios[10].Id, currentPeriod, PaymentStatus.Paid, true, true);
+            EnsureSocialCuota(socios[11].Id, currentPeriod, PaymentStatus.Paid, true, true);  // Al Día
+
+            // Deudor Solo Cuota Social: Julieta (socios[9]) paga sus ACTIVIDADES al día.
+            EnsureEnrollment(socios[9].Id, spinning.Id);
+            EnsureActivityPayment(socios[9].Id, spinning, true, currentPeriod, PaymentStatus.Paid, true);
+
+            // Al Día / Sin Deudas: Milagros (socios[11]) con actividades pagas en fecha.
+            EnsureEnrollment(socios[11].Id, spinning.Id);
+            EnsureActivityPayment(socios[11].Id, spinning, true, currentPeriod, PaymentStatus.Paid, true);
+            EnsureEnrollment(socios[11].Id, natacionLibre.Id);
+            EnsureActivityPayment(socios[11].Id, natacionLibre, true, currentPeriod, PaymentStatus.Pending, false);
+
+            // Moroso Crónico: Matías (socios[6]) arrastra Octubre + Noviembre.
+            EnsureSocialCuota(socios[6].Id, previousPeriod, PaymentStatus.Overdue, true, false);
+            EnsureActivityPayment(socios[6].Id, futbol, true, previousPeriod, PaymentStatus.Overdue, false);
 
             context.SaveChanges();
         }

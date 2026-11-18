@@ -96,6 +96,9 @@ public class Activity : BaseEntity
 
     public virtual ICollection<Enrollment> Enrollments { get; set; } = new List<Enrollment>();
 
+    /// <summary>Previsión/historial de precios por período de la actividad.</summary>
+    public virtual ICollection<ActivityPricePeriod> PricePeriods { get; set; } = new List<ActivityPricePeriod>();
+
     /// <summary>Profesores/administradores a cargo de dictar esta actividad.</summary>
     public virtual ICollection<ActivityInstructor> Instructors { get; set; } = new List<ActivityInstructor>();
 

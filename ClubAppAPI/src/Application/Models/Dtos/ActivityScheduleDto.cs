@@ -81,3 +81,35 @@ public class InstructorStatusRequest
     /// <summary>"Accepted" o "Rejected".</summary>
     public string Status { get; set; } = "Accepted";
 }
+
+/// <summary>
+/// Programa una actualización de Precio Socio / Precio No Socio a partir de un
+/// Mes/Año determinados (POST /api/activities/{activityId}/price-updates).
+/// </summary>
+public class ScheduleActivityPriceRequest
+{
+    public decimal PriceMember { get; set; }
+    public decimal PriceNonMember { get; set; }
+
+    /// <summary>Año de vigencia (ej. 2026).</summary>
+    public int Year { get; set; }
+
+    /// <summary>Mes de vigencia 1-12 (ej. 12 = Diciembre).</summary>
+    public int Month { get; set; }
+}
+
+/// <summary>Previsión de precio por período de una actividad.</summary>
+public class ActivityPricePeriodDto
+{
+    public int Id { get; set; }
+    public int ActivityId { get; set; }
+
+    /// <summary>Período "yyyy-MM" desde el cual rige el precio.</summary>
+    public string Period { get; set; } = string.Empty;
+
+    public decimal PriceMember { get; set; }
+    public decimal PriceNonMember { get; set; }
+    public DateTime EffectiveFromDate { get; set; }
+    public DateTime ChangedAt { get; set; }
+    public int? ChangedByUserId { get; set; }
+}

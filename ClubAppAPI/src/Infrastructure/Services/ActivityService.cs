@@ -448,6 +448,12 @@ public class ActivityService : IActivityService
         var enrolledCount = await _context.Enrollments
             .CountAsync(e => e.ActivityId == activity.Id && e.Status == EnrollmentStatus.ACTIVE);
 
+        // Precio pendiente más cercano (aumento programado para un período futuro).
+        var pendingPrice = await _context.ActivityPricePeriods
+            .Where(p => p.ActivityId == activity.Id && p.EffectiveFromDate > DateTime.UtcNow)
+            .OrderBy(p => p.EffectiveFromDate)
+            .FirstOrDefaultAsync();
+
         var instructorIds = activity.Instructors.Select(i => i.UserId).Distinct().ToList();
         var instructorStatuses = activity.Instructors.ToDictionary(i => i.UserId, i => i.Status);
         var instructorInvitedAt = activity.Instructors.ToDictionary(i => i.UserId, i => i.InvitedAt);
@@ -510,6 +516,10 @@ public class ActivityService : IActivityService
             Schedule = activity.Schedule,
             IsActive = activity.IsActive,
             EnrolledCount = enrolledCount,
+            PendingPriceMember = pendingPrice?.PriceMember,
+            PendingPriceNonMember = pendingPrice?.PriceNonMember,
+            PendingPricePeriod = pendingPrice?.Period,
+            PendingPriceEffectiveFromDate = pendingPrice?.EffectiveFromDate,
             Schedules = activity.Schedules
                 .OrderBy(s => s.DayOfWeek)
                 .ThenBy(s => s.StartTime)
@@ -882,6 +892,138 @@ public class ActivityService : IActivityService
 
         await _context.SaveChangesAsync();
         return await MapAsync(activity);
+    }
+
+    /// <inheritdoc />
+    public async Task<ActivityPricePeriodDto?> SchedulePriceUpdateAsync(int activityId, ScheduleActivityPriceRequest request, int actorId, UserRole actorRole)
+    {
+        if (request == null)
+            throw new AppValidationException("Debe indicar los nuevos precios de la actividad.");
+
+        if (request.PriceMember < 0 || request.PriceNonMember < 0)
+            throw new AppValidationException("Los precios no pueden ser negativos.");
+
+        if (request.Year < 2000 || request.Year > 2100 || request.Month < 1 || request.Month > 12)
+            throw new AppValidationException("Debe indicar un Mes/Año de vigencia válidos.");
+
+        var activity = await _context.Activities
+            .Include(a => a.Instructors)
+            .FirstOrDefaultAsync(a => a.Id == activityId);
+
+        if (activity == null) throw new NotFoundException("Activity", activityId);
+        EnsureCanManage(activity, actorId, actorRole);
+
+        // La nueva tarifa solo puede programarse a futuro (a partir del 1° del mes siguiente).
+        var now = DateTime.UtcNow;
+        var nextMonthFirst = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(1);
+        var effectiveFrom = new DateTime(request.Year, request.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        if (effectiveFrom < nextMonthFirst)
+            throw new AppValidationException("La vigencia debe ser a partir del 1° del mes siguiente.");
+
+        var period = $"{request.Year:0000}-{request.Month:00}";
+
+        var existing = await _context.ActivityPricePeriods
+            .FirstOrDefaultAsync(p => p.ActivityId == activityId && p.Period == period);
+
+        ActivityPricePeriod pricePeriod;
+        if (existing != null)
+        {
+            pricePeriod = existing;
+            pricePeriod.PriceMember = request.PriceMember;
+            pricePeriod.PriceNonMember = request.PriceNonMember;
+            pricePeriod.EffectiveFromDate = effectiveFrom;
+            pricePeriod.ChangedAt = DateTime.UtcNow;
+            pricePeriod.ChangedByUserId = actorId;
+        }
+        else
+        {
+            pricePeriod = new ActivityPricePeriod
+            {
+                ActivityId = activityId,
+                Period = period,
+                PriceMember = request.PriceMember,
+                PriceNonMember = request.PriceNonMember,
+                EffectiveFromDate = effectiveFrom,
+                ChangedAt = DateTime.UtcNow,
+                ChangedByUserId = actorId
+            };
+            _context.ActivityPricePeriods.Add(pricePeriod);
+        }
+
+        await _context.SaveChangesAsync();
+
+        await NotifyPriceIncreaseToEnrolleesAsync(activity, request);
+
+        return new ActivityPricePeriodDto
+        {
+            Id = pricePeriod.Id,
+            ActivityId = pricePeriod.ActivityId,
+            Period = pricePeriod.Period,
+            PriceMember = pricePeriod.PriceMember,
+            PriceNonMember = pricePeriod.PriceNonMember,
+            EffectiveFromDate = pricePeriod.EffectiveFromDate,
+            ChangedAt = pricePeriod.ChangedAt,
+            ChangedByUserId = pricePeriod.ChangedByUserId
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<List<ActivityPricePeriodDto>> GetPriceHistoryAsync(int activityId)
+    {
+        return await _context.ActivityPricePeriods
+            .Where(p => p.ActivityId == activityId)
+            .OrderByDescending(p => p.EffectiveFromDate)
+            .ThenByDescending(p => p.Id)
+            .Select(p => new ActivityPricePeriodDto
+            {
+                Id = p.Id,
+                ActivityId = p.ActivityId,
+                Period = p.Period,
+                PriceMember = p.PriceMember,
+                PriceNonMember = p.PriceNonMember,
+                EffectiveFromDate = p.EffectiveFromDate,
+                ChangedAt = p.ChangedAt,
+                ChangedByUserId = p.ChangedByUserId
+            })
+            .ToListAsync();
+    }
+
+    /// <summary>
+    /// Genera una notificación interna para cada usuario inscripto (activo) avisando
+    /// que a partir del período indicado el precio de la actividad pasará a los
+    /// nuevos valores de Socio / No Socio.
+    /// </summary>
+    private async Task NotifyPriceIncreaseToEnrolleesAsync(
+        Activity activity,
+        ScheduleActivityPriceRequest request)
+    {
+        var culture = CultureInfo.GetCultureInfo("es-AR");
+        var monthName = char.ToUpperInvariant(culture.DateTimeFormat.GetMonthName(request.Month)[0])
+                        + culture.DateTimeFormat.GetMonthName(request.Month).Substring(1);
+        var periodLabel = $"{monthName} {request.Year}";
+
+        var enrolleeIds = await _context.Enrollments
+            .Where(e => e.ActivityId == activity.Id && e.Status == EnrollmentStatus.ACTIVE)
+            .Select(e => e.UserId)
+            .Distinct()
+            .ToListAsync();
+
+        if (enrolleeIds.Count == 0) return;
+
+        var title = "Actualización de precio de actividad";
+        var message =
+            $"La actividad \"{activity.Name}\" actualizará su valor a partir de {periodLabel}: " +
+            $"Socio ${request.PriceMember.ToString("N2", culture)} / No Socio ${request.PriceNonMember.ToString("N2", culture)}.";
+
+        foreach (var userId in enrolleeIds)
+        {
+            await _notificationService.NotifyAsync(
+                userId,
+                title,
+                message,
+                NotificationCategory.Payment,
+                activity.Id.ToString());
+        }
     }
 
     /// <inheritdoc />

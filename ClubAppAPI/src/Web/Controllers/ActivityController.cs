@@ -141,6 +141,30 @@ public class ActivitiesController : ControllerBase
         return Ok(updated);
     }
 
+    /// <summary>
+    /// Programa una actualización de Precio Socio / Precio No Socio a partir de un
+    /// Mes/Año futuros. Guarda la previsión por período y notifica a los inscriptos.
+    /// </summary>
+    [HttpPost("{activityId:int}/price-updates")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN,TEACHER")]
+    public async Task<IActionResult> SchedulePriceUpdate(int activityId, [FromBody] ScheduleActivityPriceRequest request)
+    {
+        if (request == null)
+            return BadRequest(new { message = "Debe indicar los nuevos precios y el Mes/Año de vigencia." });
+
+        var (actorId, actorRole) = GetActorIdentity();
+        var saved = await _activityService.SchedulePriceUpdateAsync(activityId, request, actorId, actorRole);
+        return Ok(saved);
+    }
+
+    /// <summary>Historial de precios por período de una actividad.</summary>
+    [HttpGet("{activityId:int}/price-history")]
+    [Authorize(Roles = "ADMIN,SUPERADMIN,TEACHER")]
+    public async Task<IActionResult> GetPriceHistory(int activityId)
+    {
+        return Ok(await _activityService.GetPriceHistoryAsync(activityId));
+    }
+
     [HttpGet("{activityId:int}/settlement")]
     [Authorize(Roles = "ADMIN,SUPERADMIN,TEACHER")]
     public async Task<IActionResult> GetSettlement(int activityId)

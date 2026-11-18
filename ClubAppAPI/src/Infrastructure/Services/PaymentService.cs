@@ -330,6 +330,13 @@ public class PaymentService : IPaymentService
 
         await _context.SaveChangesAsync();
 
+        // Si el cambio implica un aumento de la cuota social, se notifica de forma
+        // masiva a todos los Socios activos con la debida anticipación.
+        if (dto.BaseFeeAmount > actual.BaseFeeAmount)
+        {
+            await NotifySocialFeeIncreaseAsync(actual.BaseFeeAmount, dto.BaseFeeAmount, vigencia);
+        }
+
         return new FeeSettingsDto
         {
             BaseFeeAmount = actual.BaseFeeAmount,
@@ -341,6 +348,40 @@ public class PaymentService : IPaymentService
             PendingDueDayOfMonth = nueva.DueDayOfMonth,
             PendingEffectiveFromDate = nueva.EffectiveFromDate
         };
+    }
+
+    /// <summary>
+    /// Notifica internamente a todos los Socios activos un aumento de la cuota social
+    /// con la fecha de vigencia del nuevo valor. Se persiste en una única transacción.
+    /// </summary>
+    private async Task NotifySocialFeeIncreaseAsync(decimal previousAmount, decimal newAmount, DateTime effectiveFrom)
+    {
+        var memberIds = await _context.Users
+            .Where(u => u.IsMember && u.IsActive)
+            .Select(u => u.Id)
+            .ToListAsync();
+
+        if (memberIds.Count == 0) return;
+
+        var culture = CultureInfo.GetCultureInfo("es-AR");
+        var now = DateTime.UtcNow;
+        var title = "Actualización de cuota social";
+        var message =
+            $"A partir del {effectiveFrom:dd/MM/yyyy} la cuota social del club pasará de " +
+            $"${previousAmount.ToString("N2", culture)} a ${newAmount.ToString("N2", culture)}.";
+
+        _context.Notifications.AddRange(memberIds.Select(id => new Notification
+        {
+            UserId = id,
+            Title = title,
+            Message = message,
+            Category = NotificationCategory.Payment,
+            SentAt = now,
+            IsRead = false,
+            CreatedAt = now
+        }));
+
+        await _context.SaveChangesAsync();
     }
 
     public async Task<List<FeeSettingsHistoryDto>> GetFeeSettingsHistoryAsync()
@@ -851,6 +892,11 @@ public class PaymentService : IPaymentService
         if (payments.Any(p => p.Status == PaymentStatus.Paid))
             return new TransferPaymentResult { Success = false, Status = "ALREADY_PAID", Message = "Una de las cuotas ya fue registrada como pagada." };
 
+        // Recomputa el recargo por mora antes de registrar la transferencia para que el
+        // neto (base + mora) coincida con la pasarela y los reportes.
+        await CheckAndUpdateOverdueStatusAsync(payments);
+        await _context.SaveChangesAsync();
+
         var netAmount = payments.Sum(p => p.Amount + p.LateFeeApplied);
 
         var clubConfig = await GetOrCreateClubConfigAsync();
@@ -924,6 +970,11 @@ public class PaymentService : IPaymentService
     {
         var now = DateTime.Now;
 
+        // Tarifa vigente de cuotas sociales: día de vencimiento y % de recargo por mora.
+        var settings = await GetFeeSettingsAsync();
+        var dueDayOfMonth = Math.Clamp(settings.DueDayOfMonth, 1, 28);
+        var lateFeePercentage = settings.LateFeePercentage;
+
         // Carga las actividades referenciadas por cuotas de actividad pendientes para
         // recomputar el recargo por mora cuando se supera el día de vencimiento.
         var activityIds = payments
@@ -951,8 +1002,9 @@ public class PaymentService : IPaymentService
 
         foreach (var payment in payments)
         {
-            // Solo cuotas impagas (Pending) pueden pasar a vencidas (Overdue).
-            if (payment.Status != PaymentStatus.Pending) continue;
+            // Solo cuotas impagas pueden estar vencidas. Las Pending se promueven a Overdue;
+            // las Overdue se mantienen y se recomputa su recargo con la tarifa vigente.
+            if (payment.Status != PaymentStatus.Pending && payment.Status != PaymentStatus.Overdue) continue;
 
             // Cuota de actividad: usa su propia fecha de vencimiento (DueDate), derivada
             // del DiaVencimiento configurado en la actividad, y recomputa el recargo.
@@ -977,14 +1029,17 @@ public class PaymentService : IPaymentService
                 continue;
             }
 
-            // Cuota social: vencimiento por período. Una cuota del mes "yyyy-MM" se
-            // considera vencida si ya pasó la fecha de vencimiento de ese mes (día 28
-            // como cierre seguro, consistente con el proxy usado en el panel de deudores).
-            if (TryResolveSocialDueDate(payment.Period, out var due))
+            // Cuota social: vencimiento por período y día de vencimiento global configurado.
+            // Al vencer se aplica el recargo por mora (% sobre el monto base) para que la
+            // pasarela de pago y los reportes de recaudación muestren el mismo monto.
+            if (TryResolveSocialDueDate(payment.Period, dueDayOfMonth, out var due))
             {
                 if (due < now)
                 {
                     payment.Status = PaymentStatus.Overdue;
+
+                    var recargo = Math.Round(payment.Amount * (lateFeePercentage / 100m), 2, MidpointRounding.AwayFromZero);
+                    payment.LateFeeApplied = recargo > 0m ? recargo : 0m;
                 }
             }
         }
@@ -994,7 +1049,7 @@ public class PaymentService : IPaymentService
     /// Resuelve la fecha de vencimiento de una cuota social a partir de su período "yyyy-MM"
     /// y el día de vencimiento global configurado (FeeSettings.DueDayOfMonth).
     /// </summary>
-    private static bool TryResolveSocialDueDate(string period, out DateTime due)
+    private static bool TryResolveSocialDueDate(string period, int dueDayOfMonth, out DateTime due)
     {
         due = DateTime.MinValue;
         if (string.IsNullOrWhiteSpace(period)) return false;
@@ -1021,11 +1076,10 @@ public class PaymentService : IPaymentService
 
         if (month < 1 || month > 12 || year < 1) return false;
 
-        // Día 28 como cierre seguro para cualquier mes; se usa el día del mes siguiente del
-        // período (la cuota del mes N vence a comienzos del mes N, por eso el vencimiento
-        // real se resuelve con el día de vencimiento del mes de la cuota).
+        // Vencimiento = día DueDayOfMonth del mes de la cuota (consistente con la UI de
+        // "Mis Cuotas", que muestra el vencimiento como "dd/MM/yyyy" del propio período).
         var maxDay = DateTime.DaysInMonth(year, month);
-        var day = Math.Min(maxDay, 28);
+        var day = Math.Min(Math.Clamp(dueDayOfMonth, 1, 28), maxDay);
         due = new DateTime(year, month, day, 23, 59, 59);
         return true;
     }
@@ -1036,10 +1090,18 @@ public class PaymentService : IPaymentService
 
     public async Task<CuotasVencidasStatsDto> GetOverdueCuotasStatsAsync()
     {
-        var overdue = await _context.Payments
+        var payments = await _context.Payments
             .Where(p => p.Status == PaymentStatus.Overdue || p.Status == PaymentStatus.Pending)
-            .Select(p => new { p.Amount, p.LateFeeApplied })
             .ToListAsync();
+
+        // Recomputa el estado vencido y el recargo por mora antes de sumar, para que las
+        // estadísticas reflejen el monto real adeudado (base + recargo exacto).
+        await CheckAndUpdateOverdueStatusAsync(payments);
+        await _context.SaveChangesAsync();
+
+        var overdue = payments
+            .Where(p => p.Status == PaymentStatus.Overdue || p.Status == PaymentStatus.Pending)
+            .ToList();
 
         return new CuotasVencidasStatsDto
         {
@@ -1052,11 +1114,18 @@ public class PaymentService : IPaymentService
     {
         var overduePayments = await _context.Payments
             .Include(p => p.User)
+            .Include(p => p.Activity)
             .Where(p => p.Status == PaymentStatus.Overdue || p.Status == PaymentStatus.Pending)
             .OrderBy(p => p.User.LastName)
             .ThenBy(p => p.User.FirstName)
             .ThenBy(p => p.Period)
             .ToListAsync();
+
+        // Recomputa estado vencido + recargo por mora antes de consolidar la deuda.
+        await CheckAndUpdateOverdueStatusAsync(overduePayments);
+        await _context.SaveChangesAsync();
+
+        var feeSettings = await GetFeeSettingsAsync();
 
         return overduePayments
             .GroupBy(p => p.UserId)
@@ -1081,15 +1150,22 @@ public class PaymentService : IPaymentService
                         .ToList(),
                     Cuotas = g
                         .OrderBy(p => p.Period)
-                        .Select(p => new CuotaDeudaDetalleDto
+                        .Select(p =>
                         {
-                            PaymentId = p.Id,
-                            Concepto = p.Concepto.ToString(),
-                            ActivityId = p.ActivityId,
-                            ActivityName = p.ActivityName,
-                            Periodo = FormatPeriodo(p.Period, p.CreatedAt),
-                            Amount = p.Amount,
-                            LateFeeApplied = p.LateFeeApplied
+                            var (tipoRecargo, valorRecargo) = ResolverReglaMora(
+                                p, feeSettings.LateFeePercentage, p.User.IsMember);
+                            return new CuotaDeudaDetalleDto
+                            {
+                                PaymentId = p.Id,
+                                Concepto = p.Concepto.ToString(),
+                                ActivityId = p.ActivityId,
+                                ActivityName = p.ActivityName,
+                                Periodo = FormatPeriodo(p.Period, p.CreatedAt),
+                                Amount = p.Amount,
+                                LateFeeApplied = p.LateFeeApplied,
+                                TipoRecargoMora = tipoRecargo,
+                                RecargoMoraValor = valorRecargo
+                            };
                         })
                         .ToList(),
                     MontoTotalAdeudado = totalAdeudado,
@@ -1110,6 +1186,7 @@ public class PaymentService : IPaymentService
 
         // 2) Carga todas las cuotas del usuario ordenadas por período.
         var payments = await _context.Payments
+            .Include(p => p.Activity)
             .Where(p => p.UserId == userId)
             .OrderBy(p => p.Period)
             .ThenBy(p => p.Concepto)
@@ -1122,23 +1199,36 @@ public class PaymentService : IPaymentService
         // para que el checkout muestre el receptor correcto en el tab de transferencia.
         var collector = await ResolvePayoutCollectorAsync();
 
+        // Regla de mora vigente (cuota social) y condición de socio del usuario, para
+        // exponer el tipo y valor de recargo exacto que aplica a cada cuota.
+        var settings = await GetFeeSettingsAsync();
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        var esSocio = user?.IsMember ?? false;
+
         return payments
-            .Select(p => new UserCuotaDto
+            .Select(p =>
             {
-                Id = p.Id,
-                Period = p.Period,
-                Amount = p.Amount,
-                LateFeeApplied = p.LateFeeApplied,
-                Status = p.Status.ToString().ToUpperInvariant(),
-                Concepto = p.Concepto.ToString(),
-                ActivityId = p.ActivityId,
-                ActivityName = p.ActivityName,
-                DueDate = p.DueDate,
-                PaymentDate = p.PaymentDate,
-                PaymentMethod = p.PaymentMethod,
-                CreatedAt = p.CreatedAt,
-                TransferAlias = collector.BankAlias,
-                PayoutCollector = collector.Label
+                var (tipoRecargo, valorRecargo) = ResolverReglaMora(
+                    p, settings.LateFeePercentage, esSocio);
+                return new UserCuotaDto
+                {
+                    Id = p.Id,
+                    Period = p.Period,
+                    Amount = p.Amount,
+                    LateFeeApplied = p.LateFeeApplied,
+                    Status = p.Status.ToString().ToUpperInvariant(),
+                    Concepto = p.Concepto.ToString(),
+                    ActivityId = p.ActivityId,
+                    ActivityName = p.ActivityName,
+                    DueDate = p.DueDate,
+                    PaymentDate = p.PaymentDate,
+                    PaymentMethod = p.PaymentMethod,
+                    CreatedAt = p.CreatedAt,
+                    TransferAlias = collector.BankAlias,
+                    PayoutCollector = collector.Label,
+                    TipoRecargoMora = tipoRecargo,
+                    RecargoMoraValor = valorRecargo
+                };
             })
             .ToList();
     }
@@ -1200,6 +1290,24 @@ public class PaymentService : IPaymentService
     }
 
     /// <summary>
+    /// Resuelve el precio de una actividad para un período concreto ("yyyy-MM").
+    /// Si existe una previsión de precio para ese período (o una anterior ya vigente),
+    /// la usa; en caso contrario cae al precio base configurado en la actividad.
+    /// </summary>
+    private async Task<decimal> ResolveActivityPriceAsync(Activity activity, string period, bool esSocio)
+    {
+        var pricePeriod = await _context.ActivityPricePeriods
+            .Where(p => p.ActivityId == activity.Id && string.CompareOrdinal(p.Period, period) <= 0)
+            .OrderByDescending(p => p.Period)
+            .FirstOrDefaultAsync();
+
+        if (pricePeriod != null)
+            return esSocio ? pricePeriod.PriceMember : pricePeriod.PriceNonMember;
+
+        return esSocio ? activity.PriceMember : activity.PriceNonMember;
+    }
+
+    /// <summary>
     /// Genera (si no existen) las cuotas del período actual para las inscripciones ACTIVAS
     /// del usuario en actividades con costo mayor a 0. Determina el precio según si el
     /// usuario es Socio o No Socio y calcula el vencimiento y recargo por mora con las
@@ -1223,8 +1331,9 @@ public class PaymentService : IPaymentService
             var activity = enrollment.Activity;
             if (activity == null || !activity.IsActive) continue;
 
-            // Precio según condición de socio / no socio.
-            var precioBase = user.IsMember ? activity.PriceMember : activity.PriceNonMember;
+            // Precio según condición de socio / no socio, resolviendo la previsión
+            // de precio programada para el período (aumentos a futuro).
+            var precioBase = await ResolveActivityPriceAsync(activity, period, user.IsMember);
             if (precioBase <= 0m) continue;
 
             var exists = await _context.Payments
@@ -1307,6 +1416,23 @@ public class PaymentService : IPaymentService
         return Math.Round(precioBase + incremento, 2);
     }
 
+    /// <summary>
+    /// Resuelve la regla de mora visible para una cuota: tipo ("Ninguno" | "Porcentaje" |
+    /// "MontoFijo") y valor aplicable según la condición de socio del usuario. Las cuotas
+    /// sociales usan la regla porcentual global (FeeSettings.LateFeePercentage).
+    /// </summary>
+    private static (string Tipo, decimal? Valor) ResolverReglaMora(
+        Payment payment, decimal lateFeePercentageGlobal, bool esSocio)
+    {
+        if (payment.Concepto == CuotaConcepto.Actividad && payment.Activity != null)
+        {
+            var valor = esSocio ? payment.Activity.RecargoMoraSocio : payment.Activity.RecargoMoraNoSocio;
+            return (payment.Activity.TipoRecargoMora.ToString(), valor);
+        }
+
+        return (TipoRecargoMora.Porcentaje.ToString(), lateFeePercentageGlobal);
+    }
+
     public async Task<string> CreateOrderAsync(IEnumerable<int> cuotaIds)
     {
         var ids = (cuotaIds ?? Enumerable.Empty<int>())
@@ -1323,6 +1449,11 @@ public class PaymentService : IPaymentService
 
         if (payments.Count == 0) return "NOT_FOUND";
         if (payments.Any(p => p.Status == PaymentStatus.Paid)) return "ALREADY_PAID";
+
+        // Recomputa el recargo por mora antes de crear la orden para que el monto cobrado
+        // coincida exactamente con la suma (Precio Base + Recargo) de los ítems elegidos.
+        await CheckAndUpdateOverdueStatusAsync(payments);
+        await _context.SaveChangesAsync();
 
         var clubConfig = await GetOrCreateClubConfigAsync();
 
@@ -1648,6 +1779,11 @@ public class PaymentService : IPaymentService
             };
         }
 
+        // Recomputa el recargo por mora antes de cobrar con tarjeta para que el monto
+        // sea idéntico al mostrado en la pasarela (base + recargo exacto).
+        await CheckAndUpdateOverdueStatusAsync(payments);
+        await _context.SaveChangesAsync();
+
         var clubConfig = await GetOrCreateClubConfigAsync();
 
         var amount = payments.Sum(p => p.Amount + p.LateFeeApplied);
@@ -1804,7 +1940,7 @@ public class PaymentService : IPaymentService
         var activity = await _context.Activities.FindAsync(activityId);
         if (activity == null || !activity.IsActive) return;
 
-        var precioBase = user.IsMember ? activity.PriceMember : activity.PriceNonMember;
+        var precioBase = await ResolveActivityPriceAsync(activity, period, user.IsMember);
         if (precioBase <= 0m) return;
 
         var exists = await _context.Payments
@@ -1863,6 +1999,72 @@ public class PaymentService : IPaymentService
         return cuotasFuturas.Count;
     }
 
+    /// <inheritdoc />
+    public async Task<UpcomingIncreasesDto> GetMyUpcomingIncreasesAsync(int userId)
+    {
+        var result = new UpcomingIncreasesDto();
+        var now = DateTime.UtcNow;
+
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (user == null) return result;
+
+        // 1) Cuota social: aumento pendiente de FeeSettings (solo para socios).
+        if (user.IsMember)
+        {
+            var settings = await GetFeeSettingsAsync();
+            if (settings.PendingBaseFeeAmount.HasValue
+                && settings.PendingEffectiveFromDate.HasValue
+                && settings.PendingBaseFeeAmount.Value > settings.BaseFeeAmount)
+            {
+                result.SocialFee = new UpcomingFeeIncreaseDto
+                {
+                    CurrentAmount = settings.BaseFeeAmount,
+                    NewAmount = settings.PendingBaseFeeAmount.Value,
+                    Period = settings.PendingEffectiveFromDate.Value.ToString("yyyy-MM"),
+                    EffectiveFromDate = settings.PendingEffectiveFromDate.Value
+                };
+            }
+        }
+
+        // 2) Actividades inscriptas con precios futuros programados (aumentos reales).
+        var activityIds = await _context.Enrollments
+            .Where(e => e.UserId == userId && e.Status == EnrollmentStatus.ACTIVE)
+            .Select(e => e.ActivityId)
+            .ToListAsync();
+
+        if (activityIds.Count == 0) return result;
+
+        var futurePrices = await _context.ActivityPricePeriods
+            .Include(p => p.Activity)
+            .Where(p => activityIds.Contains(p.ActivityId) && p.EffectiveFromDate > now)
+            .OrderBy(p => p.EffectiveFromDate)
+            .ToListAsync();
+
+        foreach (var price in futurePrices)
+        {
+            var activity = price.Activity;
+            if (activity == null || !activity.IsActive) continue;
+
+            // Solo se informa si hay un aumento real en el precio de socio o de no socio.
+            if (price.PriceMember <= activity.PriceMember && price.PriceNonMember <= activity.PriceNonMember)
+                continue;
+
+            result.Activities.Add(new UpcomingActivityIncreaseDto
+            {
+                ActivityId = activity.Id,
+                ActivityName = activity.Name,
+                CurrentPriceMember = activity.PriceMember,
+                CurrentPriceNonMember = activity.PriceNonMember,
+                NewPriceMember = price.PriceMember,
+                NewPriceNonMember = price.PriceNonMember,
+                Period = price.Period,
+                EffectiveFromDate = price.EffectiveFromDate
+            });
+        }
+
+        return result;
+    }
+
     /// <summary>
     /// Cobro parcial: registra el pago únicamente de las cuotas indicadas,
     /// dejando el resto en estado impago. Devuelve el resumen del cobro.
@@ -1877,6 +2079,11 @@ public class PaymentService : IPaymentService
         var payments = await _context.Payments
             .Where(p => ids.Contains(p.Id))
             .ToListAsync();
+
+        // Recomputa el recargo por mora para que el cobro parcial acredite el monto real
+        // (base + recargo exacto) en los reportes de recaudación.
+        await CheckAndUpdateOverdueStatusAsync(payments);
+        await _context.SaveChangesAsync();
 
         var now = DateTime.UtcNow;
         var userIdsAfectados = new HashSet<int>();
@@ -1893,7 +2100,7 @@ public class PaymentService : IPaymentService
             payment.PaymentDate = now;
 
             resultado.CuotasPagadas++;
-            resultado.MontoTotal += payment.Amount;
+            resultado.MontoTotal += payment.Amount + payment.LateFeeApplied;
             userIdsAfectados.Add(payment.UserId);
         }
 

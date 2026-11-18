@@ -78,6 +78,12 @@ public class CuotaDeudaDetalleDto
     /// <summary>Recargo por mora aplicado.</summary>
     public decimal LateFeeApplied { get; set; }
 
+    /// <summary>Regla de mora: "Ninguno" | "Porcentaje" | "MontoFijo". Para cuota social siempre "Porcentaje".</summary>
+    public string? TipoRecargoMora { get; set; }
+
+    /// <summary>Valor del recargo aplicable a este usuario (% si Porcentaje, $ si MontoFijo).</summary>
+    public decimal? RecargoMoraValor { get; set; }
+
     /// <summary>Total (base + recargo).</summary>
     public decimal Total => Amount + LateFeeApplied;
 }

@@ -1,5 +1,5 @@
 import { api } from './api';
-import type { Activity, SaveActivityRequest, ActivitySettlement, MyEnrollment } from '../types/activity';
+import type { Activity, SaveActivityRequest, ActivitySettlement, MyEnrollment, ActivityPricePeriod, ScheduleActivityPriceRequest } from '../types/activity';
 
 export const activityService = {
   /** Catálogo de actividades (GET /api/activities). */
@@ -68,6 +68,21 @@ export const activityService = {
     data: { priceMember?: number; facilityCanon?: number },
   ): Promise<Activity> => {
     const response = await api.post<Activity>(`/activities/${activityId}/negotiation/propose`, data);
+    return response.data;
+  },
+
+  /** Programa una actualización de precios a partir de un Mes/Año (POST /api/activities/{id}/price-updates). */
+  schedulePriceUpdate: async (
+    activityId: number,
+    data: ScheduleActivityPriceRequest,
+  ): Promise<ActivityPricePeriod> => {
+    const response = await api.post<ActivityPricePeriod>(`/activities/${activityId}/price-updates`, data);
+    return response.data;
+  },
+
+  /** Historial de precios por período (GET /api/activities/{id}/price-history). */
+  getPriceHistory: async (activityId: number): Promise<ActivityPricePeriod[]> => {
+    const response = await api.get<ActivityPricePeriod[]>(`/activities/${activityId}/price-history`);
     return response.data;
   },
 

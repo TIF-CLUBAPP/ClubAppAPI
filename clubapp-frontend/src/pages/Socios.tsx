@@ -1289,8 +1289,8 @@ export default function Socios() {
                 variant="warning"
                 title={
                   statusTarget.isActive
-                    ? '⚠️ Advertencia de Bloqueo de Cuenta'
-                    : '🔓 Restablecer Acceso de Usuario'
+                    ? 'Advertencia de Bloqueo de Cuenta'
+                    : 'Restablecer Acceso de Usuario'
                 }
                 description={
                   statusTarget.isActive
@@ -1312,7 +1312,7 @@ export default function Socios() {
             {deleteTarget && (
               <ConfirmModal
                 variant="danger"
-                title={`🛑 Confirmación de Eliminación Definitiva`}
+                title="Confirmación de Eliminación Definitiva"
                 description={`Atención: Una vez eliminado el usuario <strong>${deleteTarget.fullName}</strong>, esta acción NO se podrá deshacer. Se borrará su cuenta y su historial de forma permanente. ¿Estás seguro de que deseas eliminarlo?`}
                 confirmLabel="Eliminar Definitivamente"
                 confirmColor="rose"

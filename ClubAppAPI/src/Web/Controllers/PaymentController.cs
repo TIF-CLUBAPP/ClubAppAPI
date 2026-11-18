@@ -84,6 +84,22 @@ public class PaymentsController : ControllerBase
         return Ok(await _paymentService.GetUserCuotasAsync(userId));
     }
 
+    /// <summary>
+    /// Devuelve los aumentos programados para el mes siguiente que afectan al usuario
+    /// autenticado (cuota social y actividades inscriptas), para el banner de Mis Cuotas.
+    /// </summary>
+    [HttpGet("mine/upcoming-increases")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetMyUpcomingIncreases()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
+            return Unauthorized("Token inválido.");
+
+        return Ok(await _paymentService.GetMyUpcomingIncreasesAsync(userId));
+    }
+
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

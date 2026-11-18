@@ -38,6 +38,16 @@ export const PaymentSummaryBox: React.FC<PaymentSummaryBoxProps> = ({
     0,
   );
   const lateFeeAmount = cuotas.reduce((s, c) => s + (c.lateFeeAmount || 0), 0);
+  // Desglose transparente del recargo por mora: porcentaje -> "+10% (+$500)", monto fijo -> "+$2.500".
+  const lateFeeItems = cuotas
+    .filter((c) => (c.lateFeeAmount || 0) > 0)
+    .map((c) =>
+      c.tipoRecargoMora === 'Porcentaje'
+        ? `+${c.recargoMoraValor ?? ''}% (+${formatCurrency(c.lateFeeAmount || 0)})`
+        : `+${formatCurrency(c.lateFeeAmount || 0)}`,
+    );
+  const lateFeeNote =
+    lateFeeItems.length > 0 ? ` (${Array.from(new Set(lateFeeItems)).join(', ')})` : '';
 
   return (
     <div className="bg-slate-950 border border-slate-800 rounded-2xl p-2.5 space-y-1.5 text-sm">
@@ -57,7 +67,7 @@ export const PaymentSummaryBox: React.FC<PaymentSummaryBoxProps> = ({
       )}
       {lateFeeAmount > 0 && (
         <div className="flex justify-between text-rose-400">
-          <span>Recargo por Mora:</span>
+          <span>Recargo por Mora{lateFeeNote}:</span>
           <span className="text-base font-semibold">+{formatCurrency(lateFeeAmount)}</span>
         </div>
       )}

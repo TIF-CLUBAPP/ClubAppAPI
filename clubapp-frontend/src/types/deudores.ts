@@ -46,5 +46,9 @@ export interface CuotaDeudaDetalle {
   periodo: string;
   amount: number;
   lateFeeApplied: number;
+  /** Regla de mora: "Ninguno" | "Porcentaje" | "MontoFijo". */
+  tipoRecargoMora?: string | null;
+  /** Valor del recargo aplicable a este usuario (% o $). */
+  recargoMoraValor?: number | null;
   total?: number;
 }

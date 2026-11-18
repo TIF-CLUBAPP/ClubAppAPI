@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
-import { CreditCard, RefreshCw, UserPlus, AlertTriangle } from 'lucide-react';
+import { CreditCard, RefreshCw, UserPlus, AlertTriangle, TrendingUp } from 'lucide-react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import type { MemberCuota } from '../types/cuotas';
@@ -20,6 +20,12 @@ import { cuotaNumericId } from '../utils/cuotaIds';
 
 const fmt = (val: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(val);
+
+const formatDate = (iso: string) => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+};
 
 export const MisCuotas: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -45,7 +51,11 @@ export const MisCuotas: React.FC = () => {
 
 
   const { updateUser, refreshMembershipState } = useAuth();
-  const { loading, settings, exemptionLabel, cuotas, totalPending, globalStatus, updateCuota, updateCuotas, isSocio, reload } = useMisCuotas();
+  const { loading, settings, exemptionLabel, cuotas, totalPending, globalStatus, updateCuota, updateCuotas, isSocio, upcomingIncreases, reload } = useMisCuotas();
+
+  const upcomingSocial = upcomingIncreases?.socialFee ?? null;
+  const upcomingActivities = upcomingIncreases?.activities ?? [];
+  const hasUpcomingIncreases = !!upcomingSocial || upcomingActivities.length > 0;
   const [selectedCuotaIds, setSelectedCuotaIds] = useState<number[]>([]);
   const [checkoutCuotas, setCheckoutCuotas] = useState<MemberCuota[] | null>(null);
   const [selectedReceipt, setSelectedReceipt] = useState<MemberCuota | null>(null);
@@ -328,6 +338,34 @@ export const MisCuotas: React.FC = () => {
                       </p>
                     </div>
                   </div>
+                )}
+                {hasUpcomingIncreases && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.35, ease: 'easeOut' }}
+                    className="bg-sky-500/10 border border-sky-500/30 rounded-2xl p-4 flex items-start gap-3"
+                  >
+                    <TrendingUp className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1.5">
+                      <p className="text-sm font-semibold text-sky-300">Próximo aumento de tarifas</p>
+                      {upcomingSocial && (
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          Cuota social: pasará de <span className="font-bold text-white">{fmt(upcomingSocial.currentAmount)}</span> a{' '}
+                          <span className="font-bold text-white">{fmt(upcomingSocial.newAmount)}</span> a partir del{' '}
+                          {formatDate(upcomingSocial.effectiveFromDate)}.
+                        </p>
+                      )}
+                      {upcomingActivities.map((a) => (
+                        <p key={a.activityId} className="text-xs text-slate-300 leading-relaxed">
+                          {a.activityName}: Socio <span className="font-bold text-white">{fmt(a.currentPriceMember)}</span> →{' '}
+                          <span className="font-bold text-white">{fmt(a.newPriceMember)}</span> · No Socio{' '}
+                          <span className="font-bold text-white">{fmt(a.currentPriceNonMember)}</span> →{' '}
+                          <span className="font-bold text-white">{fmt(a.newPriceNonMember)}</span> desde {formatDate(a.effectiveFromDate)}.
+                        </p>
+                      ))}
+                    </div>
+                  </motion.div>
                 )}
                 <AccountStatusCard
                   globalStatus={globalStatus}

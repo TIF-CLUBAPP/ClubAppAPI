@@ -66,6 +66,15 @@ export interface Activity {
   enrolledCount: number;
   availableSpots: number;
 
+  /** Precio Socio programado para el próximo período. null = sin cambio pendiente. */
+  pendingPriceMember?: number | null;
+  /** Precio No Socio programado para el próximo período. null = sin cambio pendiente. */
+  pendingPriceNonMember?: number | null;
+  /** Período "yyyy-MM" del aumento pendiente (si existe). */
+  pendingPricePeriod?: string | null;
+  /** Fecha ISO (1° del mes) desde la que rige el precio pendiente. */
+  pendingPriceEffectiveFromDate?: string | null;
+
   // Profesores/administradores a cargo
   instructors?: ActivityInstructor[];
 
@@ -141,4 +150,24 @@ export interface MyEnrollment {
   status: string; // ACTIVE | CANCELED
   enrollmentDate: string;
   schedules: ActivitySchedule[];
+}
+
+// Previsión de precio por período de una actividad (GET /api/activities/{id}/price-history)
+export interface ActivityPricePeriod {
+  id: number;
+  activityId: number;
+  period: string; // "yyyy-MM"
+  priceMember: number;
+  priceNonMember: number;
+  effectiveFromDate: string;
+  changedAt: string;
+  changedByUserId?: number | null;
+}
+
+// Payload para programar un aumento (POST /api/activities/{id}/price-updates)
+export interface ScheduleActivityPriceRequest {
+  priceMember: number;
+  priceNonMember: number;
+  year: number;
+  month: number; // 1-12
 }

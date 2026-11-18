@@ -151,7 +151,13 @@ export const CuotasList: React.FC<CuotasListProps> = ({
                   </div>
                   <div>
                     <span className="block text-[10px] text-slate-400 uppercase">Recargo</span>
-                    <span className="text-xs font-bold text-rose-400">{cuota.lateFeeAmount > 0 ? cuota.lateFeeLabel : 'Sin recargo'}</span>
+                    <span className="text-xs font-bold text-rose-400">
+                      {cuota.lateFeeAmount > 0
+                        ? cuota.lateFeeLabel
+                          ? `${cuota.lateFeeLabel} (${formatCurrency(cuota.lateFeeAmount)})`
+                          : `+${formatCurrency(cuota.lateFeeAmount)}`
+                        : 'Sin recargo'}
+                    </span>
                   </div>
                 </div>
 

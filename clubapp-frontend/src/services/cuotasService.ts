@@ -59,6 +59,8 @@ export const cuotasService = {
           periodo: c.Periodo ?? c.periodo ?? '',
           amount: c.Amount ?? c.amount ?? 0,
           lateFeeApplied: c.LateFeeApplied ?? c.lateFeeApplied ?? 0,
+          tipoRecargoMora: c.TipoRecargoMora ?? c.tipoRecargoMora ?? null,
+          recargoMoraValor: c.RecargoMoraValor ?? c.recargoMoraValor ?? null,
           total: c.Total ?? c.total ?? 0,
         })),
         montoTotalAdeudado: item.MontoTotalAdeudado ?? item.montoTotalAdeudado ?? 0,

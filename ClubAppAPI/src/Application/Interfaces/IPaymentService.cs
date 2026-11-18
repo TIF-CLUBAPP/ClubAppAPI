@@ -145,6 +145,12 @@ public interface IPaymentService
     /// canceladas.
     /// </summary>
     Task<int> CancelPendingActivityCuotasAsync(int userId, int activityId);
+
+    /// <summary>
+    /// Devuelve los aumentos programados para el mes siguiente que afectan al usuario:
+    /// su cuota social (si es socio) y los precios de sus actividades inscriptas.
+    /// </summary>
+    Task<UpcomingIncreasesDto> GetMyUpcomingIncreasesAsync(int userId);
 }
 
 /// <summary>

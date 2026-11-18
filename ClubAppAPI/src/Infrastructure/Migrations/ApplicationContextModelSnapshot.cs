@@ -147,6 +147,45 @@ namespace Infrastructure.Migrations
                     b.ToTable("ActivityInstructors");
                 });
 
+            modelBuilder.Entity("ClubApp.Domain.Entities.ActivityPricePeriod", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ActivityId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("ChangedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("ChangedByUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("EffectiveFromDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Period")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("PriceMember")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("PriceNonMember")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActivityId", "Period")
+                        .IsUnique();
+
+                    b.ToTable("ActivityPricePeriods");
+                });
+
             modelBuilder.Entity("ClubApp.Domain.Entities.ActivitySchedule", b =>
                 {
                     b.Property<int>("Id")
@@ -982,6 +1021,17 @@ namespace Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("ClubApp.Domain.Entities.ActivityPricePeriod", b =>
+                {
+                    b.HasOne("ClubApp.Domain.Entities.Activity", "Activity")
+                        .WithMany("PricePeriods")
+                        .HasForeignKey("ActivityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Activity");
+                });
+
             modelBuilder.Entity("ClubApp.Domain.Entities.ActivitySchedule", b =>
                 {
                     b.HasOne("ClubApp.Domain.Entities.Activity", "Activity")
@@ -1173,6 +1223,8 @@ namespace Infrastructure.Migrations
                     b.Navigation("Enrollments");
 
                     b.Navigation("Instructors");
+
+                    b.Navigation("PricePeriods");
 
                     b.Navigation("Schedules");
                 });

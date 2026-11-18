@@ -15,7 +15,8 @@ import type {
   UserCuota,
   RegisterTransferRequest,
   TransferPaymentResult,
-  PendingTransfer
+  PendingTransfer,
+  UpcomingIncreases
 } from '../types/cuotas';
 import type { PayoutConfig, SavePayoutConfigRequest } from '../types/payout';
 
@@ -149,6 +150,12 @@ export const paymentsService = {
   /** Obtener las cuotas del usuario autenticado con su ID real de BD (GET /api/payments/mine) */
   getMyCuotas: async (): Promise<UserCuota[]> => {
     const response = await api.get<UserCuota[]>('/payments/mine');
+    return response.data;
+  },
+
+  /** Aumentos programados que afectan al usuario (GET /api/payments/mine/upcoming-increases). */
+  getMyUpcomingIncreases: async (): Promise<UpcomingIncreases> => {
+    const response = await api.get<UpcomingIncreases>('/payments/mine/upcoming-increases');
     return response.data;
   },
 

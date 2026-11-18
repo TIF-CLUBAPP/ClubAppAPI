@@ -10,6 +10,7 @@ namespace ClubApp.Infrastructure.Data
         }
 
         public DbSet<Activity> Activities { get; set; }
+        public DbSet<ActivityPricePeriod> ActivityPricePeriods { get; set; }
         public DbSet<ActivityInstructor> ActivityInstructors { get; set; }
         public DbSet<User> Users { get; set; }
         public DbSet<Enrollment> Enrollments { get; set; }
@@ -59,6 +60,17 @@ namespace ClubApp.Infrastructure.Data
             // Historial de precios: se consulta ordenado por fecha de vigencia.
             modelBuilder.Entity<FeeSettingsHistory>()
                 .HasIndex(h => h.EffectiveFromDate);
+
+            // Previsión de precios por período de actividad: una fila por (actividad, período).
+            modelBuilder.Entity<ActivityPricePeriod>()
+                .HasOne(p => p.Activity)
+                .WithMany(a => a.PricePeriods)
+                .HasForeignKey(p => p.ActivityId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ActivityPricePeriod>()
+                .HasIndex(p => new { p.ActivityId, p.Period })
+                .IsUnique();
 
             // Configuración de RoleConfiguration - único por Role
             modelBuilder.Entity<RoleConfiguration>()

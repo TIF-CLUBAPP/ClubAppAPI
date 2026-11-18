@@ -118,6 +118,12 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
                     <span>-{formatCurrency((cuota.baseAmount * cuota.discountPercentage) / 100)}</span>
                   </div>
                 )}
+                {cuota.lateFeeAmount > 0 && (
+                  <div className="flex justify-between text-rose-400">
+                    <span>Recargo por Mora:</span>
+                    <span>+{formatCurrency(cuota.lateFeeAmount)}</span>
+                  </div>
+                )}
                 <div className="print-dashed pt-2 border-t border-slate-800/80 flex justify-between font-bold text-sm text-white">
                   <span>Total Abonado:</span>
                   <span className="text-emerald-400 text-base">{formatCurrency(cuota.totalAmount)}</span>

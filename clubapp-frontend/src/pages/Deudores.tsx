@@ -29,7 +29,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { cuotasService } from '../services/cuotasService';
 import { paymentsService } from '../services/paymentsService';
-import type { CuotaVencida, CuotasVencidasStats } from '../types/deudores';
+import type { CuotaVencida, CuotaDeudaDetalle, CuotasVencidasStats } from '../types/deudores';
 import type { FeeSettings, PendingTransfer } from '../types/cuotas';
 
 const formatNumber = (value: number) => value.toLocaleString('es-AR');
@@ -198,6 +198,19 @@ const formatCuotaDetalle = (periodo?: string | null, monto?: number | null): str
 };
 
 /**
+ * Detalle del recargo por mora según la regla de la actividad:
+ * porcentaje -> "+10% (+$500)"; monto fijo -> "+$2.500"; sin recargo -> "".
+ */
+const formatMoraDetalle = (detalle?: CuotaDeudaDetalle | null): string => {
+  const mora = detalle?.lateFeeApplied ?? 0;
+  if (mora <= 0) return '';
+  if (detalle?.tipoRecargoMora === 'Porcentaje') {
+    return `+${detalle?.recargoMoraValor ?? ''}% (+${formatCurrency(mora)})`;
+  }
+  return `+${formatCurrency(mora)}`;
+};
+
+/**
  * Determina si una cuota está vencida comparando su período con el mes actual.
  * Una cuota es vencida cuando su mes/año es anterior al mes/año de hoy.
  */
@@ -223,18 +236,77 @@ function getPeriodosValidos(deudor: CuotaVencida): string[] {
     : [];
 }
 
-/**
- * Obtiene el texto formateado para mostrar en la columna "PERÍODOS ADEUDADOS".
- * Si no hay períodos válidos, devuelve "Adeuda cuota".
- */
-function getTextoPeriodos(deudor: CuotaVencida): string {
-  const periodosValidos = getPeriodosValidos(deudor);
+interface PeriodoGroup {
+  concepto: 'CuotaSocial' | 'Actividad';
+  count: number;
+  /** Períodos formateados "MM/YYYY", ordenados cronológicamente (más antiguo primero). */
+  periodos: string[];
+  /** Nombres de actividad únicos (solo para concepto Actividad). */
+  activityNames: string[];
+}
 
-  if (periodosValidos.length > 0) {
-    return periodosValidos.join(', ');
+/** Compara dos períodos "MM/YYYY" cronológicamente (más antiguo primero). */
+const comparePeriodos = (a: string, b: string): number => {
+  const da = parsePeriodoToDate(a)?.getTime() ?? 0;
+  const db = parsePeriodoToDate(b)?.getTime() ?? 0;
+  return da - db;
+};
+
+/**
+ * Agrupa las cuotas impagas de un deudor por concepto (Cuota Social vs Actividad)
+ * para renderizarlas de forma compacta. Si el backend no devolvió el detalle
+ * discriminado (`cuotas`), retrocede a `periodosVencidos` tratándolos como sociales.
+ */
+function buildPeriodoGroups(deudor: CuotaVencida): PeriodoGroup[] {
+  const cuotas = Array.isArray(deudor?.cuotas) ? deudor.cuotas : [];
+
+  if (cuotas.length === 0) {
+    const periodos = getPeriodosValidos(deudor)
+      .map(formatPeriodo)
+      .sort(comparePeriodos);
+    if (periodos.length === 0) return [];
+    return [{ concepto: 'CuotaSocial', count: periodos.length, periodos, activityNames: [] }];
   }
 
-  return 'Adeuda cuota';
+  const social: CuotaDeudaDetalle[] = [];
+  const activity: CuotaDeudaDetalle[] = [];
+  for (const c of cuotas) {
+    if (c.concepto === 'Actividad') activity.push(c);
+    else social.push(c);
+  }
+
+  const groups: PeriodoGroup[] = [];
+  if (social.length) {
+    groups.push({
+      concepto: 'CuotaSocial',
+      count: social.length,
+      periodos: social.map((c) => formatPeriodo(c.periodo)).sort(comparePeriodos),
+      activityNames: [],
+    });
+  }
+  if (activity.length) {
+    const names = Array.from(
+      new Set(
+        activity
+          .map((c) => (c.activityName ?? '').trim())
+          .filter((n) => n !== ''),
+      ),
+    );
+    groups.push({
+      concepto: 'Actividad',
+      count: activity.length,
+      periodos: activity.map((c) => formatPeriodo(c.periodo)).sort(comparePeriodos),
+      activityNames: names,
+    });
+  }
+  return groups;
+}
+
+/** Rango textual "MM/YYYY" o "MM/YYYY - MM/YYYY" de un grupo de períodos. */
+function periodoRange(periodos: string[]): string {
+  if (periodos.length === 0) return '';
+  if (periodos.length === 1) return periodos[0];
+  return `${periodos[0]} - ${periodos[periodos.length - 1]}`;
 }
 
 type SortKey = 'deuda-desc' | 'deuda-asc' | 'atraso-desc' | 'atraso-asc' | 'nombre';
@@ -260,6 +332,83 @@ function SummaryCard({
       </div>
       <p className="text-2xl font-black text-white">{value}</p>
       {sub && <p className="text-[10px] text-slate-500 font-medium mt-0.5">{sub}</p>}
+    </div>
+  );
+}
+
+/** Píldoras compactas agrupadas por concepto para la columna "PERÍODOS ADEUDADOS". */
+function PeriodoPills({ deudor }: { deudor: CuotaVencida }) {
+  const groups = buildPeriodoGroups(deudor);
+  const totalCuotas = groups.reduce((s, g) => s + g.count, 0);
+
+  const socialPill =
+    'inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold whitespace-nowrap bg-rose-500/10 text-rose-400 border border-rose-500/20';
+  const activityPill =
+    'inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold whitespace-nowrap bg-sky-500/10 text-sky-400 border border-sky-500/20';
+
+  if (totalCuotas === 0) {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20 whitespace-nowrap">
+        Adeuda cuota
+      </span>
+    );
+  }
+
+  // Pocos períodos (1-2): una píldora por cuota, en una sola línea horizontal.
+  if (totalCuotas <= 2) {
+    const cuotas = deudor.cuotas ?? [];
+    if (cuotas.length > 0) {
+      return (
+        <div className="flex flex-wrap items-center justify-center gap-1">
+          {cuotas.map((c) =>
+            c.concepto === 'Actividad' ? (
+              <span key={`a-${c.paymentId}`} className={activityPill}>
+                Actividad: {c.activityName || formatPeriodo(c.periodo)}
+              </span>
+            ) : (
+              <span key={`s-${c.paymentId}`} className={socialPill}>
+                Cuota Social {formatPeriodo(c.periodo)}
+              </span>
+            ),
+          )}
+        </div>
+      );
+    }
+    // Fallback sin detalle discriminado: períodos vencidos como cuotas sociales.
+    const periodos = getPeriodosValidos(deudor).map(formatPeriodo);
+    return (
+      <div className="flex flex-wrap items-center justify-center gap-1">
+        {periodos.map((p) => (
+          <span key={`s-${p}`} className={socialPill}>
+            Cuota Social {p}
+          </span>
+        ))}
+      </div>
+    );
+  }
+
+  // Muchos períodos (>2): resumen ultra-compacto por concepto (máx. 2 píldoras).
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-1">
+      {groups.map((g) => {
+        if (g.concepto === 'CuotaSocial') {
+          const label = `${g.count}x ${g.count > 1 ? 'Cuotas Sociales' : 'Cuota Social'}`;
+          return (
+            <span key="g-social" className={socialPill}>
+              {label} ({periodoRange(g.periodos)})
+            </span>
+          );
+        }
+        const label = `${g.count}x ${g.count > 1 ? 'Actividades' : 'Actividad'}`;
+        const detalle = g.activityNames.length
+          ? g.activityNames.join(', ')
+          : periodoRange(g.periodos);
+        return (
+          <span key="g-activity" className={activityPill}>
+            {label} ({detalle})
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -305,11 +454,7 @@ function DebtorCard({
 
       {/* Períodos adeudados */}
       <div className="mt-2.5">
-        <div className="flex flex-wrap gap-1">
-          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
-            {getTextoPeriodos(debtor)}
-          </span>
-        </div>
+        <PeriodoPills deudor={debtor} />
       </div>
 
       {/* Monto adeudado + antigüedad */}
@@ -797,6 +942,20 @@ export default function Deudores() {
                   </select>
                 </div>
               </div>
+
+              {/* Leyenda de colores — períodos adeudados */}
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-2.5 rounded-2xl border border-slate-800 bg-slate-900/60">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Referencia:</span>
+                <span className="inline-flex items-center gap-1.5 text-xs text-slate-300">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                  Cuota Social
+                </span>
+                <span className="inline-flex items-center gap-1.5 text-xs text-slate-300">
+                  <span className="w-2.5 h-2.5 rounded-full bg-sky-400" />
+                  Actividades
+                </span>
+              </div>
+
               {/* Lista / tabla de deudores */}
               {loading && !debtors.length ? (
                 <div className="rounded-3xl border border-slate-800 bg-slate-900/80 overflow-hidden">
@@ -895,41 +1054,7 @@ export default function Deudores() {
                               </div>
                             </td>
                             <td className="px-3 py-3 text-center">
-                              <div className="flex flex-wrap justify-center gap-1 max-w-50 mx-auto">
-                                {(() => {
-                                  const periodos = getPeriodosValidos(d);
-                                  const activityCuotas = (d.cuotas ?? []).filter(
-                                    (c) => c.concepto === 'Actividad',
-                                  );
-                                  if (periodos.length === 0 && activityCuotas.length === 0) {
-                                    return (
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                                        Adeuda cuota
-                                      </span>
-                                    );
-                                  }
-                                  return (
-                                    <>
-                                      {periodos.map((p) => (
-                                        <span
-                                          key={`p-${p}`}
-                                          className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20 whitespace-nowrap"
-                                        >
-                                          {formatPeriodo(p)}
-                                        </span>
-                                      ))}
-                                      {activityCuotas.map((c) => (
-                                        <span
-                                          key={`a-${c.paymentId}`}
-                                          className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-sky-500/10 text-sky-400 border border-sky-500/20 whitespace-nowrap"
-                                        >
-                                          {c.activityName || c.periodo}
-                                        </span>
-                                      ))}
-                                    </>
-                                  );
-                                })()}
-                              </div>
+                              <PeriodoPills deudor={d} />
                             </td>
                             <td className="px-3 py-3 text-center whitespace-nowrap">
                               <p className="font-black text-rose-400">{formatCurrency(d.montoTotalAdeudado)}</p>
@@ -1143,6 +1268,12 @@ export default function Deudores() {
                                 }`}
                               >
                                 {formatCuotaDetalle(periodo, montoCuota)}
+                                {formatMoraDetalle(detalle) && (
+                                  <span className="font-normal text-rose-400/90">
+                                    {' '}
+                                    · {formatMoraDetalle(detalle)}
+                                  </span>
+                                )}
                               </span>
                               {esVencida && (
                                 <span className="shrink-0 px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-wider bg-rose-500/15 text-rose-400 border border-rose-500/30">

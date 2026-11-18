@@ -44,4 +44,10 @@ public class UserCuotaDto
 
     /// <summary>Receptor final del cobro (\"Club\" o el nombre del profesor).</summary>
     public string PayoutCollector { get; set; } = string.Empty;
+
+    /// <summary>Regla de mora: "Ninguno" | "Porcentaje" | "MontoFijo". Para cuota social siempre "Porcentaje".</summary>
+    public string? TipoRecargoMora { get; set; }
+
+    /// <summary>Valor del recargo aplicable a este usuario (% si Porcentaje, $ si MontoFijo).</summary>
+    public decimal? RecargoMoraValor { get; set; }
 }

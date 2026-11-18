@@ -67,6 +67,18 @@ public class ActivityDto
 
     /// <summary>Cupos disponibles (negativo si está sobrecargada).</summary>
     public int AvailableSpots => MaxCapacity - EnrolledCount;
+
+    /// <summary>Precio Socio programado para el próximo período. Null = sin cambio pendiente.</summary>
+    public decimal? PendingPriceMember { get; set; }
+
+    /// <summary>Precio No Socio programado para el próximo período. Null = sin cambio pendiente.</summary>
+    public decimal? PendingPriceNonMember { get; set; }
+
+    /// <summary>Período "yyyy-MM" del aumento pendiente (si existe).</summary>
+    public string? PendingPricePeriod { get; set; }
+
+    /// <summary>Fecha (UTC, 1° del mes) desde la que rige el precio pendiente.</summary>
+    public DateTime? PendingPriceEffectiveFromDate { get; set; }
 }
 
 /// <summary>Profesor/administrador a cargo de una actividad (expuesto al frontend).</summary>

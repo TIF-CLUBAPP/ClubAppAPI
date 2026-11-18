@@ -27,6 +27,15 @@ public interface IActivityService
     Task ExpireOverdueInvitationsAsync();
 
     /// <summary>
+    /// Programa una actualización de Precio Socio / Precio No Socio a partir de un
+    /// Mes/Año futuros. Guarda la previsión por período y notifica a los inscriptos.
+    /// </summary>
+    Task<ActivityPricePeriodDto?> SchedulePriceUpdateAsync(int activityId, ScheduleActivityPriceRequest request, int actorId, UserRole actorRole);
+
+    /// <summary>Historial de precios por período de la actividad, más reciente primero.</summary>
+    Task<List<ActivityPricePeriodDto>> GetPriceHistoryAsync(int activityId);
+
+    /// <summary>
     /// Calcula el monto total a cobrar por una cuota de actividad aplicando el recargo por mora
     /// cuando corresponda. Si la fecha de referencia ya superó el día de vencimiento mensual,
     /// añade el recargo configurado (porcentaje sobre el precio base o monto fijo) según

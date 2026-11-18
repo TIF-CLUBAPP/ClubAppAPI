@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Edit2, Trash2, X, Save, Clock, MapPin,
   CheckCircle2, AlertCircle, AlertTriangle, Dumbbell, RefreshCw, Users,
-  GraduationCap, UserPlus, ChevronDown, Receipt, Banknote, Search,
+  GraduationCap, UserPlus, ChevronDown, Receipt, Banknote, Search, TrendingUp,
 } from 'lucide-react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
@@ -12,7 +12,7 @@ import { useToast } from '../context/ToastContext';
 import { activityService } from '../services/activityService';
 import { spaceService } from '../services/spaceService';
 import { userService } from '../services/userService';
-import type { Activity, ActivityScheduleInput, SaveActivityRequest, ActivitySettlement } from '../types/activity';
+import type { Activity, ActivityScheduleInput, SaveActivityRequest, ActivitySettlement, ScheduleActivityPriceRequest } from '../types/activity';
 import type { Space } from '../types/space';
 import { SPORT_CATEGORIES } from '../types/space';
 import type { UserListItem } from '../types/user';
@@ -77,6 +77,20 @@ const overlaps = (aStart: string, aEnd: string, bStart: string, bEnd: string): b
 
 const fmtCurrency = (val: number) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(val);
+
+const MONTH_NAMES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
+
+/** Convierte "yyyy-MM" a "Mes Año" (ej. "2026-12" -> "Diciembre 2026"). */
+const formatPeriodLabel = (period?: string | null): string => {
+  if (!period) return '';
+  const [year, month] = period.split('-');
+  const monthIndex = Number(month);
+  if (!monthIndex || monthIndex < 1 || monthIndex > 12) return period;
+  return `${MONTH_NAMES[monthIndex - 1]} ${year}`;
+};
 
 // Normaliza un texto removiendo tildes/acentos para búsquedas fuzzy (case-insensitive).
 const normalizeDiacritics = (value: string): string =>
@@ -193,6 +207,11 @@ export default function GestionActividades() {
   const [proposePrice, setProposePrice] = useState<number>(0);
   const [proposeCanon, setProposeCanon] = useState<number>(0);
   const [proposeSaving, setProposeSaving] = useState(false);
+  const [priceUpdateTarget, setPriceUpdateTarget] = useState<Activity | null>(null);
+  const [priceUpdateForm, setPriceUpdateForm] = useState<ScheduleActivityPriceRequest>({
+    priceMember: 0, priceNonMember: 0, year: 0, month: 0,
+  });
+  const [priceUpdateSaving, setPriceUpdateSaving] = useState(false);
   const [scheduleMode, setScheduleMode] = useState<'detailed' | 'massive'>('detailed');
   const [massiveBlocks, setMassiveBlocks] = useState<WeeklyScheduleBlock[]>([
     { id: '1', days: [1, 2, 3, 4, 5], startTime: '08:00', endTime: '20:00' },
@@ -694,6 +713,46 @@ export default function GestionActividades() {
     }
   };
 
+  const openPriceUpdate = (a: Activity) => {
+    if (!canManageActivity(a)) {
+      toast.error('No tenés permisos para gestionar esta actividad');
+      return;
+    }
+    // Por defecto se propone el mes siguiente como fecha de vigencia.
+    const now = new Date();
+    const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    setPriceUpdateTarget(a);
+    setPriceUpdateForm({
+      priceMember: a.priceMember,
+      priceNonMember: a.priceNonMember,
+      year: next.getFullYear(),
+      month: next.getMonth() + 1,
+    });
+  };
+
+  const confirmPriceUpdate = async () => {
+    if (!priceUpdateTarget) return;
+    if (priceUpdateForm.priceMember < 0 || priceUpdateForm.priceNonMember < 0) {
+      toast.error('Los precios no pueden ser negativos.');
+      return;
+    }
+    if (!priceUpdateForm.year || !priceUpdateForm.month) {
+      toast.error('Indicá el Mes/Año de vigencia del nuevo precio.');
+      return;
+    }
+    setPriceUpdateSaving(true);
+    try {
+      await activityService.schedulePriceUpdate(priceUpdateTarget.id, priceUpdateForm);
+      toast.success('Aumento programado y notificado a los inscriptos.');
+      setPriceUpdateTarget(null);
+      await load();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? err?.message ?? 'No se pudo programar el aumento.');
+    } finally {
+      setPriceUpdateSaving(false);
+    }
+  };
+
   const rowStyle = (status: RowStatus) =>
     status === 'blocked'
       ? 'border-red-500/50 bg-red-500/5'
@@ -920,6 +979,22 @@ export default function GestionActividades() {
                             )}
                           </span>
                         ))}
+                      </div>
+                    )}
+
+                    {canManageActivity(a) && (
+                      <button
+                        onClick={() => openPriceUpdate(a)}
+                        className="mt-2 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-bold hover:bg-amber-500/20 transition"
+                      >
+                        <TrendingUp size={14} /> Actualizar Precios
+                      </button>
+                    )}
+
+                    {a.pendingPricePeriod && (
+                      <div className="mt-2 rounded-xl border border-sky-500/30 bg-sky-500/10 p-2.5 text-[11px] text-sky-200 leading-relaxed">
+                        <span className="font-bold">Aumento programado desde {formatPeriodLabel(a.pendingPricePeriod)}:</span>{' '}
+                        Socio {fmtCurrency(a.pendingPriceMember ?? 0)} · No Socio {fmtCurrency(a.pendingPriceNonMember ?? 0)}
                       </div>
                     )}
 
@@ -1762,6 +1837,98 @@ export default function GestionActividades() {
                 >
                   {proposeSaving ? <RefreshCw size={14} className="animate-spin" /> : <Banknote size={14} />}
                   Enviar Propuesta
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {priceUpdateTarget && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+          >
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-bold text-white">Actualizar Precios</h3>
+                <button onClick={() => setPriceUpdateTarget(null)} className="text-slate-400 hover:text-white">
+                  <X size={18} />
+                </button>
+              </div>
+              <p className="text-xs text-slate-400 mb-4">
+                Programá el nuevo valor de <strong className="text-slate-200">{priceUpdateTarget.name}</strong> y
+                elegí a partir de qué mes rige. Se notificará a los inscriptos.
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-1">Precio Socio ($)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={priceUpdateForm.priceMember === 0 ? '' : priceUpdateForm.priceMember}
+                    onChange={(e) => setPriceUpdateForm({ ...priceUpdateForm, priceMember: parseNumericInput(e.target.value) })}
+                    className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-1">Precio No Socio ($)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={priceUpdateForm.priceNonMember === 0 ? '' : priceUpdateForm.priceNonMember}
+                    onChange={(e) => setPriceUpdateForm({ ...priceUpdateForm, priceNonMember: parseNumericInput(e.target.value) })}
+                    className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 mb-1">Vigencia (Mes)</label>
+                    <select
+                      value={priceUpdateForm.month || ''}
+                      onChange={(e) => setPriceUpdateForm({ ...priceUpdateForm, month: Number(e.target.value) })}
+                      className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                    >
+                      <option value="" disabled>Mes</option>
+                      {MONTH_NAMES.map((name, i) => (
+                        <option key={name} value={i + 1}>{name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 mb-1">Vigencia (Año)</label>
+                    <input
+                      type="number"
+                      min={2000}
+                      max={2100}
+                      value={priceUpdateForm.year === 0 ? '' : priceUpdateForm.year}
+                      onChange={(e) => setPriceUpdateForm({ ...priceUpdateForm, year: parseNumericInput(e.target.value) })}
+                      className="w-full bg-[#0f172a] border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-emerald-500 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-3 mt-5">
+                <button
+                  onClick={() => setPriceUpdateTarget(null)}
+                  disabled={priceUpdateSaving}
+                  className="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold text-slate-300 border border-slate-700 hover:bg-slate-800"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmPriceUpdate}
+                  disabled={priceUpdateSaving}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-sm font-bold"
+                >
+                  {priceUpdateSaving ? <RefreshCw size={14} className="animate-spin" /> : <TrendingUp size={14} />}
+                  Programar Aumento
                 </button>
               </div>
             </motion.div>

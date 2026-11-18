@@ -61,7 +61,7 @@ export const groupPaymentService = {
   /** Construye el link de compartir por WhatsApp con el link de pago embebido. */
   buildWhatsAppLink: (token: string, amountLabel: string): string => {
     const link = groupPaymentService.buildPaymentLink(token);
-    const text = `¡Sumate a la reserva grupal! 💪 Pagá tu parte (${amountLabel}) acá: ${link}`;
+    const text = `¡Sumate a la reserva grupal! Pagá tu parte (${amountLabel}) acá: ${link}`;
     return `https://wa.me/?text=${encodeURIComponent(text)}`;
   },
 

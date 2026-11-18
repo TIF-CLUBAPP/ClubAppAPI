@@ -16,7 +16,7 @@ interface BookingModalProps {
   zone?: Zone | null;
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: (bookingData: { date: string; slot: string }) => void; // 👈 Callback de éxito
+  onSuccess?: (bookingData: { date: string; slot: string }) => void; // Callback de éxito
 }
 
 const TIME_SLOTS = [

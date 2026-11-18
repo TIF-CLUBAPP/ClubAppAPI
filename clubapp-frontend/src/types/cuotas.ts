@@ -184,6 +184,10 @@ export interface CuotaDeudaDetalle {
   periodo: string;
   amount: number;
   lateFeeApplied: number;
+  /** Regla de mora: "Ninguno" | "Porcentaje" | "MontoFijo". */
+  tipoRecargoMora?: string | null;
+  /** Valor del recargo aplicable a este usuario (% o $). */
+  recargoMoraValor?: number | null;
   total?: number;
 }
 
@@ -212,6 +216,10 @@ export interface MemberCuota {
   activityName?: string | null;
   /** Fecha de vencimiento propia de la cuota de actividad (ISO). */
   dueDate?: string | null;
+  /** Regla de mora: "Ninguno" | "Porcentaje" | "MontoFijo". */
+  tipoRecargoMora?: string | null;
+  /** Valor del recargo aplicable a este usuario (% o $). */
+  recargoMoraValor?: number | null;
   /** Alias / CBU / CVU que recibe la transferencia (Club o Profesor). */
   transferAlias?: string;
   /** Receptor final del cobro (para mostrar en el checkout). */
@@ -238,6 +246,10 @@ export interface UserCuota {
   activityName?: string | null;
   /** Fecha de vencimiento propia de la cuota de actividad (ISO). */
   dueDate?: string | null;
+  /** Regla de mora: "Ninguno" | "Porcentaje" | "MontoFijo". */
+  tipoRecargoMora?: string | null;
+  /** Valor del recargo aplicable a este usuario (% o $). */
+  recargoMoraValor?: number | null;
   paymentDate?: string | null;
   paymentMethod?: string;
   createdAt: string;
@@ -291,5 +303,31 @@ export interface PendingTransfer {
   paymentDate: string;
   externalTransactionId?: string | null;
   transferReference?: string | null;
+}
+
+// Aumento programado de la cuota social (GET /api/payments/mine/upcoming-increases)
+export interface UpcomingFeeIncrease {
+  currentAmount: number;
+  newAmount: number;
+  period: string; // "yyyy-MM"
+  effectiveFromDate: string;
+}
+
+// Aumento programado del precio de una actividad inscripta
+export interface UpcomingActivityIncrease {
+  activityId: number;
+  activityName: string;
+  currentPriceMember: number;
+  currentPriceNonMember: number;
+  newPriceMember: number;
+  newPriceNonMember: number;
+  period: string; // "yyyy-MM"
+  effectiveFromDate: string;
+}
+
+// Respuesta completa de aumentos programados para "Mis Cuotas"
+export interface UpcomingIncreases {
+  socialFee: UpcomingFeeIncrease | null;
+  activities: UpcomingActivityIncrease[];
 }
 

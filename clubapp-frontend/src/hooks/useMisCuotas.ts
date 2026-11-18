@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { paymentsService } from '../services/paymentsService';
-import type { FeeSettings, UserExemption, RoleExemption, MemberCuota, UserCuota } from '../types/cuotas';
+import type { FeeSettings, UserExemption, RoleExemption, MemberCuota, UserCuota, UpcomingIncreases } from '../types/cuotas';
+
+const EMPTY_INCREASES: UpcomingIncreases = { socialFee: null, activities: [] };
 
 const MONTH_NAMES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -69,7 +71,11 @@ const mapCuota = (p: UserCuota, s: FeeSettings): MemberCuota => {
     discountPercentage: 0,
     isOverdue: status === 'EN_MORA',
     lateFeeAmount: lateFee,
-    lateFeeLabel: lateFee > 0 ? (isActividad ? 'Recargo por mora' : `+${s.lateFeePercentage ?? 0}% Mora`) : undefined,
+    lateFeeLabel: lateFee > 0 && (p.tipoRecargoMora ?? 'Porcentaje') === 'Porcentaje'
+      ? `+${p.recargoMoraValor ?? s.lateFeePercentage ?? 0}%`
+      : undefined,
+    tipoRecargoMora: p.tipoRecargoMora ?? null,
+    recargoMoraValor: p.recargoMoraValor ?? null,
     totalAmount: total,
     status,
     concepto: p.concepto ?? 'CuotaSocial',
@@ -92,6 +98,7 @@ export function useMisCuotas() {
   });
   const [exemptionLabel, setExemptionLabel] = useState('');
   const [cuotas, setCuotas] = useState<MemberCuota[]>([]);
+  const [upcomingIncreases, setUpcomingIncreases] = useState<UpcomingIncreases>(EMPTY_INCREASES);
 
   useEffect(() => { loadData(); }, [user, isSocio]);
 
@@ -123,8 +130,13 @@ export function useMisCuotas() {
       setExemptionLabel(label);
 
       // Fuente de datos REAL: las cuotas vienen del backend con su ID numérico primario.
-      const raw = await paymentsService.getMyCuotas();
+      // En paralelo se consultan los aumentos programados para el banner informativo.
+      const [raw, increases] = await Promise.all([
+        paymentsService.getMyCuotas(),
+        paymentsService.getMyUpcomingIncreases().catch(() => EMPTY_INCREASES),
+      ]);
       setCuotas(raw.map((p) => mapCuota(p, sData)));
+      setUpcomingIncreases(increases);
     } catch (err) {
       console.error('Error al cargar datos de cuotas:', err);
       // Sin cuotas en el backend (o error): no fabricamos deudas fantasma.
@@ -153,5 +165,5 @@ export function useMisCuotas() {
   const hasPending = cuotas.some(c => c.status === 'PENDIENTE');
   const globalStatus: 'AL_DIA' | 'PENDIENTE' | 'EN_MORA' = hasOverdue ? 'EN_MORA' : hasPending ? 'PENDIENTE' : 'AL_DIA';
 
-  return { loading, settings, exemptionLabel, cuotas, totalPending, globalStatus, updateCuota, updateCuotas, isSocio, reload: loadData };
+  return { loading, settings, exemptionLabel, cuotas, totalPending, globalStatus, updateCuota, updateCuotas, isSocio, upcomingIncreases, reload: loadData };
 }
